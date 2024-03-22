@@ -9,13 +9,6 @@ from llama_index.llms.anthropic import Anthropic
 # DATA
 dataPath = 'data/test/' 
 
-# # Example data from tutorial
-# if not os.path.exists('data/paul_graham'):
-#     os.makedirs('data/paul_graham')
-#     import requests
-#     url = 'https://raw.githubusercontent.com/run-llama/llama_index/main/docs/examples/data/paul_graham/paul_graham_essay.txt'
-#     r = requests.get(url)
-#     open('data/paul_graham/paul_graham_essay.txt', "wb").write(r.content)
 
 # Get the OpenAI API key and organistation
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
@@ -34,8 +27,109 @@ else:
     storage_context = StorageContext.from_defaults(persist_dir= dataPath)
     index = load_index_from_storage(storage_context)
 
-chat_engine = index.as_chat_engine(chat_mode="best", llm=llm, verbose=True)
+# Prompt engineering
+# https://docs.llamaindex.ai/en/stable/examples/customization/prompts/chat_prompts/
 
-response = chat_engine.chat(
-    "What is the difference between translation and transcription"
+from llama_index.core.llms import ChatMessage, MessageRole
+from llama_index.core import ChatPromptTemplate
+
+qa_prompt_str = (
+    "Context information is below.\n"
+    "---------------------\n"
+    "{context_str}\n"
+    "---------------------\n"
+    "Given the context information and not prior knowledge, "
+    "answer the question: {query_str}\n"
 )
+
+refine_prompt_str = (
+    "We have the opportunity to refine the original answer "
+    "(only if needed) with some more context below.\n"
+    "------------\n"
+    "{context_msg}\n"
+    "------------\n"
+    "Given the new context, refine the original answer to better "
+    "answer the question: {query_str}. "
+    "If the context isn't useful, output the original answer again.\n"
+    "Original Answer: {existing_answer}"
+)
+
+chat_text_qa_msgs = [
+    ChatMessage(
+        role=MessageRole.SYSTEM,
+        content=(
+            """
+            Your goal is to check wether the user (a student) has an understanding of the following topic: 
+            'The central dogma of molecular biology'
+            ----
+            These are the sub-concepts that the user should understand:
+            * DNA is made up of 4 bases that encode all information needed for life
+            * A protein is encoded in the DNA as a seqeunce of bases
+            * To create a protein, you first have to transcribe the DNA into RNA
+            * RNA is similar to DNA but instead of ACTG it has ACUG and is single stranded
+            * RNA is processed by removing introns, keeping only exons
+            * RNA is translated into protein. 3 RNA bases form a codon, and each codon represents an amino acid,
+            or the start / stop of the seqeunce
+            * Based on RNA codons, amino acids are chained together into a single protrein strand
+            * Finally, the protein will fold into a 3D shape to become functional, with optional post-translational processing
+            ----
+            Remember that you are not lecturing, i.e. giving definitions or giving away all the concepts.
+            Rather, you will ask a series of questions (try to generate a multiple choice question if it fits) and look
+            at the answers to refine your next question according to the current understanding of the user.
+            Try to make the user think and reason critically, but do help out if they get stuck. 
+            You will adapt the conversation until you feel all sub-concepts are understood.
+            Do not go beyond what is expected, as this is not your aim. Make sure to always check any user
+            message for mistakes, like the use of incorrect terminology and correct if needed, this is very important!
+            """
+        ),
+    ),
+    ChatMessage(role=MessageRole.USER, content=qa_prompt_str),
+]
+text_qa_template = ChatPromptTemplate(chat_text_qa_msgs)
+
+# Refine Prompt
+chat_refine_msgs = [
+    ChatMessage(
+        role=MessageRole.SYSTEM,
+        content=(
+            """
+            Remember that you are not lecturing, i.e. giving definitions or giving away all the concepts.
+            Rather, you will ask a series of questions (try to generate a multiple choice question if it fits) and look
+            at the answers to refine your next question according to the current understanding of the user.
+            Try to make the user think and reason critically, but do help out if they get stuck. 
+            You will adapt the conversation until you feel all sub-concepts are understood.
+            Do not go beyond what is expected, as this is not your aim. Make sure to always check any user
+            message for mistakes, like the use of incorrect terminology and correct if needed, this is very important!
+            """
+        ),
+    ),
+    ChatMessage(role=MessageRole.USER, content=refine_prompt_str),
+]
+refine_template = ChatPromptTemplate(chat_refine_msgs)
+
+chat_engine = index.as_query_engine(
+            text_qa_template=text_qa_template,
+            refine_template=refine_template,
+            llm=llm,
+            streaming = True
+        )
+
+response = """Hello, I'm here to help you get a basic understanding of the 'central dogma of molecular biology'.
+Have you heard about this before?"""
+print("----- START OF CONVERSATION -----\n\n" + "--- BOT\n" + response)
+
+log = "---- PREVIOUS CONVERSATION ----\n--- YOU\n" + response
+
+userResponse = ""
+
+while userResponse != "exit":
+    userResponse = input("--- YOU\n")
+    if userResponse != "exit":
+        msg = log + "\n---- NEW RESPONSE FROM USER ----\n" + userResponse
+        convo = chat_engine.query(msg)
+        response = str(convo)
+        log = log + "\n--- USER\n" + userResponse
+        log = log + "\n--- YOU\n" + response
+        print("--- BOT\n" + response)
+    else:
+        print("--- BOT\nGoodbye and good luck!")      
