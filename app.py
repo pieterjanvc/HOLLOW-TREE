@@ -117,29 +117,53 @@ chat_engine = index.as_query_engine(
         )
 
 # ------- SHINY APP
+import asyncio
 from shiny import reactive
 from shiny.express import input, render, ui
 from htmltools import HTML, div
 
-userLog = reactive.value(f"""<b>--- BOT:</b><br>Hello, I'm here to help you get a basic understanding of the 
-                     'central dogma of molecular biology'. Have you heard about this before?""")
+userLog = reactive.value(f"""<h4 style='color:#236ba6'>--- BioBot:</h4>
+                         <p style='color:#236ba6'>Hello, I'm here to help you get a basic understanding of the 
+                     'central dogma of molecular biology'. Have you heard about this before?</p>""")
 
 botLog = reactive.value(f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\nHello, I'm here to help 
                         you get a basic understanding of the 'central dogma of molecular biology'. 
                         Have you heard about this before?""")
 
+chatInput = reactive.value(ui.TagList(ui.tags.hr(), ui.input_text("newChat", "", value=""), 
+                                      ui.input_action_button("send", "Send")))
+
 @reactive.effect
-@reactive.event(input.send)
+@reactive.event(input.send, ignore_init=True)
 def _():
+    #print("Process new input")
+    if input.newChat() == "": return
     botIn = botLog.get() + "\n---- NEW RESPONSE FROM USER ----\n" + input.newChat()    
-    botOut = str(chat_engine.query(botIn))
-    userLog.set(userLog.get() + "<br>--- YOU:<br>" + input.newChat() + "<br>--- BOT:<br>" + botOut)
-    botLog.set(botLog.get() + f"\n--- USER:\n{input.newChat()}" + f"\n--- YOU:\n" + botOut)   
-    ui.update_text("newChat", value = "")
+    userLog.set(userLog.get() + "<h4 style='color:#A65E23'>--- YOU:</h4><p style='color:#A65E23'>" + input.newChat() + "</p>")
+    botLog.set(botLog.get() + f"\n--- USER:\n{input.newChat()}")   
+    #ui.update_text("newChat", value = "")
+    chatInput.set(HTML("<hr><i>The BioBot is thinking hard ...</i>"))
+    botResponse(botIn)
+
+@reactive.extended_task
+async def botResponse(botIn):
+    #print("Get botResponse")
+    return str(chat_engine.query(botIn))
+
+@reactive.effect
+def _():
+    #print("Update logs")
+    x = botResponse.result()
+    with reactive.isolate():
+        userLog.set(userLog.get() +  "<h4 style='color:#236ba6'>--- BioBot:</h4><p style='color:#236ba6'>" + x + "</p>")
+        botLog.set(botLog.get() + f"\n--- YOU:\n" + x) 
+    chatInput.set(ui.TagList(ui.tags.hr(), ui.input_text("newChat", "", value=""), 
+                                      ui.input_action_button("send", "Send")))
 
 @render.ui
 def chatLog():
     return HTML(userLog.get())
 
-ui.input_text("newChat", "", value="")
-ui.input_action_button("send", "Send")
+@render.ui
+def chatButton():
+    return chatInput.get()

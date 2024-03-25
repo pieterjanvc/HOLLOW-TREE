@@ -4,7 +4,6 @@
 import os
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
 from llama_index.llms.openai import OpenAI
-from llama_index.llms.anthropic import Anthropic
 
 # DATA
 dataPath = 'data/test/' 
