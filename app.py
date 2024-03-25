@@ -7,7 +7,7 @@ from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageCon
 from llama_index.llms.openai import OpenAI
 
 # DATA
-dataPath = 'data/test/' 
+dataPath = 'dataStores/test/' #Path do the folder for this Bot
 
 
 # Get the OpenAI API key and organistation
@@ -17,14 +17,14 @@ os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
 # Use OpenAI LLM 
 llm = OpenAI(model="gpt-3.5-turbo-0125") # use gpt-3.5-turbo-0125	or gpt-4
 
-if not os.path.exists(dataPath + "default__vector_store.json"):
+if not os.path.exists(dataPath + "vectorStore/default__vector_store.json"):
     # Build the vector store    
-    data = SimpleDirectoryReader(input_dir= dataPath).load_data()
+    data = SimpleDirectoryReader(input_dir= dataPath + "original").load_data()
     index = VectorStoreIndex.from_documents(data)
-    index.storage_context.persist(persist_dir = dataPath)
+    index.storage_context.persist(persist_dir = dataPath + "vectorStore")
 else:
     # Load the index from storage
-    storage_context = StorageContext.from_defaults(persist_dir= dataPath)
+    storage_context = StorageContext.from_defaults(persist_dir= dataPath + "vectorStore")
     index = load_index_from_storage(storage_context)
 
 # Prompt engineering
@@ -33,6 +33,8 @@ else:
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core import ChatPromptTemplate
 
+# The two strings below have not been altered from the defaults set by llamaindex, 
+# but can be if needed
 qa_prompt_str = (
     "Context information is below.\n"
     "---------------------\n"
@@ -54,15 +56,8 @@ refine_prompt_str = (
     "Original Answer: {existing_answer}"
 )
 
-chat_text_qa_msgs = [
-    ChatMessage(
-        role=MessageRole.SYSTEM,
-        content=(
-            """
-            Your goal is to check wether the user (a student) has an understanding of the following topic: 
-            'The central dogma of molecular biology'
-            ----
-            These are the sub-concepts that the user should understand:
+topic = "The central dogma of molecular biology"
+concepts = """
             * DNA is made up of 4 bases that encode all information needed for life
             * A protein is encoded in the DNA as a seqeunce of bases
             * To create a protein, you first have to transcribe the DNA into RNA
@@ -72,6 +67,18 @@ chat_text_qa_msgs = [
             or the start / stop of the seqeunce
             * Based on RNA codons, amino acids are chained together into a single protrein strand
             * Finally, the protein will fold into a 3D shape to become functional, with optional post-translational processing
+            """
+
+chat_text_qa_msgs = [
+    ChatMessage(
+        role=MessageRole.SYSTEM,
+        content=(
+            f"""
+            Your goal is to check wether the user (a student) has an understanding of the following topic: 
+            '{topic}'
+            ----
+            These are the sub-concepts that the user should understand:
+            {concepts}
             ----
             Remember that you are not lecturing, i.e. giving definitions or giving away all the concepts.
             Rather, you will ask a series of questions (or generate a multiple choice question if it fits) and look
@@ -100,8 +107,9 @@ chat_refine_msgs = [
             You will adapt the conversation until you feel all sub-concepts are understood.
             Do not go beyond what is expected, as this is not your aim. Make sure to always check any user
             message for mistakes, like the use of incorrect terminology and correct if needed, this is very important!
-            Finally, your output will be rendered as HTML, so format accordinly 
-            (e.g. make a list of multiple choice questions using <ul> and <li> tags).
+            Finally, your output will be rendered as HTML, so format accordinly. Examples:
+                * Make important concepts bold using <b> </b> tags 
+                * Make a list of multiple choice questions using <ul> and <li> tags
             """
         ),
     ),
@@ -117,21 +125,22 @@ chat_engine = index.as_query_engine(
         )
 
 # ------- SHINY APP
-import asyncio
 from shiny import reactive
 from shiny.express import input, render, ui
 from htmltools import HTML, div
 
 userLog = reactive.value(f"""<h4 style='color:#236ba6'>--- BioBot:</h4>
-                         <p style='color:#236ba6'>Hello, I'm here to help you get a basic understanding of the 
-                     'central dogma of molecular biology'. Have you heard about this before?</p>""")
+                         <p style='color:#236ba6'>Hello, I'm here to help you get a basic understanding of 
+                         the following topic: <b>{topic}</b>. Have you heard about this before?</p>""")
 
 botLog = reactive.value(f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\nHello, I'm here to help 
-                        you get a basic understanding of the 'central dogma of molecular biology'. 
+                        you get a basic understanding of the following topic: '{topic}'. 
                         Have you heard about this before?""")
 
-chatInput = reactive.value(ui.TagList(ui.tags.hr(), ui.input_text("newChat", "", value=""), 
-                                      ui.input_action_button("send", "Send")))
+chatInput = reactive.value(ui.TagList(
+    ui.tags.hr(), 
+    ui.input_text("newChat", "", value="", width="100%", spellcheck=True), 
+    ui.input_action_button("send", "Send")))
 
 @reactive.effect
 @reactive.event(input.send, ignore_init=True)
@@ -157,9 +166,13 @@ def _():
     with reactive.isolate():
         userLog.set(userLog.get() +  "<h4 style='color:#236ba6'>--- BioBot:</h4><p style='color:#236ba6'>" + x + "</p>")
         botLog.set(botLog.get() + f"\n--- YOU:\n" + x) 
-    chatInput.set(ui.TagList(ui.tags.hr(), ui.input_text("newChat", "", value=""), 
-                                      ui.input_action_button("send", "Send")))
+    chatInput.set(ui.TagList(
+        ui.tags.hr(), 
+        ui.input_text("newChat", "", value="", width="100%", spellcheck=True),
+        ui.input_action_button("send", "Send")))
 
+
+#---- Rendering the UI
 @render.ui
 def chatLog():
     return HTML(userLog.get())
@@ -167,3 +180,14 @@ def chatLog():
 @render.ui
 def chatButton():
     return chatInput.get()
+
+# Add some JS so that enter can send the message too
+ui.head_content(
+    HTML("""<script>
+         $(document).keyup(function(event) {
+            if ($("#newChat").is(":focus") && (event.key == "Enter")) {
+                $("#send").click();
+            }
+        });
+         </script>""")
+)
