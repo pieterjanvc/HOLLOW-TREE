@@ -3,12 +3,27 @@
 # https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
 
 import os
+import sqlite3
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
 from llama_index.llms.openai import OpenAI
 
 # DATA
 dataPath = 'dataStores/test/' #Path do the folder for this Bot
 
+# Database to store app data (this is not the vector database!)
+if not os.path.exists(dataPath + 'tutorBot.db'):
+    #Create a new database 
+    with open('createDB.sql', 'r') as file:
+        query = file.read().replace('\n', ' ').replace('\t', '').split(";")
+
+    conn = sqlite3.connect('tutorBot.db')
+    cursor = conn.cursor()
+    
+    for x in query:
+        _ = cursor.execute(x)
+    
+    conn.commit()
+    conn.close()
 
 # Get the OpenAI API key and organistation
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
