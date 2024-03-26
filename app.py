@@ -29,6 +29,28 @@ if not os.path.exists('tutorBot.db'):
     #Add the anonymous user
     _ = cursor.execute('INSERT INTO user(username, creationDate)' 
                        f'VALUES("anonymous", "{dt()}")')
+    
+    #Add a test topic (to be removed later)
+    topic = "The central dogma of molecular biology"
+    _ = cursor.execute('INSERT INTO topic(topic)' 
+                       f'VALUES("{topic}")')
+    tID = cursor.lastrowid
+    
+    #Add topic concepts (to be removed later)
+    concepts = [
+        ('DNA is made up of 4 bases that encode all information needed for life',),
+        ('A protein is encoded in the DNA as a seqeunce of bases',),
+        ('To create a protein, you first have to transcribe the DNA into RNA',),
+        ('RNA is similar to DNA but instead of ACTG it has ACUG and is single stranded',),
+        ('RNA is processed by removing introns, keeping only exons',),
+        ('RNA is translated into protein. 3 RNA bases form a codon, and each codon)' 
+        'represents an amino acid, or the start / stop of the seqeunce',),
+        ('Based on RNA codons, amino acids are chained together into a single protrein strand',),
+        ('The protein will fold into a 3D shape to become functional,' 
+        'with optional post-translational processing',)
+    ]
+    _ = cursor.executemany('INSERT INTO concept(tID, concept) ' 
+                           f'VALUES({tID}, ?)', concepts)
     conn.commit()
     conn.close()
 
@@ -78,18 +100,16 @@ refine_prompt_str = (
     "Original Answer: {existing_answer}"
 )
 
-topic = "The central dogma of molecular biology"
-concepts = """
-            * DNA is made up of 4 bases that encode all information needed for life
-            * A protein is encoded in the DNA as a seqeunce of bases
-            * To create a protein, you first have to transcribe the DNA into RNA
-            * RNA is similar to DNA but instead of ACTG it has ACUG and is single stranded
-            * RNA is processed by removing introns, keeping only exons
-            * RNA is translated into protein. 3 RNA bases form a codon, and each codon represents an amino acid,
-            or the start / stop of the seqeunce
-            * Based on RNA codons, amino acids are chained together into a single protrein strand
-            * Finally, the protein will fold into a 3D shape to become functional, with optional post-translational processing
-            """
+# Get the topic and concepts form the DB
+conn = sqlite3.connect('tutorBot.db')
+cursor = conn.cursor()
+tID = 1 #later chosen by user
+topic = cursor.execute(f'SELECT topic FROM topic WHERE tID = {tID}')\
+    .fetchall()[0][0]
+concepts = cursor.execute(f'SELECT concept FROM concept WHERE tID = {tID}')\
+    .fetchall()
+concepts = "* "+"\n* ".join([x[0] for x in concepts])
+conn.close()
 
 chat_text_qa_msgs = [
     ChatMessage(
@@ -152,6 +172,7 @@ from shiny.express import input, render, ui, session
 from htmltools import HTML, div
 
 sessionID = reactive.value(0)
+messages = reactive.value([])
 
 userLog = reactive.value(f"""<h4 style='color:#236ba6'>--- BioBot:</h4>
                          <p style='color:#236ba6'>Hello, I'm here to help you get a basic understanding of 
@@ -171,6 +192,9 @@ chatInput = reactive.value(ui.TagList(
 def _():
     #print("Process new input")
     if input.newChat() == "": return
+    msg = messages.get()
+    msg.append((False,dt(), input.newChat()))
+    messages.set(msg)
     botIn = botLog.get() + "\n---- NEW RESPONSE FROM USER ----\n" + input.newChat()    
     userLog.set(userLog.get() + "<h4 style='color:#A65E23'>--- YOU:</h4><p style='color:#A65E23'>" + input.newChat() + "</p>")
     botLog.set(botLog.get() + f"\n--- USER:\n{input.newChat()}")   
@@ -189,11 +213,14 @@ def _():
     x = botResponse.result()
     with reactive.isolate():
         userLog.set(userLog.get() +  "<h4 style='color:#236ba6'>--- BioBot:</h4><p style='color:#236ba6'>" + x + "</p>")
-        botLog.set(botLog.get() + f"\n--- YOU:\n" + x) 
+        botLog.set(botLog.get() + "\n--- YOU:\n" + x) 
     chatInput.set(ui.TagList(
         ui.tags.hr(), 
         ui.input_text("newChat", "", value="", width="100%", spellcheck=True),
         ui.input_action_button("send", "Send")))
+    msg = messages.get()
+    msg.append((True,dt(), msg))
+    messages.set(msg)
 
 @reactive.effect
 def _():
@@ -208,25 +235,20 @@ def _():
     conn.close()
 
     #Set the function to be called when the session ends
-    x = sessionID.get()
-    _ = session.on_ended(lambda: theEnd(x))
+    sID = sessionID.get()
+    msg = messages.get()
+    _ = session.on_ended(lambda: theEnd(sID, msg))
 
-def theEnd(x):
-    #Register the end of the session DB
+def theEnd(sID, msg):
+    #Add logs to the database after user exits
     conn = sqlite3.connect('tutorBot.db')
     cursor = conn.cursor()
+    cursor.execute(f'UPDATE session SET end = "{dt()}" WHERE sID = {sID}')
     #For now we only have anonymous users
-    cursor.execute(f'UPDATE session SET end = "{dt()}" WHERE sID = {x}')
+    cursor.execute(f'UPDATE session SET end = "{dt()}" WHERE sID = {sID}')
     conn.commit()
     conn.close()
     return "Session ended"
-
-@reactive.Effect
-@reactive.event(input.close)
-def _():
-    print("HI")
-
-
 
 #---- Rendering the UI
 @render.ui

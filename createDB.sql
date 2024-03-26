@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS "session" (
 DROP TABLE IF EXISTS "topic";
 CREATE TABLE IF NOT EXISTS "topic" (
 	"tID" INTEGER PRIMARY KEY AUTOINCREMENT,
-	"name" TEXT,
+	"topic" TEXT,
   "description" TEXT
 );
 
@@ -28,6 +28,7 @@ DROP TABLE IF EXISTS "concept";
 CREATE TABLE IF NOT EXISTS "concept" (
 	"cID" INTEGER PRIMARY KEY AUTOINCREMENT,
 	"tID" TEXT,
+  "concept" TEXT,
   "description" TEXT,
   FOREIGN KEY("tID") REFERENCES "topic"("tID") 
 		ON DELETE CASCADE ON UPDATE CASCADE
@@ -52,6 +53,7 @@ CREATE TABLE IF NOT EXISTS "messages" (
 	"dID" INTEGER,
   "isBot" INTEGER,
   "timestamp" TEXT,
+  "message" TEXT,
   FOREIGN KEY("dID") REFERENCES "discussion"("dID") 
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
