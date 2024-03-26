@@ -4,14 +4,18 @@
 
 import os
 import sqlite3
+from datetime import datetime
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
 from llama_index.llms.openai import OpenAI
 
 # DATA
 dataPath = 'dataStores/test/' #Path do the folder for this Bot
 
+def dt():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 # Database to store app data (this is not the vector database!)
-if not os.path.exists(dataPath + 'tutorBot.db'):
+if not os.path.exists('tutorBot.db'):
     #Create a new database 
     with open('createDB.sql', 'r') as file:
         query = file.read().replace('\n', ' ').replace('\t', '').split(";")
@@ -22,6 +26,9 @@ if not os.path.exists(dataPath + 'tutorBot.db'):
     for x in query:
         _ = cursor.execute(x)
     
+    #Add the anonymous user
+    _ = cursor.execute('INSERT INTO user(username, creationDate)' 
+                       f'VALUES("anonymous", "{dt()}")')
     conn.commit()
     conn.close()
 
@@ -141,8 +148,10 @@ chat_engine = index.as_query_engine(
 
 # ------- SHINY APP
 from shiny import reactive
-from shiny.express import input, render, ui
+from shiny.express import input, render, ui, session
 from htmltools import HTML, div
+
+sessionID = reactive.value(0)
 
 userLog = reactive.value(f"""<h4 style='color:#236ba6'>--- BioBot:</h4>
                          <p style='color:#236ba6'>Hello, I'm here to help you get a basic understanding of 
@@ -186,10 +195,42 @@ def _():
         ui.input_text("newChat", "", value="", width="100%", spellcheck=True),
         ui.input_action_button("send", "Send")))
 
+@reactive.effect
+def _():
+    #Register the session in the DB at start
+    conn = sqlite3.connect('tutorBot.db')
+    cursor = conn.cursor()
+    #For now we only have anonymous users
+    cursor.execute('INSERT INTO session (shinyToken, uID, start)'
+                   f'VALUES("{session.id}", 1, "{dt()}")')
+    sessionID.set(cursor.lastrowid)
+    conn.commit()
+    conn.close()
+
+    #Set the function to be called when the session ends
+    x = sessionID.get()
+    _ = session.on_ended(lambda: theEnd(x))
+
+def theEnd(x):
+    #Register the end of the session DB
+    conn = sqlite3.connect('tutorBot.db')
+    cursor = conn.cursor()
+    #For now we only have anonymous users
+    cursor.execute(f'UPDATE session SET end = "{dt()}" WHERE sID = {x}')
+    conn.commit()
+    conn.close()
+    return "Session ended"
+
+@reactive.Effect
+@reactive.event(input.close)
+def _():
+    print("HI")
+
+
 
 #---- Rendering the UI
 @render.ui
-def chatLog():
+def chatLog():    
     return HTML(userLog.get())
 
 @render.ui
