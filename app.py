@@ -9,6 +9,7 @@
 import os
 import sqlite3
 from datetime import datetime
+from html import escape
 # Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
 from llama_index.llms.openai import OpenAI
@@ -189,13 +190,14 @@ discussionID = reactive.value(0)
 welcome = ('Hello, I\'m here to help you get a basic understanding of the following topic: '
            f'{topic}. Have you heard about this before?')
 messages = reactive.value([(1, dt(), welcome)])
-userLog = reactive.value(f"""<h4 style='color:#236ba6'>--- BioBot:</h4>
-                         <p style='color:#236ba6'>Hello, I'm here to help you get a basic understanding of 
-                         the following topic: <b>{topic}</b>. Have you heard about this before?</p>""")
+userLog = reactive.value(f"""<div class='botChat'><h4>--- BioBot:</h4>
+                         <p>Hello, I'm here to help you get a basic understanding of 
+                         the following topic: <b>{topic}</b>. Have you heard about this before?</p></div>""")
 botLog = reactive.value(f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\n{welcome}""")
 chatInput = reactive.value(ui.TagList(
     ui.tags.hr(), 
-    ui.input_text("newChat", "", value="", width="100%", spellcheck=True), 
+    ui.input_text_area("newChat", "", value="", width="100%", 
+                       spellcheck=True, resize=False), 
     ui.input_action_button("send", "Send")))
 
 
@@ -205,13 +207,14 @@ chatInput = reactive.value(ui.TagList(
 @reactive.effect
 @reactive.event(input.send, ignore_init=True)
 def _():
-    if input.newChat() == "": return
-    msg = messages.get()
-    msg.append((False,dt(), input.newChat()))
+    newChat = escape(input.newChat()) #prevent HTML injection from user
+    if newChat == "": return
+    msg = messages.get()    
+    msg.append((False,dt(), newChat))
     messages.set(msg)
-    botIn = botLog.get() + "\n---- NEW RESPONSE FROM USER ----\n" + input.newChat()    
-    userLog.set(userLog.get() + "<h4 style='color:#A65E23'>--- YOU:</h4><p style='color:#A65E23'>" + input.newChat() + "</p>")
-    botLog.set(botLog.get() + f"\n--- USER:\n{input.newChat()}")   
+    botIn = botLog.get() + "\n---- NEW RESPONSE FROM USER ----\n" + newChat    
+    userLog.set(userLog.get() + "<div class='userChat'><h4>--- YOU:</h4><p>" + newChat + "</p></div>")
+    botLog.set(botLog.get() + f"\n--- USER:\n{newChat}")   
     chatInput.set(HTML("<hr><i>The BioBot is thinking hard ...</i>"))
     botResponse(botIn)
 
@@ -225,11 +228,14 @@ async def botResponse(botIn):
 def _():
     resp = botResponse.result()
     with reactive.isolate():
-        userLog.set(userLog.get() +  "<h4 style='color:#236ba6'>--- BioBot:</h4><p style='color:#236ba6'>" + resp + "</p>")
+        userLog.set(userLog.get() +  
+                    "<div class='botChat'><h4>--- BioBot:</h4><p>" + 
+                    resp + "</p></div>")
         botLog.set(botLog.get() + "\n--- YOU:\n" + resp) 
     chatInput.set(ui.TagList(
         ui.tags.hr(), 
-        ui.input_text("newChat", "", value="", width="100%", spellcheck=True),
+        ui.input_text_area("newChat", "", value="", width="100%", 
+                       spellcheck=True, resize=False),
         ui.input_action_button("send", "Send")))
     msg = messages.get()
     msg.append((True,dt(), resp))
@@ -273,17 +279,7 @@ def theEnd(sID, dID, msg):
 
 # --- RENDERING UI ---
 
-# Render the chat window
-@render.ui
-def chatLog():    
-    return HTML(userLog.get())
-
-#Render the text input (send button generated above)
-@render.ui
-def chatButton():
-    return chatInput.get()
-
-# Add some JS so that pressing enter can send the message too
+# Add some JS so that pressing enter can send the message too    
 ui.head_content(
     HTML("""<script>
          $(document).keyup(function(event) {
@@ -293,3 +289,24 @@ ui.head_content(
         });
          </script>""")
 )
+ui.include_css("www/styles.css")
+
+with ui.navset_pill(id="tab"): 
+    
+    with ui.nav_panel("BMIbot"):
+
+        ui.tags.br()
+        ui.tags.hr()
+
+        # Render the chat window
+        @render.ui
+        def chatLog():    
+            return div(HTML(userLog.get()))
+
+        #Render the text input (send button generated above)
+        @render.ui
+        def chatButton():
+            return chatInput.get()
+
+    with ui.nav_panel("Settings"):
+        "todo"
