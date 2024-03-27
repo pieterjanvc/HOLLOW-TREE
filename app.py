@@ -24,12 +24,12 @@ def dt():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # Database to store app data (this is not the vector database!)
-if not os.path.exists('tutorBot.db'):
+if not os.path.exists('appData/tutorBot.db'):
     #Create a new database 
-    with open('createDB.sql', 'r') as file:
+    with open('appData/createDB.sql', 'r') as file:
         query = file.read().replace('\n', ' ').replace('\t', '').split(";")
 
-    conn = sqlite3.connect('tutorBot.db')
+    conn = sqlite3.connect('appData/tutorBot.db')
     cursor = conn.cursor()
     
     for x in query:
@@ -113,8 +113,9 @@ refine_prompt_str = (
 )
 
 # Get the topic and concepts form the DB
-conn = sqlite3.connect('tutorBot.db')
+conn = sqlite3.connect('appData/tutorBot.db')
 cursor = conn.cursor()
+uID = 1 #if registered users update later
 tID = 1 #later chosen by user
 topic = cursor.execute(f'SELECT topic FROM topic WHERE tID = {tID}')\
     .fetchall()[0][0]
@@ -181,26 +182,29 @@ chat_engine = index.as_query_engine(
 # ----------- SHINY APP -----------
 # *********************************
 
-sessionID = reactive.value(0)
-messages = reactive.value([])
+# --- REACTIVE VARIABLES ---
 
+sessionID = reactive.value(0)
+discussionID = reactive.value(0)
+welcome = ('Hello, I\'m here to help you get a basic understanding of the following topic: '
+           f'{topic}. Have you heard about this before?')
+messages = reactive.value([(1, dt(), welcome)])
 userLog = reactive.value(f"""<h4 style='color:#236ba6'>--- BioBot:</h4>
                          <p style='color:#236ba6'>Hello, I'm here to help you get a basic understanding of 
                          the following topic: <b>{topic}</b>. Have you heard about this before?</p>""")
-
-botLog = reactive.value(f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\nHello, I'm here to help 
-                        you get a basic understanding of the following topic: '{topic}'. 
-                        Have you heard about this before?""")
-
+botLog = reactive.value(f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\n{welcome}""")
 chatInput = reactive.value(ui.TagList(
     ui.tags.hr(), 
     ui.input_text("newChat", "", value="", width="100%", spellcheck=True), 
     ui.input_action_button("send", "Send")))
 
+
+# --- REACTIVE FUNCTIONS ---
+
+#When the send button is clicked...
 @reactive.effect
 @reactive.event(input.send, ignore_init=True)
 def _():
-    #print("Process new input")
     if input.newChat() == "": return
     msg = messages.get()
     msg.append((False,dt(), input.newChat()))
@@ -208,69 +212,78 @@ def _():
     botIn = botLog.get() + "\n---- NEW RESPONSE FROM USER ----\n" + input.newChat()    
     userLog.set(userLog.get() + "<h4 style='color:#A65E23'>--- YOU:</h4><p style='color:#A65E23'>" + input.newChat() + "</p>")
     botLog.set(botLog.get() + f"\n--- USER:\n{input.newChat()}")   
-    #ui.update_text("newChat", value = "")
     chatInput.set(HTML("<hr><i>The BioBot is thinking hard ...</i>"))
     botResponse(botIn)
 
+# Async Shiny task waiting for LLM reply
 @reactive.extended_task
 async def botResponse(botIn):
-    #print("Get botResponse")
     return str(chat_engine.query(botIn))
 
+# Processing LLM response
 @reactive.effect
 def _():
-    #print("Update logs")
-    x = botResponse.result()
+    resp = botResponse.result()
     with reactive.isolate():
-        userLog.set(userLog.get() +  "<h4 style='color:#236ba6'>--- BioBot:</h4><p style='color:#236ba6'>" + x + "</p>")
-        botLog.set(botLog.get() + "\n--- YOU:\n" + x) 
+        userLog.set(userLog.get() +  "<h4 style='color:#236ba6'>--- BioBot:</h4><p style='color:#236ba6'>" + resp + "</p>")
+        botLog.set(botLog.get() + "\n--- YOU:\n" + resp) 
     chatInput.set(ui.TagList(
         ui.tags.hr(), 
         ui.input_text("newChat", "", value="", width="100%", spellcheck=True),
         ui.input_action_button("send", "Send")))
     msg = messages.get()
-    msg.append((True,dt(), msg))
+    msg.append((True,dt(), resp))
     messages.set(msg)
 
+# Code to run at the start of the session (i.e. user connects)
 @reactive.effect
 def _():
     #Register the session in the DB at start
-    conn = sqlite3.connect('tutorBot.db')
+    conn = sqlite3.connect('appData/tutorBot.db')
     cursor = conn.cursor()
     #For now we only have anonymous users
     cursor.execute('INSERT INTO session (shinyToken, uID, start)'
-                   f'VALUES("{session.id}", 1, "{dt()}")')
-    sessionID.set(cursor.lastrowid)
+                   f'VALUES("{session.id}", {uID}, "{dt()}")')
+    sID = cursor.lastrowid
+    cursor.execute('INSERT INTO discussion (tID, sID, start)'
+                   f'VALUES({tID}, {sID}, "{dt()}")')
+    dID = cursor.lastrowid
+    sessionID.set(sID)
+    discussionID.set(dID)
     conn.commit()
     conn.close()
 
     #Set the function to be called when the session ends
-    sID = sessionID.get()
+    dID = discussionID.get()
     msg = messages.get()
-    _ = session.on_ended(lambda: theEnd(sID, msg))
+    _ = session.on_ended(lambda: theEnd(sID, dID, msg))
 
-def theEnd(sID, msg):
+# Code to run at the end of the session (i.e. user disconnects)
+def theEnd(sID, dID, msg):
     #Add logs to the database after user exits
-    conn = sqlite3.connect('tutorBot.db')
+    conn = sqlite3.connect('appData/tutorBot.db')
     cursor = conn.cursor()
     cursor.execute(f'UPDATE session SET end = "{dt()}" WHERE sID = {sID}')
-    #For now we only have anonymous users
-    cursor.execute(f'UPDATE session SET end = "{dt()}" WHERE sID = {sID}')
-    
+    cursor.execute(f'UPDATE discussion SET end = "{dt()}" WHERE dID = {dID}')
+    cursor.executemany(f'INSERT INTO messages(dID,isBot,timeStamp,message)' 
+                   f'VALUES({dID}, ?, ?, ?)', msg)
     conn.commit()
     conn.close()
-    return "Session ended"
 
-#---- Rendering the UI
+
+# --- RENDERING UI ---
+
+# Render the chat window
 @render.ui
 def chatLog():    
     return HTML(userLog.get())
 
+#Render the text input (send button generated above)
 @render.ui
 def chatButton():
     return chatInput.get()
 
-# Add some JS so that enter can send the message too
+# Add some JS so that pressing enter can send the message too
 ui.head_content(
     HTML("""<script>
          $(document).keyup(function(event) {
