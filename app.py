@@ -1,14 +1,23 @@
-#------ BOT LOGIC
-# TUTORIAL
-# https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
+# *********************************
+# ----------- TUTORBOT -----------
+# *********************************
 
+# ----------- FUNCTIONS -----------
+# *********************************
+
+# General
 import os
 import sqlite3
 from datetime import datetime
+# Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
 from llama_index.llms.openai import OpenAI
+# Shiny
+from shiny import reactive
+from shiny.express import input, render, ui, session
+from htmltools import HTML, div
 
-# DATA
+# Data Path (to be updated later)
 dataPath = 'dataStores/test/' #Path do the folder for this Bot
 
 def dt():
@@ -53,6 +62,9 @@ if not os.path.exists('tutorBot.db'):
                            f'VALUES({tID}, ?)', concepts)
     conn.commit()
     conn.close()
+
+# TUTORIAL Llamaindex
+# https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
 
 # Get the OpenAI API key and organistation
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
@@ -166,10 +178,8 @@ chat_engine = index.as_query_engine(
             streaming = True
         )
 
-# ------- SHINY APP
-from shiny import reactive
-from shiny.express import input, render, ui, session
-from htmltools import HTML, div
+# ----------- SHINY APP -----------
+# *********************************
 
 sessionID = reactive.value(0)
 messages = reactive.value([])
@@ -246,6 +256,7 @@ def theEnd(sID, msg):
     cursor.execute(f'UPDATE session SET end = "{dt()}" WHERE sID = {sID}')
     #For now we only have anonymous users
     cursor.execute(f'UPDATE session SET end = "{dt()}" WHERE sID = {sID}')
+    
     conn.commit()
     conn.close()
     return "Session ended"
