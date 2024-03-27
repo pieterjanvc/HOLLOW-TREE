@@ -1,3 +1,5 @@
 dataStores/*
 *.pyc
 *.db
+backup/*
+*.svg
