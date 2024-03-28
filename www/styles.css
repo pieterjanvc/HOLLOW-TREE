@@ -19,12 +19,17 @@ body {
     color: white;
 }
 
-/* This is a bug and if not overridden you can't see which row in a table is selected */
+/* The folowing two fix bugs in DT rendering */
 .table>:not(caption)>*>* {
-    background-color: transparent;
+    background-color: transparent; /* see which row in a table is selected */
 }
-/* 
 
+thead, tbody, tfoot, tr, td, th {
+    border-bottom: 1px solid #dadada; /* row dividers */
+}
+
+
+/* 
 TALK BUBBLES
 https://codepen.io/Founts/pen/AJyVOr 
 */
@@ -71,9 +76,4 @@ https://codepen.io/Founts/pen/AJyVOr
 
 .userChat.tri:after{
     border-color: var(--userCol) var(--userCol) transparent transparent;
-}
-
-/* Concepts table */
-#conceptsTable {
-    --bs-table-bg: #A65E23 !important;
 }

@@ -67,15 +67,23 @@ if not os.path.exists('appData/tutorBot.db'):
     conn.commit()
     conn.close()
 
-# TUTORIAL Llamaindex
-# https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
+# --- Global variables
 
 # Get the OpenAI API key and organistation
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
 os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
+gptModel = "gpt-3.5-turbo-0125" # use gpt-3.5-turbo-0125 or gpt-4
+
+conn = sqlite3.connect('appData/tutorBot.db')
+#cursor = conn.cursor()
+topics = pd.read_sql_query("SELECT * FROM topic", conn)
+conn.close()
+
+# TUTORIAL Llamaindex
+# https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
 
 # Use OpenAI LLM 
-llm = OpenAI(model="gpt-3.5-turbo-0125") # use gpt-3.5-turbo-0125	or gpt-4
+llm = OpenAI(model=gptModel) # use gpt-3.5-turbo-0125	or gpt-4
 
 if not os.path.exists(dataPath + "vectorStore/default__vector_store.json"):
     # Build the vector store    
@@ -87,100 +95,6 @@ else:
     storage_context = StorageContext.from_defaults(persist_dir= dataPath + "vectorStore")
     index = load_index_from_storage(storage_context)
 
-# Prompt engineering
-# https://docs.llamaindex.ai/en/stable/examples/customization/prompts/chat_prompts/
-
-# The two strings below have not been altered from the defaults set by llamaindex, 
-# but can be if needed
-qa_prompt_str = (
-    "Context information is below.\n"
-    "---------------------\n"
-    "{context_str}\n"
-    "---------------------\n"
-    "Given the context information and not prior knowledge, "
-    "answer the question: {query_str}\n"
-)
-
-refine_prompt_str = (
-    "We have the opportunity to refine the original answer "
-    "(only if needed) with some more context below.\n"
-    "------------\n"
-    "{context_msg}\n"
-    "------------\n"
-    "Given the new context, refine the original answer to better "
-    "answer the question: {query_str}. "
-    "If the context isn't useful, output the original answer again.\n"
-    "Original Answer: {existing_answer}"
-)
-
-# Get the topic and concepts form the DB
-conn = sqlite3.connect('appData/tutorBot.db')
-cursor = conn.cursor()
-uID = 1 #if registered users update later
-tID = 1 #later chosen by user
-topic = cursor.execute(f'SELECT topic FROM topic WHERE tID = {tID}')\
-    .fetchall()[0][0]
-conceptsList = cursor.execute(f'SELECT concept FROM concept WHERE tID = {tID}')\
-    .fetchall()
-conceptsList = "* "+"\n* ".join([x[0] for x in conceptsList])
-concepts = pd.read_sql_query(f'SELECT concept FROM concept WHERE tID = {tID}', conn)
-conn.close()
-
-chat_text_qa_msgs = [
-    ChatMessage(
-        role=MessageRole.SYSTEM,
-        content=(
-            f"""
-            Your goal is to check wether the user (a student) has an understanding of the following topic: 
-            '{topic}'
-            ----
-            These are the sub-concepts that the user should understand:
-            {conceptsList}
-            ----
-            Remember that you are not lecturing, i.e. giving definitions or giving away all the concepts.
-            Rather, you will ask a series of questions (or generate a multiple choice question if it fits) and look
-            at the answers to refine your next question according to the current understanding of the user.
-            Try to make the user think and reason critically, but do help out if they get stuck. 
-            You will adapt the conversation until you feel all sub-concepts are understood.
-            Do not go beyond what is expected, as this is not your aim. Make sure to always check any user
-            message for mistakes, like the use of incorrect terminology and correct if needed, this is very important!
-            """
-        ),
-    ),
-    ChatMessage(role=MessageRole.USER, content=qa_prompt_str),
-]
-text_qa_template = ChatPromptTemplate(chat_text_qa_msgs)
-
-# Refine Prompt
-chat_refine_msgs = [
-    ChatMessage(
-        role=MessageRole.SYSTEM,
-        content=(
-            """
-            Remember that you are not lecturing, i.e. giving definitions or giving away all the concepts.
-            Rather, you will ask a series of questions (or generate a multiple choice question if it fits) and look
-            at the answers to refine your next question according to the current understanding of the user.
-            Try to make the user think and reason critically, but do help out if they get stuck. 
-            You will adapt the conversation until you feel all sub-concepts are understood.
-            Do not go beyond what is expected, as this is not your aim. Make sure to always check any user
-            message for mistakes, like the use of incorrect terminology and correct if needed, this is very important!
-            Finally, your output will be rendered as HTML, so format accordinly. Examples:
-                * Make important concepts bold using <b> </b> tags 
-                * Make a list of multiple choice questions using <ul> and <li> tags
-            """
-        ),
-    ),
-    ChatMessage(role=MessageRole.USER, content=refine_prompt_str),
-]
-refine_template = ChatPromptTemplate(chat_refine_msgs)
-
-chat_engine = index.as_query_engine(
-            text_qa_template=text_qa_template,
-            refine_template=refine_template,
-            llm=llm,
-            streaming = True
-        )
-
 # ----------- SHINY APP -----------
 # *********************************
 
@@ -188,13 +102,34 @@ chat_engine = index.as_query_engine(
 
 sessionID = reactive.value(0)
 discussionID = reactive.value(0)
-welcome = ('Hello, I\'m here to help you get a basic understanding of the following topic: '
-           f'{topic}. Have you heard about this before?')
-messages = reactive.value([(1, dt(), welcome)])
-userLog = reactive.value(f"""<div class='botChat talk-bubble tri'>
-                         <p>Hello, I'm here to help you get a basic understanding of 
-                         the following topic: <b>{topic}</b>. Have you heard about this before?</p></div>""")
-botLog = reactive.value(f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\n{welcome}""")
+
+@reactive.calc
+def tID():
+    return topics[topics["tID"] == 1].iloc[0]["tID"] # todo make user select topic
+
+@reactive.calc
+def concepts():
+    conn = sqlite3.connect('appData/tutorBot.db')
+    #cursor = conn.cursor()
+    concepts = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = {tID()}", conn)
+    conn.close()
+    return concepts
+
+
+@reactive.calc
+def welcome():
+    return(('Hello, I\'m here to help you get a basic understanding of the following topic: '
+           f'{topics[topics["tID"] == tID()].iloc[0]["topic"]}. Have you heard about this before?'))
+
+
+with reactive.isolate():
+    messages = reactive.value([(1, dt(), welcome())])
+    userLog = reactive.value(f"""<div class='botChat talk-bubble tri'>
+                            <p>Hello, I'm here to help you get a basic understanding of 
+                            the following topic: <b>{topics[topics["tID"] == tID()].iloc[0]["topic"]}</b>. 
+                            Have you heard about this before?</p></div>""")
+    botLog = reactive.value(f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\n{welcome()}""")
+
 chatInput = reactive.value(ui.TagList(
     ui.input_text_area("newChat", "", value="", width="100%", 
                        spellcheck=True, resize=False), 
@@ -202,6 +137,97 @@ chatInput = reactive.value(ui.TagList(
 
 
 # --- REACTIVE FUNCTIONS ---
+
+uID = 1 #if registered users update later
+
+@reactive.calc
+def chatEngine():
+
+    # Prompt engineering
+    # https://docs.llamaindex.ai/en/stable/examples/customization/prompts/chat_prompts/
+
+    # The two strings below have not been altered from the defaults set by llamaindex, 
+    # but can be if needed
+    qa_prompt_str = (
+        "Context information is below.\n"
+        "---------------------\n"
+        "{context_str}\n"
+        "---------------------\n"
+        "Given the context information and not prior knowledge, "
+        "answer the question: {query_str}\n"
+    )
+
+    refine_prompt_str = (
+        "We have the opportunity to refine the original answer "
+        "(only if needed) with some more context below.\n"
+        "------------\n"
+        "{context_msg}\n"
+        "------------\n"
+        "Given the new context, refine the original answer to better "
+        "answer the question: {query_str}. "
+        "If the context isn't useful, output the original answer again.\n"
+        "Original Answer: {existing_answer}"
+    )
+
+    topicList = "* "+"\n* ".join([x[0] for x in concepts()["concept"]]) 
+
+    # System prompt
+    chat_text_qa_msgs = ([
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                f"""
+                Your goal is to check wether the user (a student) has an understanding of the following topic: 
+                {topics[topics["tID"] == tID()].iloc[0]["topic"]}
+                ----
+                These are the sub-concepts that the user should understand:
+                {topicList}
+                ----
+                Remember that you are not lecturing, i.e. giving definitions or giving away all the concepts.
+                Rather, you will ask a series of questions (or generate a multiple choice question if it fits) and look
+                at the answers to refine your next question according to the current understanding of the user.
+                Try to make the user think and reason critically, but do help out if they get stuck. 
+                You will adapt the conversation until you feel all sub-concepts are understood.
+                Do not go beyond what is expected, as this is not your aim. Make sure to always check any user
+                message for mistakes, like the use of incorrect terminology and correct if needed, this is very important!
+                """
+            ),
+    ),
+    ChatMessage(role=MessageRole.USER, content=qa_prompt_str),
+    ])
+    text_qa_template = ChatPromptTemplate(chat_text_qa_msgs)
+
+    # Refine Prompt
+    chat_refine_msgs = [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                """
+                Remember that you are not lecturing, i.e. giving definitions or giving away all the concepts.
+                Rather, you will ask a series of questions (or generate a multiple choice question if it fits) and look
+                at the answers to refine your next question according to the current understanding of the user.
+                Try to make the user think and reason critically, but do help out if they get stuck. 
+                You will adapt the conversation until you feel all sub-concepts are understood.
+                Do not go beyond what is expected, as this is not your aim. Make sure to always check any user
+                message for mistakes, like the use of incorrect terminology and correct if needed, this is very important!
+                Finally, your output will be rendered as HTML, so format accordinly. Examples:
+                    * Make important concepts bold using <b> </b> tags 
+                    * Make a list of multiple choice questions using <ul> and <li> tags
+                """
+            ),
+        ),
+        ChatMessage(role=MessageRole.USER, content=refine_prompt_str),
+    ]
+    refine_template = ChatPromptTemplate(chat_refine_msgs)
+
+    return(
+        index.as_query_engine(
+            text_qa_template=text_qa_template,
+            refine_template=refine_template,
+            llm=llm,
+            streaming = True
+    )
+    )
 
 #When the send button is clicked...
 @reactive.effect
@@ -216,12 +242,12 @@ def _():
     userLog.set(userLog.get() + "<div class='userChat talk-bubble tri'><p>" + newChat + "</p></div>")
     botLog.set(botLog.get() + f"\n--- USER:\n{newChat}")   
     chatInput.set(HTML("<hr><i>The BioBot is thinking hard ...</i>"))
-    botResponse(botIn)
+    botResponse(chatEngine(), botIn)
 
 # Async Shiny task waiting for LLM reply
 @reactive.extended_task
-async def botResponse(botIn):
-    return str(chat_engine.query(botIn))
+async def botResponse(chatEngine, botIn):
+    return str(chatEngine.query(botIn))
 
 # Processing LLM response
 @reactive.effect
@@ -251,7 +277,7 @@ def _():
                    f'VALUES("{session.id}", {uID}, "{dt()}")')
     sID = cursor.lastrowid
     cursor.execute('INSERT INTO discussion (tID, sID, start)'
-                   f'VALUES({tID}, {sID}, "{dt()}")')
+                   f'VALUES({tID()}, {sID}, "{dt()}")')
     dID = cursor.lastrowid
     sessionID.set(sID)
     discussionID.set(dID)
@@ -309,12 +335,18 @@ with ui.navset_pill(id="tab"):
             return chatInput.get()
 
     with ui.nav_panel("Settings"):
-        with ui.layout_columns():  
+        with ui.layout_columns(col_widths= 12):  
             with ui.card():
                 ui.card_header("Concepts related to the topic")
                 @render.data_frame
                 def conceptsTable():
-                    return render.DataTable(concepts, width="100%", row_selection_mode="single")
+                    return render.DataTable(
+                        concepts()[["concept"]], width="100%", row_selection_mode="single")
+            
+            div(ui.input_action_button("cAdd", "Add new", width= "180px"),
+            ui.input_action_button("cEdit", "Edit selected", width= "180px"),
+            ui.input_action_button("cDel", "Delete selected", width= "180px"), style = "display:inline")
+
 @render.ui
 def rows():
     rows = input.conceptsTable_selected_rows()  
