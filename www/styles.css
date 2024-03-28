@@ -1,11 +1,79 @@
+/* Overall settings */
+html {
+    margin:    0 auto;
+    max-width: 1280px;
+}
+
 body {
-    background: #fbe7d7;
+    background: #252525;
+    --botCol: #236ba6;
+    --userCol: #A65E23;
+}
+
+.card-body {
+    flex-direction: column-reverse;
+}
+
+.btn {
+    background-color: #007bc2;
+    color: white;
+}
+
+/* This is a bug and if not overridden you can't see which row in a table is selected */
+.table>:not(caption)>*>* {
+    background-color: transparent;
+}
+/* 
+
+TALK BUBBLES
+https://codepen.io/Founts/pen/AJyVOr 
+*/
+.talk-bubble {
+	margin: 10px 40px 15px 40px;
+    padding: 5px;
+    display: inline-block;
+    position: relative;
+	width: auto;
+    min-width: 30%;
+    max-width: 70%;
+    min-height: 40px;
+    border-radius: 5px;
+	height: auto;	
+}
+
+.tri:after{
+	content: ' ';
+	position: absolute;
+	width: 0;
+	height: 0;
+    left: auto;
+	right: 38px;
+	bottom: -20px;
+	border: 12px solid;	
 }
 
 .botChat{
-    color: #236ba6
+    color: white;    
+    background-color: var(--botCol);
+    border-color: var(--botCol);
+}
+
+.botChat.tri:after{
+    border-color: var(--botCol) var(--botCol) transparent transparent;
 }
 
 .userChat{
-    color: #A65E23
+    color: white;
+    float: right;
+    background-color: var(--userCol);
+    border-color: var(--userCol);
+}
+
+.userChat.tri:after{
+    border-color: var(--userCol) var(--userCol) transparent transparent;
+}
+
+/* Concepts table */
+#conceptsTable {
+    --bs-table-bg: #A65E23 !important;
 }

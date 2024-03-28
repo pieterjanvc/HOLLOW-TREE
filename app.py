@@ -10,9 +10,12 @@ import os
 import sqlite3
 from datetime import datetime
 from html import escape
+import pandas as pd
 # Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
 from llama_index.llms.openai import OpenAI
+from llama_index.core.llms import ChatMessage, MessageRole
+from llama_index.core import ChatPromptTemplate
 # Shiny
 from shiny import reactive
 from shiny.express import input, render, ui, session
@@ -87,9 +90,6 @@ else:
 # Prompt engineering
 # https://docs.llamaindex.ai/en/stable/examples/customization/prompts/chat_prompts/
 
-from llama_index.core.llms import ChatMessage, MessageRole
-from llama_index.core import ChatPromptTemplate
-
 # The two strings below have not been altered from the defaults set by llamaindex, 
 # but can be if needed
 qa_prompt_str = (
@@ -120,9 +120,10 @@ uID = 1 #if registered users update later
 tID = 1 #later chosen by user
 topic = cursor.execute(f'SELECT topic FROM topic WHERE tID = {tID}')\
     .fetchall()[0][0]
-concepts = cursor.execute(f'SELECT concept FROM concept WHERE tID = {tID}')\
+conceptsList = cursor.execute(f'SELECT concept FROM concept WHERE tID = {tID}')\
     .fetchall()
-concepts = "* "+"\n* ".join([x[0] for x in concepts])
+conceptsList = "* "+"\n* ".join([x[0] for x in conceptsList])
+concepts = pd.read_sql_query(f'SELECT concept FROM concept WHERE tID = {tID}', conn)
 conn.close()
 
 chat_text_qa_msgs = [
@@ -134,7 +135,7 @@ chat_text_qa_msgs = [
             '{topic}'
             ----
             These are the sub-concepts that the user should understand:
-            {concepts}
+            {conceptsList}
             ----
             Remember that you are not lecturing, i.e. giving definitions or giving away all the concepts.
             Rather, you will ask a series of questions (or generate a multiple choice question if it fits) and look
@@ -190,12 +191,11 @@ discussionID = reactive.value(0)
 welcome = ('Hello, I\'m here to help you get a basic understanding of the following topic: '
            f'{topic}. Have you heard about this before?')
 messages = reactive.value([(1, dt(), welcome)])
-userLog = reactive.value(f"""<div class='botChat'><h4>--- BioBot:</h4>
+userLog = reactive.value(f"""<div class='botChat talk-bubble tri'>
                          <p>Hello, I'm here to help you get a basic understanding of 
                          the following topic: <b>{topic}</b>. Have you heard about this before?</p></div>""")
 botLog = reactive.value(f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\n{welcome}""")
 chatInput = reactive.value(ui.TagList(
-    ui.tags.hr(), 
     ui.input_text_area("newChat", "", value="", width="100%", 
                        spellcheck=True, resize=False), 
     ui.input_action_button("send", "Send")))
@@ -213,7 +213,7 @@ def _():
     msg.append((False,dt(), newChat))
     messages.set(msg)
     botIn = botLog.get() + "\n---- NEW RESPONSE FROM USER ----\n" + newChat    
-    userLog.set(userLog.get() + "<div class='userChat'><h4>--- YOU:</h4><p>" + newChat + "</p></div>")
+    userLog.set(userLog.get() + "<div class='userChat talk-bubble tri'><p>" + newChat + "</p></div>")
     botLog.set(botLog.get() + f"\n--- USER:\n{newChat}")   
     chatInput.set(HTML("<hr><i>The BioBot is thinking hard ...</i>"))
     botResponse(botIn)
@@ -229,11 +229,10 @@ def _():
     resp = botResponse.result()
     with reactive.isolate():
         userLog.set(userLog.get() +  
-                    "<div class='botChat'><h4>--- BioBot:</h4><p>" + 
+                    "<div class='botChat talk-bubble tri'><p>" + 
                     resp + "</p></div>")
         botLog.set(botLog.get() + "\n--- YOU:\n" + resp) 
     chatInput.set(ui.TagList(
-        ui.tags.hr(), 
         ui.input_text_area("newChat", "", value="", width="100%", 
                        spellcheck=True, resize=False),
         ui.input_action_button("send", "Send")))
@@ -278,6 +277,7 @@ def theEnd(sID, dID, msg):
 
 
 # --- RENDERING UI ---
+ui.page_opts(fillable=True)
 
 # Add some JS so that pressing enter can send the message too    
 ui.head_content(
@@ -295,13 +295,13 @@ with ui.navset_pill(id="tab"):
     
     with ui.nav_panel("BMIbot"):
 
-        ui.tags.br()
-        ui.tags.hr()
-
         # Render the chat window
-        @render.ui
-        def chatLog():    
-            return div(HTML(userLog.get()))
+        with ui.layout_columns():  
+            with ui.card(id="chatWindow", height="70vh"):
+                ui.card_header("Conversation")
+                @render.ui
+                def chatLog():    
+                    return div(HTML(userLog.get()))
 
         #Render the text input (send button generated above)
         @render.ui
@@ -309,4 +309,14 @@ with ui.navset_pill(id="tab"):
             return chatInput.get()
 
     with ui.nav_panel("Settings"):
-        "todo"
+        with ui.layout_columns():  
+            with ui.card():
+                ui.card_header("Concepts related to the topic")
+                @render.data_frame
+                def conceptsTable():
+                    return render.DataTable(concepts, width="100%", row_selection_mode="single")
+@render.ui
+def rows():
+    rows = input.conceptsTable_selected_rows()  
+    selected = ", ".join(str(i) for i in sorted(rows)) if rows else "None"
+    print(f"Rows selected: {selected}")
