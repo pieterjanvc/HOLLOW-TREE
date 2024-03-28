@@ -380,7 +380,7 @@ ui.page_opts(fillable=True)
 ui.head_content(
     HTML("""<script>
          $(document).keyup(function(event) {
-            if ($("#newChat").is(":focus") && (event.key == "Enter")) {
+            if ($("#newChat").is(":focus") && (event.key == "Enter") && event.ctrlKey) {
                 $("#send").click();
             }
         });
