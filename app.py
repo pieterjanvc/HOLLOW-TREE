@@ -40,13 +40,13 @@ if not os.path.exists('appData/tutorBot.db'):
         _ = cursor.execute(x)
     
     #Add the anonymous user
-    _ = cursor.execute('INSERT INTO user(username, creationDate)' 
+    _ = cursor.execute('INSERT INTO user(username, created)' 
                        f'VALUES("anonymous", "{dt()}")')
     
     #Add a test topic (to be removed later)
     topic = "The central dogma of molecular biology"
-    _ = cursor.execute('INSERT INTO topic(topic)' 
-                       f'VALUES("{topic}")')
+    _ = cursor.execute('INSERT INTO topic(topic, created)' 
+                       f'VALUES("{topic}", "{dt()}")')
     tID = cursor.lastrowid
     
     #Add topic concepts (to be removed later)
@@ -62,8 +62,8 @@ if not os.path.exists('appData/tutorBot.db'):
         ('The protein will fold into a 3D shape to become functional,' 
         'with optional post-translational processing',)
     ]
-    _ = cursor.executemany('INSERT INTO concept(tID, concept) ' 
-                           f'VALUES({tID}, ?)', concepts)
+    _ = cursor.executemany('INSERT INTO concept(tID, concept, created) ' 
+                           f'VALUES({tID}, ?, "{dt()}")', concepts)
     conn.commit()
     conn.close()
 
@@ -110,8 +110,7 @@ def tID():
 @reactive.calc
 def concepts():
     conn = sqlite3.connect('appData/tutorBot.db')
-    #cursor = conn.cursor()
-    concepts = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = {tID()}", conn)
+    concepts = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = {tID()} AND archived = 0", conn)
     conn.close()
     return concepts
 
@@ -296,11 +295,83 @@ def theEnd(sID, dID, msg):
     cursor = conn.cursor()
     cursor.execute(f'UPDATE session SET end = "{dt()}" WHERE sID = {sID}')
     cursor.execute(f'UPDATE discussion SET end = "{dt()}" WHERE dID = {dID}')
-    cursor.executemany(f'INSERT INTO messages(dID,isBot,timeStamp,message)' 
+    cursor.executemany(f'INSERT INTO message(dID,isBot,timeStamp,message)' 
                    f'VALUES({dID}, ?, ?, ?)', msg)
     conn.commit()
     conn.close()
 
+# --- Add a new concepts
+@reactive.effect
+@reactive.event(input.cAdd)
+def show_login_modal():
+    m = ui.modal(  
+        ui.tags.p(HTML('<i>Concepts are single facts that a student should understand<br>'
+                  'There is no need to provide context as this will come from the database</i>')),
+        ui.input_text("ncInput", "New concept:", width="100%"),
+        ui.input_action_button("ncAdd", "Add"),
+        title="Add a new concept to the topic",  
+        easy_close=True,
+        size = "l",  
+        footer=None,  
+    )  
+    ui.modal_show(m)
+
+@reactive.effect  
+@reactive.event(input.ncAdd)  
+def addNewConcept():
+    #rows = input.conceptsTable_selected_rows()
+    conn = sqlite3.connect('appData/tutorBot.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO concept(tID, concept, created)'
+                   f'VALUES({tID()}, "{input.ncInput()}", "{dt()}")')
+    conn.commit()
+    conn.close()
+
+    ui.modal_remove()
+
+# --- Edit an existing concepts
+@reactive.effect
+@reactive.event(input.cEdit)
+def show_login_modal():
+    if input.conceptsTable_selected_rows() is None: return
+    concept = concepts().iloc[input.conceptsTable_selected_rows()]["concept"]
+    m = ui.modal(  
+        ui.tags.p(HTML('<i>Make sure to only make edits that do not change the concept. '
+                       'Otherwise add or delete instead</i>')),
+        ui.input_text("ecInput", "New concept:", width="100%", value = concept),
+        ui.input_action_button("ncEdit", "Update"),
+        title="Edit and existing topic",  
+        easy_close=True,
+        size = "l",  
+        footer=None,  
+    )  
+    ui.modal_show(m)
+
+@reactive.effect  
+@reactive.event(input.ncEdit)  
+def addNewConcept():
+    cID = concepts().iloc[input.conceptsTable_selected_rows()]["cID"]
+    conn = sqlite3.connect('appData/tutorBot.db')
+    cursor = conn.cursor()
+    cursor.execute(f'UPDATE concept SET concept = "{input.ecInput()}", '
+                   f'modified = "{dt()}" WHERE cID = {cID}')
+    conn.commit()
+    conn.close()
+
+    ui.modal_remove()    
+
+# --- delete a concept (archive)
+@reactive.effect
+@reactive.event(input.cDel)
+def show_login_modal():
+    if input.conceptsTable_selected_rows() is None: return
+    cID = concepts().iloc[input.conceptsTable_selected_rows()]["cID"]
+    conn = sqlite3.connect('appData/tutorBot.db')
+    cursor = conn.cursor()
+    cursor.execute('UPDATE concept SET archived = 1, '
+                   f'modified = "{dt()}" WHERE cID = {cID}')
+    conn.commit()
+    conn.close()
 
 # --- RENDERING UI ---
 ui.page_opts(fillable=True)
@@ -346,9 +417,3 @@ with ui.navset_pill(id="tab"):
             div(ui.input_action_button("cAdd", "Add new", width= "180px"),
             ui.input_action_button("cEdit", "Edit selected", width= "180px"),
             ui.input_action_button("cDel", "Delete selected", width= "180px"), style = "display:inline")
-
-@render.ui
-def rows():
-    rows = input.conceptsTable_selected_rows()  
-    selected = ", ".join(str(i) for i in sorted(rows)) if rows else "None"
-    print(f"Rows selected: {selected}")
