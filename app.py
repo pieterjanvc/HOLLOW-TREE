@@ -12,60 +12,21 @@ from datetime import datetime
 from html import escape
 import pandas as pd
 # Llamaindex
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
-from llama_index.llms.openai import OpenAI
+from llama_index.core import VectorStoreIndex, ChatPromptTemplate
 from llama_index.core.llms import ChatMessage, MessageRole
-from llama_index.core import ChatPromptTemplate
+from llama_index.llms.openai import OpenAI
+from llama_index.vector_stores.duckdb import DuckDBVectorStore
 # Shiny
 from shiny import reactive
 from shiny.express import input, render, ui, session
 from htmltools import HTML, div
 
-# Data Path (to be updated later)
-dataPath = 'dataStores/test/' #Path do the folder for this Bot
+#ONly run the app if the database exists
+if not os.path.exists('appData/tutorBot.db'):
+    raise ConnectionError("The app database was not found. Please run the admin app first")
 
 def dt():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-# Database to store app data (this is not the vector database!)
-if not os.path.exists('appData/tutorBot.db'):
-    #Create a new database 
-    with open('appData/createDB.sql', 'r') as file:
-        query = file.read().replace('\n', ' ').replace('\t', '').split(";")
-
-    conn = sqlite3.connect('appData/tutorBot.db')
-    cursor = conn.cursor()
-    
-    for x in query:
-        _ = cursor.execute(x)
-    
-    #Add the anonymous user
-    _ = cursor.execute('INSERT INTO user(username, created)' 
-                       f'VALUES("anonymous", "{dt()}")')
-    
-    #Add a test topic (to be removed later)
-    topic = "The central dogma of molecular biology"
-    _ = cursor.execute('INSERT INTO topic(topic, created)' 
-                       f'VALUES("{topic}", "{dt()}")')
-    tID = cursor.lastrowid
-    
-    #Add topic concepts (to be removed later)
-    concepts = [
-        ('DNA is made up of 4 bases that encode all information needed for life',),
-        ('A protein is encoded in the DNA as a seqeunce of bases',),
-        ('To create a protein, you first have to transcribe the DNA into RNA',),
-        ('RNA is similar to DNA but instead of ACTG it has ACUG and is single stranded',),
-        ('RNA is processed by removing introns, keeping only exons',),
-        ('RNA is translated into protein. 3 RNA bases form a codon, and each codon)' 
-        'represents an amino acid, or the start / stop of the seqeunce',),
-        ('Based on RNA codons, amino acids are chained together into a single protrein strand',),
-        ('The protein will fold into a 3D shape to become functional,' 
-        'with optional post-translational processing',)
-    ]
-    _ = cursor.executemany('INSERT INTO concept(tID, concept, created) ' 
-                           f'VALUES({tID}, ?, "{dt()}")', concepts)
-    conn.commit()
-    conn.close()
 
 # --- Global variables
 
@@ -75,7 +36,6 @@ os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
 gptModel = "gpt-3.5-turbo-0125" # use gpt-3.5-turbo-0125 or gpt-4
 
 conn = sqlite3.connect('appData/tutorBot.db')
-#cursor = conn.cursor()
 topics = pd.read_sql_query("SELECT * FROM topic", conn)
 conn.close()
 
@@ -85,15 +45,9 @@ conn.close()
 # Use OpenAI LLM 
 llm = OpenAI(model=gptModel) # use gpt-3.5-turbo-0125	or gpt-4
 
-if not os.path.exists(dataPath + "vectorStore/default__vector_store.json"):
-    # Build the vector store    
-    data = SimpleDirectoryReader(input_dir= dataPath + "original").load_data()
-    index = VectorStoreIndex.from_documents(data)
-    index.storage_context.persist(persist_dir = dataPath + "vectorStore")
-else:
-    # Load the index from storage
-    storage_context = StorageContext.from_defaults(persist_dir= dataPath + "vectorStore")
-    index = load_index_from_storage(storage_context)
+# Load the index from storage
+vector_store = DuckDBVectorStore(1536, "vectorStore.duckdb", persist_dir= "appData/")
+index = VectorStoreIndex.from_vector_store(vector_store)
 
 # ----------- SHINY APP -----------
 # *********************************
@@ -167,8 +121,8 @@ def chatEngine():
         "If the context isn't useful, output the original answer again.\n"
         "Original Answer: {existing_answer}"
     )
-
-    topicList = "* "+"\n* ".join([x[0] for x in concepts()["concept"]]) 
+    
+    topicList = "* "+"\n* ".join(concepts()["concept"]) 
 
     # System prompt
     chat_text_qa_msgs = ([
@@ -182,7 +136,7 @@ def chatEngine():
                 These are the sub-concepts that the user should understand:
                 {topicList}
                 ----
-                Remember that you are not lecturing, i.e. giving definitions or giving away all the concepts.
+                Remember that you are not lecturing, i.e. giving / asking definitions or giving away all the concepts.
                 Rather, you will ask a series of questions (or generate a multiple choice question if it fits) and look
                 at the answers to refine your next question according to the current understanding of the user.
                 Try to make the user think and reason critically, but do help out if they get stuck. 
@@ -202,16 +156,16 @@ def chatEngine():
             role=MessageRole.SYSTEM,
             content=(
                 """
-                Remember that you are not lecturing, i.e. giving definitions or giving away all the concepts.
-                Rather, you will ask a series of questions (or generate a multiple choice question if it fits) and look
-                at the answers to refine your next question according to the current understanding of the user.
-                Try to make the user think and reason critically, but do help out if they get stuck. 
-                You will adapt the conversation until you feel all sub-concepts are understood.
-                Do not go beyond what is expected, as this is not your aim. Make sure to always check any user
-                message for mistakes, like the use of incorrect terminology and correct if needed, this is very important!
-                Finally, your output will be rendered as HTML, so format accordinly. Examples:
-                    * Make important concepts bold using <b> </b> tags 
-                    * Make a list of multiple choice questions using <ul> and <li> tags
+                If necessary, make edits to ensure the following:
+                - Do not keep repeating the topic title in your answer, focus on what's currently going on
+                - You should stay on topic, and make sure all sub-concpets are evaluated 
+                (but don't give them away accidentally!)
+                - If a user seems confused or does not know something, you should explain some of the theory 
+                in light of their current perceived knowledge
+                - Make sure you make the user think for themselves, but don't make it frustrating
+                - Double check if the latest user query does not contain conceptual or jargon errors and address them if needed
+                - You can add some fun facts based on the provided background if appropriate to keep the conversation
+                interesting 
                 """
             ),
         ),
@@ -232,13 +186,13 @@ def chatEngine():
 @reactive.effect
 @reactive.event(input.send, ignore_init=True)
 def _():
-    newChat = escape(input.newChat()) #prevent HTML injection from user
+    newChat = input.newChat() #prevent HTML injection from user
     if newChat == "": return
     msg = messages.get()    
     msg.append((False,dt(), newChat))
     messages.set(msg)
     botIn = botLog.get() + "\n---- NEW RESPONSE FROM USER ----\n" + newChat    
-    userLog.set(userLog.get() + "<div class='userChat talk-bubble tri'><p>" + newChat + "</p></div>")
+    userLog.set(userLog.get() + "<div class='userChat talk-bubble tri'><p>" + escape(newChat) + "</p></div>")
     botLog.set(botLog.get() + f"\n--- USER:\n{newChat}")   
     chatInput.set(HTML("<hr><i>The BioBot is thinking hard ...</i>"))
     botResponse(chatEngine(), botIn)
@@ -300,79 +254,6 @@ def theEnd(sID, dID, msg):
     conn.commit()
     conn.close()
 
-# --- Add a new concepts
-@reactive.effect
-@reactive.event(input.cAdd)
-def show_login_modal():
-    m = ui.modal(  
-        ui.tags.p(HTML('<i>Concepts are single facts that a student should understand<br>'
-                  'There is no need to provide context as this will come from the database</i>')),
-        ui.input_text("ncInput", "New concept:", width="100%"),
-        ui.input_action_button("ncAdd", "Add"),
-        title="Add a new concept to the topic",  
-        easy_close=True,
-        size = "l",  
-        footer=None,  
-    )  
-    ui.modal_show(m)
-
-@reactive.effect  
-@reactive.event(input.ncAdd)  
-def addNewConcept():
-    #rows = input.conceptsTable_selected_rows()
-    conn = sqlite3.connect('appData/tutorBot.db')
-    cursor = conn.cursor()
-    cursor.execute('INSERT INTO concept(tID, concept, created)'
-                   f'VALUES({tID()}, "{input.ncInput()}", "{dt()}")')
-    conn.commit()
-    conn.close()
-
-    ui.modal_remove()
-
-# --- Edit an existing concepts
-@reactive.effect
-@reactive.event(input.cEdit)
-def show_login_modal():
-    if input.conceptsTable_selected_rows() is None: return
-    concept = concepts().iloc[input.conceptsTable_selected_rows()]["concept"]
-    m = ui.modal(  
-        ui.tags.p(HTML('<i>Make sure to only make edits that do not change the concept. '
-                       'Otherwise add or delete instead</i>')),
-        ui.input_text("ecInput", "New concept:", width="100%", value = concept),
-        ui.input_action_button("ncEdit", "Update"),
-        title="Edit and existing topic",  
-        easy_close=True,
-        size = "l",  
-        footer=None,  
-    )  
-    ui.modal_show(m)
-
-@reactive.effect  
-@reactive.event(input.ncEdit)  
-def addNewConcept():
-    cID = concepts().iloc[input.conceptsTable_selected_rows()]["cID"]
-    conn = sqlite3.connect('appData/tutorBot.db')
-    cursor = conn.cursor()
-    cursor.execute(f'UPDATE concept SET concept = "{input.ecInput()}", '
-                   f'modified = "{dt()}" WHERE cID = {cID}')
-    conn.commit()
-    conn.close()
-
-    ui.modal_remove()    
-
-# --- delete a concept (archive)
-@reactive.effect
-@reactive.event(input.cDel)
-def show_login_modal():
-    if input.conceptsTable_selected_rows() is None: return
-    cID = concepts().iloc[input.conceptsTable_selected_rows()]["cID"]
-    conn = sqlite3.connect('appData/tutorBot.db')
-    cursor = conn.cursor()
-    cursor.execute('UPDATE concept SET archived = 1, '
-                   f'modified = "{dt()}" WHERE cID = {cID}')
-    conn.commit()
-    conn.close()
-
 # --- RENDERING UI ---
 ui.page_opts(fillable=True)
 
@@ -405,15 +286,8 @@ with ui.navset_pill(id="tab"):
         def chatButton():
             return chatInput.get()
 
-    with ui.nav_panel("Settings"):
+    with ui.nav_panel("Profile"):
         with ui.layout_columns(col_widths= 12):  
             with ui.card():
-                ui.card_header("Concepts related to the topic")
-                @render.data_frame
-                def conceptsTable():
-                    return render.DataTable(
-                        concepts()[["concept"]], width="100%", row_selection_mode="single")
-            
-            div(ui.input_action_button("cAdd", "Add new", width= "180px"),
-            ui.input_action_button("cEdit", "Edit selected", width= "180px"),
-            ui.input_action_button("cDel", "Delete selected", width= "180px"), style = "display:inline")
+                ui.card_header("User Progress")
+                "TODO"
