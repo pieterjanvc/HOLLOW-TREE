@@ -2,6 +2,7 @@ DROP TABLE IF EXISTS "user";
 CREATE TABLE IF NOT EXISTS "user" (
 	"uID" INTEGER PRIMARY KEY AUTOINCREMENT,
 	"username" TEXT UNIQUE,
+  "isAdmin" INTEGER DEFAULT 0,
   "email" TEXT,
   "created" TEXT
 );

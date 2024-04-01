@@ -1,5 +1,6 @@
-dataStores/*
+appData/uploadedFiles/*
 *.pyc
 *.db
 backup/*
 *.svg
+*.duckdb
