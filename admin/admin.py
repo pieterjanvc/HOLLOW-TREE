@@ -10,6 +10,7 @@ import pandas as pd
 import regex as re
 import duckdb
 import json
+from shutil import move
 # -- Llamaindex
 # pip install llama-index
 # pip install llama-index-vector-stores-duckdb
@@ -149,9 +150,12 @@ sessionID = reactive.value(0)
 # Workaround until issue with reactive.cals is resolved
 # https://github.com/posit-dev/py-shiny/issues/1271
 conn = sqlite3.connect('appData/tutorBot.db')
-concepts = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = 0", conn)
+concepts = pd.read_sql_query("SELECT * FROM concept WHERE tID = 0", conn)
+files = pd.read_sql_query("SELECT * FROM file", conn)
 conn.close()
+
 concepts = reactive.value(concepts)
+files = reactive.value(files)
 
 # --- REACTIVE FUNCTIONS ---
 
@@ -392,7 +396,19 @@ def _():
     conn.close()
     concepts.set(conceptList)
 
+
+# ---- VECTOR DATABASE ----
+
+@reactive.effect
+@reactive.event(input.newFile, ignore_init=True)
+def _():
+    #Move the file to the uploadedFiles folder
+    move(input.newFile()[0]["datapath"], "appData/uploadedFiles/" + input.newFile()[0]["name"])
+
+
 # --- RENDERING UI ---
+#**********************
+    
 ui.page_opts(fillable=True)
 
 # Add some JS so that pressing enter can send the message too    
@@ -435,4 +451,15 @@ with ui.navset_pill(id="tab"):
                         concepts.get()[["concept"]], width="100%", row_selection_mode="single")                
 
     with ui.nav_panel("Vector Database"):
-        "test"
+        with ui.card():
+                ui.card_header("Vector database files")
+                @render.data_frame
+                def filesTable():
+                    return render.DataTable(
+                        files.get(), width="100%", row_selection_mode="single")
+                
+        with ui.card():
+                ui.card_header("Upload a new file")
+                ui.input_file("newFile", "Pick a file", 
+                              accept=[".csv", ".pdf", ".docx", ".txt", ".md", ".epub", ".ipynb", ".ppt", ".pptx"])
+
