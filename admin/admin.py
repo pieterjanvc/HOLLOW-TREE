@@ -2,9 +2,6 @@
 # ----------- TUTORBOT ADMIN -----------
 # **************************************
 
-# ----------- FUNCTIONS -----------
-# *********************************
-
 # General
 import os
 import sqlite3
@@ -12,9 +9,10 @@ from datetime import datetime
 import pandas as pd
 import regex as re
 # Llamaindex
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
-from llama_index.core import ChatPromptTemplate
-from llama_index.core.llms import ChatMessage, MessageRole
+# pip install llama-index
+# pip install llama-index-vector-stores-duckdb
+# pip install llama-index-llms-openai
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
 from llama_index.core.extractors import TitleExtractor, KeywordExtractor
 from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
@@ -22,6 +20,9 @@ from llama_index.vector_stores.duckdb import DuckDBVectorStore
 from shiny import reactive
 from shiny.express import input, render, ui, session
 from htmltools import HTML, div
+
+# ----------- FUNCTIONS -----------
+# *********************************
 
 def dt():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -79,10 +80,6 @@ os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
 os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
 gptModel = "gpt-3.5-turbo-0125" # use gpt-3.5-turbo-0125 or gpt-4
 
-conn = sqlite3.connect('appData/tutorBot.db')
-topics = pd.read_sql_query("SELECT * FROM topic", conn)
-conn.close()
-
 # TUTORIAL Llamaindex
 # https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
 
@@ -90,6 +87,10 @@ conn.close()
 llm = OpenAI(model=gptModel) # use gpt-3.5-turbo-0125	or gpt-4
 
 if not os.path.exists("appData/vectorStore.duckdb"):
+
+    if not os.path.exists("appData/uploadedFiles"):
+        os.makedirs("appData/uploadedFiles")
+
     # Build the vector store https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/   
     data = SimpleDirectoryReader(input_dir= "appData/uploadedFiles").load_data()
     vector_store = DuckDBVectorStore(1536, "vectorStore.duckdb", persist_dir= "appData/")
@@ -98,10 +99,9 @@ if not os.path.exists("appData/vectorStore.duckdb"):
     index = VectorStoreIndex.from_documents(data, storage_context=storage_context,
                                             transformations=[TitleExtractor(), KeywordExtractor()])
 else:
-    # Load the exisiting index from storage
-    #vector_store = DuckDBVectorStore(embed_dim=1536).from_local("appData/vectorStore.duckdb")
     vector_store = DuckDBVectorStore(1536, "vectorStore.duckdb", persist_dir= "appData/")
     index = VectorStoreIndex.from_vector_store(vector_store)
+
 
 # ----------- SHINY APP -----------
 # *********************************
