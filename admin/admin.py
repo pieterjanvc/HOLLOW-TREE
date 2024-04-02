@@ -2,13 +2,15 @@
 # ----------- TUTORBOT ADMIN -----------
 # **************************************
 
-# General
+# -- General
 import os
 import sqlite3
 from datetime import datetime
 import pandas as pd
 import regex as re
-# Llamaindex
+import duckdb
+import json
+# -- Llamaindex
 # pip install llama-index
 # pip install llama-index-vector-stores-duckdb
 # pip install llama-index-llms-openai
@@ -16,7 +18,7 @@ from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageCon
 from llama_index.core.extractors import TitleExtractor, KeywordExtractor
 from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
-# Shiny
+# -- Shiny
 from shiny import reactive
 from shiny.express import input, render, ui, session
 from htmltools import HTML, div
@@ -98,6 +100,38 @@ if not os.path.exists("appData/vectorStore.duckdb"):
     #Generate the first index
     index = VectorStoreIndex.from_documents(data, storage_context=storage_context,
                                             transformations=[TitleExtractor(), KeywordExtractor()])
+    
+    #Get the metadata out of the DB excerpt_keywords document_title
+    fileName = data[1].metadata["file_name"]
+    con = duckdb.connect("appData/vectorStore.duckdb")
+    #con.query("SELECT metadata_ FROM documents LIMIT 1").fetchall()
+    x = con.query('SELECT metadata_ ->> [\'document_title\', \'excerpt_keywords\'] FROM documents WHERE CAST(json_extract(metadata_, \'$.file_name\') as VARCHAR) = \'"Central_dogma_of_molecular_biology.pdf"\'').fetchall()
+    con.close()
+
+    chunkTitles = "* " + "\n* ".join(set([y[0][0] for y in x]))
+    chunkKeywords = ", ".join(set((", ".join([y[0][1] for y in x])).split(", ")))    
+
+    #Summarise everything using the LLM and add it to the DB
+    docSum = ("Below is a list of subheadings belonging to the same document."
+          f"Note that many of them might be near identical:\n\n{chunkTitles}"
+          f"\n\nYou also get a list of keywords describing the same content:\n\n{chunkKeywords}"
+          "\n\nAgain note that some key words are very related.\n"
+          "Your task is to summarize all of this into a single, succinct short title, a subtitle, "
+          "and a list of the top-10 keywords. Stay as close to the original titles as possible."
+          " The output should be in the following valid JSON format: \n\n"
+          '{"title": "", "subtitle": "", "keywords": []}')
+    docSum = json.loads(str(index.as_query_engine().query(docSum)))
+
+    conn = sqlite3.connect('appData/tutorBot.db')
+    cursor = conn.cursor()
+    _ = cursor.execute(('INSERT INTO file(fileName, title, subtitle, created) '
+                       f'VALUES("{fileName}", "{docSum["title"]}", "{docSum["subtitle"]}", "{dt()}")'))
+    fID = cursor.lastrowid
+    _ = cursor.executemany('INSERT INTO keyword(fID, keyword) ' 
+                           f'VALUES("{fID}", ?)', [(item,) for item in docSum["keywords"]])
+    conn.commit()
+    conn.close()
+
 else:
     vector_store = DuckDBVectorStore(1536, "vectorStore.duckdb", persist_dir= "appData/")
     index = VectorStoreIndex.from_vector_store(vector_store)
