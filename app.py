@@ -36,7 +36,15 @@ os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
 gptModel = "gpt-3.5-turbo-0125" # use gpt-3.5-turbo-0125 or gpt-4
 
 conn = sqlite3.connect('appData/tutorBot.db')
-topics = pd.read_sql_query("SELECT * FROM topic", conn)
+
+#Check if there are topics to discuss present before proceeding
+topics = pd.read_sql_query("SELECT * FROM topic WHERE archived = 0 AND tID IN"
+                           "(SELECT DISTINCT tID from concept WHERE archived = 0)", conn)
+
+if topics.shape[0] == 0:
+    raise ValueError("There are no active topics with at least one concept in the database."
+                     " Please run the admin app first")
+
 conn.close()
 
 # TUTORIAL Llamaindex
