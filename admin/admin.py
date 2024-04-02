@@ -8,11 +8,9 @@
 # General
 import os
 import sqlite3
-import duckdb
 from datetime import datetime
-from html import escape
 import pandas as pd
-import json
+import regex as re
 # Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
 from llama_index.core import ChatPromptTemplate
@@ -27,6 +25,12 @@ from htmltools import HTML, div
 
 def dt():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def inputCheck(input):
+    if re.search(r"(?=(.*[a-zA-Z0-9]){6,}).*", input):
+        return True
+    else:
+        False
 
 # Database to store app data (this is not the vector database!)
 if not os.path.exists('appData/tutorBot.db'):
@@ -102,171 +106,20 @@ else:
 # ----------- SHINY APP -----------
 # *********************************
 
+uID = 2 #if registered users update later
+
 # --- REACTIVE VARIABLES ---
 
 sessionID = reactive.value(0)
 
-@reactive.calc
-def tID():
-    return topics[topics["tID"] == 1].iloc[0]["tID"] # todo make user select topic
-
-@reactive.calc
-def concepts():
-    conn = sqlite3.connect('appData/tutorBot.db')
-    concepts = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = {tID()} AND archived = 0", conn)
-    conn.close()
-    return concepts
-
-
-# @reactive.calc
-# def welcome():
-#     return(('Hello, I\'m here to help you get a basic understanding of the following topic: '
-#            f'{topics[topics["tID"] == tID()].iloc[0]["topic"]}. Have you heard about this before?'))
-
-
-# with reactive.isolate():
-#     messages = reactive.value([(1, dt(), welcome())])
-#     userLog = reactive.value(f"""<div class='botChat talk-bubble tri'>
-#                             <p>Hello, I'm here to help you get a basic understanding of 
-#                             the following topic: <b>{topics[topics["tID"] == tID()].iloc[0]["topic"]}</b>. 
-#                             Have you heard about this before?</p></div>""")
-#     botLog = reactive.value(f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\n{welcome()}""")
-
-# chatInput = reactive.value(ui.TagList(
-#     ui.input_text_area("newChat", "", value="", width="100%", 
-#                        spellcheck=True, resize=False), 
-#     ui.input_action_button("send", "Send")))
-
+# Workaround until issue with reactive.cals is resolved
+# https://github.com/posit-dev/py-shiny/issues/1271
+conn = sqlite3.connect('appData/tutorBot.db')
+concepts = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = 0", conn)
+conn.close()
+concepts = reactive.value(concepts)
 
 # --- REACTIVE FUNCTIONS ---
-
-uID = 2 #if registered users update later
-
-# @reactive.calc
-# def chatEngine():
-
-#     # Prompt engineering
-#     # https://docs.llamaindex.ai/en/stable/examples/customization/prompts/chat_prompts/
-
-#     # The two strings below have not been altered from the defaults set by llamaindex, 
-#     # but can be if needed
-#     qa_prompt_str = (
-#         "Context information is below.\n"
-#         "---------------------\n"
-#         "{context_str}\n"
-#         "---------------------\n"
-#         "Given the context information and not prior knowledge, "
-#         "answer the question: {query_str}\n"
-#     )
-
-#     refine_prompt_str = (
-#         "We have the opportunity to refine the original answer "
-#         "(only if needed) with some more context below.\n"
-#         "------------\n"
-#         "{context_msg}\n"
-#         "------------\n"
-#         "Given the new context, refine the original answer to better "
-#         "answer the question: {query_str}. "
-#         "If the context isn't useful, output the original answer again.\n"
-#         "Original Answer: {existing_answer}"
-#     )
-
-#     topicList = "* "+"\n* ".join([x[0] for x in concepts()["concept"]]) 
-
-#     # System prompt
-#     chat_text_qa_msgs = ([
-#         ChatMessage(
-#             role=MessageRole.SYSTEM,
-#             content=(
-#                 f"""
-#                 Your goal is to check wether the user (a student) has an understanding of the following topic: 
-#                 {topics[topics["tID"] == tID()].iloc[0]["topic"]}
-#                 ----
-#                 These are the sub-concepts that the user should understand:
-#                 {topicList}
-#                 ----
-#                 Remember that you are not lecturing, i.e. giving definitions or giving away all the concepts.
-#                 Rather, you will ask a series of questions (or generate a multiple choice question if it fits) and look
-#                 at the answers to refine your next question according to the current understanding of the user.
-#                 Try to make the user think and reason critically, but do help out if they get stuck. 
-#                 You will adapt the conversation until you feel all sub-concepts are understood.
-#                 Do not go beyond what is expected, as this is not your aim. Make sure to always check any user
-#                 message for mistakes, like the use of incorrect terminology and correct if needed, this is very important!
-#                 """
-#             ),
-#     ),
-#     ChatMessage(role=MessageRole.USER, content=qa_prompt_str),
-#     ])
-#     text_qa_template = ChatPromptTemplate(chat_text_qa_msgs)
-
-#     # Refine Prompt
-#     chat_refine_msgs = [
-#         ChatMessage(
-#             role=MessageRole.SYSTEM,
-#             content=(
-#                 """
-#                 Remember that you are not lecturing, i.e. giving definitions or giving away all the concepts.
-#                 Rather, you will ask a series of questions (or generate a multiple choice question if it fits) and look
-#                 at the answers to refine your next question according to the current understanding of the user.
-#                 Try to make the user think and reason critically, but do help out if they get stuck. 
-#                 You will adapt the conversation until you feel all sub-concepts are understood.
-#                 Do not go beyond what is expected, as this is not your aim. Make sure to always check any user
-#                 message for mistakes, like the use of incorrect terminology and correct if needed, this is very important!
-#                 Finally, your output will be rendered as HTML, so format accordinly. Examples:
-#                     * Make important concepts bold using <b> </b> tags 
-#                     * Make a list of multiple choice questions using <ul> and <li> tags
-#                 """
-#             ),
-#         ),
-#         ChatMessage(role=MessageRole.USER, content=refine_prompt_str),
-#     ]
-#     refine_template = ChatPromptTemplate(chat_refine_msgs)
-
-#     return(
-#         index.as_query_engine(
-#             text_qa_template=text_qa_template,
-#             refine_template=refine_template,
-#             llm=llm,
-#             streaming = True
-#     )
-#     )
-
-# #When the send button is clicked...
-# @reactive.effect
-# @reactive.event(input.send, ignore_init=True)
-# def _():
-#     newChat = escape(input.newChat()) #prevent HTML injection from user
-#     if newChat == "": return
-#     msg = messages.get()    
-#     msg.append((False,dt(), newChat))
-#     messages.set(msg)
-#     botIn = botLog.get() + "\n---- NEW RESPONSE FROM USER ----\n" + newChat    
-#     userLog.set(userLog.get() + "<div class='userChat talk-bubble tri'><p>" + newChat + "</p></div>")
-#     botLog.set(botLog.get() + f"\n--- USER:\n{newChat}")   
-#     chatInput.set(HTML("<hr><i>The BioBot is thinking hard ...</i>"))
-#     botResponse(chatEngine(), botIn)
-
-# # Async Shiny task waiting for LLM reply
-# @reactive.extended_task
-# async def botResponse(chatEngine, botIn):
-#     return str(chatEngine.query(botIn))
-
-# # Processing LLM response
-# @reactive.effect
-# def _():
-#     resp = botResponse.result()
-#     with reactive.isolate():
-#         userLog.set(userLog.get() +  
-#                     "<div class='botChat talk-bubble tri'><p>" + 
-#                     resp + "</p></div>")
-#         botLog.set(botLog.get() + "\n--- YOU:\n" + resp) 
-#     chatInput.set(ui.TagList(
-#         ui.input_text_area("newChat", "", value="", width="100%", 
-#                        spellcheck=True, resize=False),
-#         ui.input_action_button("send", "Send")))
-#     msg = messages.get()
-#     msg.append((True,dt(), resp))
-#     messages.set(msg)
 
 # Code to run at the start of the session (i.e. user connects)
 @reactive.effect
@@ -279,10 +132,11 @@ def _():
                    f'VALUES("{session.id}", {uID}, "{dt()}")')
     sID = cursor.lastrowid
     sessionID.set(sID)
+    topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
     conn.commit()
     conn.close()
-
-    ui.update_select("topic", choices=[topics[topics["tID"] == tID()].iloc[0]["topic"]])
+    #Update the topics select input
+    ui.update_select("tID", choices= dict(zip(topics["tID"], topics["topic"])))
 
     #Set the function to be called when the session ends
     _ = session.on_ended(lambda: theEnd(sID))
@@ -296,10 +150,110 @@ def theEnd(sID):
     conn.commit()
     conn.close()
 
+# ---- TOPICS ----
+
+# --- Add a new topic
+@reactive.effect
+@reactive.event(input.tAdd)
+def addTopic_modal():
+    m = ui.modal(  
+        ui.tags.p(HTML('<i>Keep the topic name short.<br>'
+                  'Make sure the topic can be covered by ~ 4-8 concepts, otherwise split it up.'
+                  'The AI might struggle with broad topics that cover many concepts</i>')),
+        ui.input_text("ntTopic", "New topic:", width="100%"),
+        ui.input_text("ntDescr", "Description (optional):", width="100%"),
+        ui.input_action_button("ntAdd", "Add"),
+        title="Add a topic",  
+        easy_close=True,
+        size = "l",  
+        footer=None,  
+    )  
+    ui.modal_show(m)
+
+@reactive.effect  
+@reactive.event(input.ntAdd)  
+def addNewTopic():
+    #Only proceed if the input is valid
+    if not inputCheck(input.ntTopic()):
+        ui.remove_ui("#notGood")
+        ui.insert_ui(HTML("<div id=notGood style='color: red'>New topic must be at least 6 characters</div>"), 
+                     "#ntAdd", "afterEnd")
+        return
+    
+    #Add new topic to DB
+    conn = sqlite3.connect('appData/tutorBot.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO topic(topic, created, description)'
+                   f'VALUES("{input.ntTopic()}", "{dt()}", "{input.ntDescr()}")')
+    tID = cursor.lastrowid
+    topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+    conn.commit()
+    conn.close()
+    # Update the topic list
+    ui.update_select("tID", choices=dict(zip(topics["tID"], topics["topic"])), selected= tID)
+    ui.modal_remove()
+
+# # --- Edit an existing concepts
+# @reactive.effect
+# @reactive.event(input.cEdit)
+# def show_login_modal():
+#     if input.conceptsTable_selected_rows() is None: return
+#     concept = concepts().iloc[input.conceptsTable_selected_rows()]["concept"]
+#     m = ui.modal(  
+#         ui.tags.p(HTML('<i>Make sure to only make edits that do not change the concept. '
+#                        'Otherwise add or delete instead</i>')),
+#         ui.input_text("ecInput", "New concept:", width="100%", value = concept),
+#         ui.input_action_button("ncEdit", "Update"),
+#         title="Edit and existing topic",  
+#         easy_close=True,
+#         size = "l",  
+#         footer=None,  
+#     )  
+#     ui.modal_show(m)
+
+# @reactive.effect  
+# @reactive.event(input.ncEdit)  
+# def addNewConcept():
+#     cID = concepts().iloc[input.conceptsTable_selected_rows()]["cID"]
+#     conn = sqlite3.connect('appData/tutorBot.db')
+#     cursor = conn.cursor()
+#     cursor.execute(f'UPDATE concept SET concept = "{input.ecInput()}", '
+#                    f'modified = "{dt()}" WHERE cID = {cID}')
+#     conn.commit()
+#     conn.close()
+
+#     ui.modal_remove()    
+
+# --- Archive a topic
+@reactive.effect
+@reactive.event(input.tArchive)
+def _():
+    if input.tID() is None: return
+
+    conn = sqlite3.connect('appData/tutorBot.db')
+    cursor = conn.cursor()
+    cursor.execute('UPDATE topic SET archived = 1, '
+                   f'modified = "{dt()}" WHERE tID = {input.tID()}')
+    topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+    
+    ui.update_select("tID", choices=dict(zip(topics["tID"], topics["topic"])))
+
+    #Empty the concept table is last topic was removed
+    if topics.shape[0] == 0:
+        conceptList = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = 0", conn)        
+        concepts.set(conceptList)
+    
+    conn.commit()
+    conn.close()
+
+
+
+# ---- CONCEPTS ----
+    
 # --- Add a new concepts
 @reactive.effect
 @reactive.event(input.cAdd)
-def show_login_modal():
+def _():
     m = ui.modal(  
         ui.tags.p(HTML('<i>Concepts are single facts that a student should understand<br>'
                   'There is no need to provide context as this will come from the database</i>')),
@@ -314,60 +268,95 @@ def show_login_modal():
 
 @reactive.effect  
 @reactive.event(input.ncAdd)  
-def addNewConcept():
-    #rows = input.conceptsTable_selected_rows()
+def _():
+    #Only proceed if the input is valid
+    if not inputCheck(input.ncInput()):
+        ui.remove_ui("#notGood")
+        ui.insert_ui(HTML("<div id=notGood style='color: red'>New concept must be at least 6 characters</div>"), 
+                     "#ncAdd", "afterEnd")
+        return
+    
+    #Add new topic to DB
     conn = sqlite3.connect('appData/tutorBot.db')
     cursor = conn.cursor()
     cursor.execute('INSERT INTO concept(tID, concept, created)'
-                   f'VALUES({tID()}, "{input.ncInput()}", "{dt()}")')
-    conn.commit()
+                   f'VALUES({input.tID()}, "{input.ncInput()}", "{dt()}")')
+    conceptList = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = {input.tID()} AND archived = 0", conn) 
+    conn.commit()       
     conn.close()
-
+    #Update concept table
+    concepts.set(conceptList)
     ui.modal_remove()
+
+
 
 # --- Edit an existing concepts
 @reactive.effect
 @reactive.event(input.cEdit)
-def show_login_modal():
-    if input.conceptsTable_selected_rows() is None: return
-    concept = concepts().iloc[input.conceptsTable_selected_rows()]["concept"]
-    m = ui.modal(  
-        ui.tags.p(HTML('<i>Make sure to only make edits that do not change the concept. '
-                       'Otherwise add or delete instead</i>')),
-        ui.input_text("ecInput", "New concept:", width="100%", value = concept),
-        ui.input_action_button("ncEdit", "Update"),
-        title="Edit and existing topic",  
-        easy_close=True,
-        size = "l",  
-        footer=None,  
-    )  
-    ui.modal_show(m)
+def _():
+    if input.conceptsTable_selected_rows() != ():   
+        concept = concepts.get().iloc[input.conceptsTable_selected_rows()]["concept"]
+        m = ui.modal(  
+            ui.tags.p(HTML('<i>Make sure to only make edits that do not change the concept. '
+                        'Otherwise add or delete instead</i>')),
+            ui.input_text("ecInput", "New concept:", width="100%", value = concept),
+            ui.input_action_button("ncEdit", "Update"),
+            title="Edit and existing topic",  
+            easy_close=True,
+            size = "l",  
+            footer=None,  
+        )  
+        ui.modal_show(m)
 
 @reactive.effect  
 @reactive.event(input.ncEdit)  
-def addNewConcept():
-    cID = concepts().iloc[input.conceptsTable_selected_rows()]["cID"]
+def _():
+    #Only proceed if the input is valid
+    if not inputCheck(input.ecInput()):
+        ui.remove_ui("#notGood")
+        ui.insert_ui(HTML("<div id=notGood style='color: red'>A concept must be at least 6 characters</div>"), 
+                     "#ncEdit", "afterEnd")
+        return
+    
+    #Edit topic in DB
+    cID = concepts.get().iloc[input.conceptsTable_selected_rows()]["cID"]
     conn = sqlite3.connect('appData/tutorBot.db')
     cursor = conn.cursor()
     cursor.execute(f'UPDATE concept SET concept = "{input.ecInput()}", '
                    f'modified = "{dt()}" WHERE cID = {cID}')
+    conceptList = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = {input.tID()} AND archived = 0", conn)
     conn.commit()
     conn.close()
-
-    ui.modal_remove()    
+    #Update concept table
+    concepts.set(conceptList)
+    ui.modal_remove()  
 
 # --- delete a concept (archive)
 @reactive.effect
-@reactive.event(input.cDel)
-def show_login_modal():
-    if input.conceptsTable_selected_rows() is None: return
-    cID = concepts().iloc[input.conceptsTable_selected_rows()]["cID"]
+@reactive.event(input.cArchive)
+def _():
+    if input.conceptsTable_selected_rows() == (): return
+
+    cID = concepts.get().iloc[input.conceptsTable_selected_rows()]["cID"]
     conn = sqlite3.connect('appData/tutorBot.db')
     cursor = conn.cursor()
     cursor.execute('UPDATE concept SET archived = 1, '
                    f'modified = "{dt()}" WHERE cID = {cID}')
+    conceptList = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = {input.tID()} AND archived = 0", conn)
     conn.commit()
     conn.close()
+
+    concepts.set(conceptList)
+
+@reactive.effect
+@reactive.event(input.tID)
+def _():
+    
+    tID = input.tID() if input.tID() else 0
+    conn = sqlite3.connect('appData/tutorBot.db')
+    conceptList = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = {tID} AND archived = 0", conn)
+    conn.close()
+    concepts.set(conceptList)
 
 # --- RENDERING UI ---
 ui.page_opts(fillable=True)
@@ -395,17 +384,21 @@ with ui.navset_pill(id="tab"):
                     ui.input_action_button("tAdd", "Add new", width= "180px"),
                     ui.input_action_button("tArchive", "Archive selected", width= "180px")
                 )
-                ui.input_select("topic", "Pick a topic", choices=[], width="400px")                
+                ui.input_select("tID", "Pick a topic", choices=[], width="400px")                
             
             with ui.card():
                 ui.card_header("Concepts related to the topic")
+                HTML('<i>Concepts are facts or pieces of information you want the Bot to check with your students.'
+                     'You can be very brief, as all context will be retrieved from the database of documents. '
+                     'Don\'t be too broad, as this might cause confusion (you\'ll have to test it). '
+                     'Try to limit the number of concepts to 4 - 8 as the AI might preform worse with a large number</i>')
                 div(ui.input_action_button("cAdd", "Add new", width= "180px"),
                 ui.input_action_button("cEdit", "Edit selected", width= "180px"),
-                ui.input_action_button("cDel", "Delete selected", width= "180px"), style = "display:inline")
+                ui.input_action_button("cArchive", "Archive selected", width= "180px"), style = "display:inline")
                 @render.data_frame
                 def conceptsTable():
                     return render.DataTable(
-                        concepts()[["concept"]], width="100%", row_selection_mode="single")                
+                        concepts.get()[["concept"]], width="100%", row_selection_mode="single")                
 
-    with ui.nav_panel("Upload"):
+    with ui.nav_panel("Vector Database"):
         "test"
