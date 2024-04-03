@@ -25,6 +25,26 @@ from shiny import reactive
 from shiny.express import input, render, ui, session
 from htmltools import HTML, div
 
+# The following is needed to prevent async issues when inserting new data in vector DB
+# https://github.com/run-llama/llama_index/issues/9978
+import nest_asyncio 
+nest_asyncio.apply()
+
+# --- Global variables
+
+appDB = "appData/tutorBot.db"
+vectorDB = "appData/vectorStore.duckdb"
+storageFolder = "appData/uploadedFiles/" #keep files user uploads, if set to None, original not kept
+uID = 2 #if registered admins make reactive later
+
+# Get the OpenAI API key and organistation
+os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
+os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
+gptModel = "gpt-3.5-turbo-0125" # use gpt-3.5-turbo-0125 or gpt-4
+
+# Use OpenAI LLM from Llamaindex 
+llm = OpenAI(model=gptModel)
+
 # ----------- FUNCTIONS -----------
 # *********************************
 
@@ -38,13 +58,13 @@ def inputCheck(input):
         False
 
 # Database to store app data (this is not the vector database!)
-def createAppDB(DBpath, addDemo = True):
+def createAppDB(DBpath, sqlFile = "appData/createDB.sql", addDemo = True):
     
     if os.path.exists(DBpath):
-        raise FileExistsError(f"{DBpath} already exists")
+        return (1, "Database already exists. Skipping")
     
     #Create a new database from the SQL file
-    with open("appData/createDB.sql", 'r') as file:
+    with open(sqlFile, 'r') as file:
         query = file.read().replace('\n', ' ').replace('\t', '').split(";")
 
     conn = sqlite3.connect(DBpath)
@@ -86,22 +106,27 @@ def createAppDB(DBpath, addDemo = True):
     conn.commit()
     conn.close()
 
-newFile = "backup/testData/Mendelian inheritance.txt"
-vectorDB = "backup/testData/testDB.duckdb"
-appDB = "backup/testData/appDB.db"
-storageFolder = "backup/testData/originalFiles"
-newFileName = None
+    return (0, "Creation completed")
 
-createAppDB(appDB)
-addFileToDB(newFile, vectorDB, appDB, storageFolder, newFileName)
+# newFile = "backup/testData/Mendelian inheritance.txt"
+# vectorDB = "backup/testData/testDB.duckdb"
+# appDB = "backup/testData/appDB.db"
+# storageFolder = "backup/testData/originalFiles"
+# newFileName = None
+# createAppDB(appDB)
+# addFileToDB(newFile, vectorDB, appDB, storageFolder, newFileName)
 
+# Create DuckDB vector database and add files
 def addFileToDB(newFile, vectorDB, appDB, storageFolder = None, newFileName = None):
 
     if not os.path.exists(appDB):
         raise ConnectionError("The appDB was not found")
     
+    if not os.path.exists(newFile):
+        raise ConnectionError(f"The newFile was not found at {newFile}")
+    
     # Move the file to permanent storage if requested
-    if storageFolder != None:
+    if storageFolder is not None:
         if not os.path.exists(storageFolder):
             os.makedirs(storageFolder)
         
@@ -116,32 +141,24 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder = None, newFileName = No
     
     # Workaround for error: RuntimeError('Event loop is closed')
     # https://github.com/run-llama/llama_index/issues/7244
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    # loop = asyncio.new_event_loop()
+    # asyncio.set_event_loop(loop)
     # ---
     # newFile='backup/testData/Mendelian inheritance.txt'
     # newFile='backup/testData/Central_dogma_of_molecular_biology.pdf'
     newData = SimpleDirectoryReader(input_files=[newFile]).load_data()
 
-    # Build the vector store https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/ 
-    vectorDB = 'backup/testData/testdb.duckdb'
+    # Build the vector store https://docs.llamaindex.ai/en/stable/examples/vector_stores/DuckDBDemo/?h=duckdb
     if os.path.exists(vectorDB):
-        # vector_store = DuckDBVectorStore(1536, os.path.basename(vectorDB), persist_dir = os.path.dirname(vectorDB))
-        # # storage_context = StorageContext.from_defaults(index_store=os.path.basename(vectorDB), persist_dir=os.path.dirname(vectorDB))
-        # x = DuckDBVectorStore(embed_dim=1536)
-        # x
-        # vector_store = vector_store.from_local(vectorDB)
-        # index = VectorStoreIndex.from_vector_store(vector_store)
-        p = "D:/Documents/LocalProjects/TutorBot/backup/testData/"
-        StorageContext.from_defaults()
-        index = load_index_from_storage(storage_context)
-        index = VectorStoreIndex.from_vector_store(vector_store)
-        index = VectorStoreIndex.from_documents(newData, storage_context = storage_context, transformations=[TitleExtractor(), KeywordExtractor()])
-        index = index.insert(newData[0], storage_context = storage_context, transformations=[TitleExtractor(), KeywordExtractor()])
-    else:                  
-        vector_store = DuckDBVectorStore(1536, os.path.basename(vectorDB), persist_dir = p)
+        vector_store = DuckDBVectorStore.from_local(vectorDB)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        index = VectorStoreIndex.from_documents(newData, storage_context = storage_context, transformations=[TitleExtractor(), KeywordExtractor()])
+        index =VectorStoreIndex.from_vector_store(vector_store)
+        index = index.insert(newData, storage_context = storage_context, transformations=[TitleExtractor(), KeywordExtractor()])
+    else:                  
+        vector_store = DuckDBVectorStore(1536, os.path.basename(vectorDB), persist_dir = os.path.dirname(vectorDB))
+        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+        index = VectorStoreIndex.from_documents(newData, storage_context = storage_context, 
+                                                transformations=[TitleExtractor(), KeywordExtractor()])
     
     #Get the metadata out of the DB excerpt_keywords document_title
     fileName = newData[0].metadata["file_name"]
@@ -177,72 +194,16 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder = None, newFileName = No
 
     return (0, "Completed")
 
-# --- Global variables
-
-# Get the OpenAI API key and organistation
-os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
-os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
-gptModel = "gpt-3.5-turbo-0125" # use gpt-3.5-turbo-0125 or gpt-4
-
-# TUTORIAL Llamaindex
-# https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
-
-# Use OpenAI LLM 
-llm = OpenAI(model=gptModel) # use gpt-3.5-turbo-0125	or gpt-4
-
-if not os.path.exists("appData/vectorStore.duckdb"):
-
-    if not os.path.exists("appData/uploadedFiles"):
-        os.makedirs("appData/uploadedFiles")
-
-    # Build the vector store https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/   
-    data = SimpleDirectoryReader(input_dir= "appData/uploadedFiles").load_data()
-    vector_store = DuckDBVectorStore(1536, "vectorStore.duckdb", persist_dir= "appData/")
-    storage_context = StorageContext.from_defaults(vector_store=vector_store)
-    #Generate the first index
-    index = VectorStoreIndex.from_documents(data, storage_context=storage_context,
-                                            transformations=[TitleExtractor(), KeywordExtractor()])
-    
-    #Get the metadata out of the DB excerpt_keywords document_title
-    fileName = data[1].metadata["file_name"]
-    con = duckdb.connect("appData/vectorStore.duckdb")
-    #con.query("SELECT metadata_ FROM documents LIMIT 1").fetchall()
-    x = con.query('SELECT metadata_ ->> [\'document_title\', \'excerpt_keywords\'] FROM documents WHERE CAST(json_extract(metadata_, \'$.file_name\') as VARCHAR) = \'"Central_dogma_of_molecular_biology.pdf"\'').fetchall()
-    con.close()
-
-    chunkTitles = "* " + "\n* ".join(set([y[0][0] for y in x]))
-    chunkKeywords = ", ".join(set((", ".join([y[0][1] for y in x])).split(", ")))    
-
-    #Summarise everything using the LLM and add it to the DB
-    docSum = ("Below is a list of subheadings belonging to the same document."
-          f"Note that many of them might be near identical:\n\n{chunkTitles}"
-          f"\n\nYou also get a list of keywords describing the same content:\n\n{chunkKeywords}"
-          "\n\nAgain note that some key words are very related.\n"
-          "Your task is to summarize all of this into a single, succinct short title, a subtitle, "
-          "and a list of the top-10 keywords. Stay as close to the original titles as possible."
-          " The output should be in the following valid JSON format: \n\n"
-          '{"title": "", "subtitle": "", "keywords": []}')
-    docSum = json.loads(str(index.as_query_engine().query(docSum)))
-
-    conn = sqlite3.connect('appData/tutorBot.db')
-    cursor = conn.cursor()
-    _ = cursor.execute(('INSERT INTO file(fileName, title, subtitle, created) '
-                       f'VALUES("{fileName}", "{docSum["title"]}", "{docSum["subtitle"]}", "{dt()}")'))
-    fID = cursor.lastrowid
-    _ = cursor.executemany('INSERT INTO keyword(fID, keyword) ' 
-                           f'VALUES("{fID}", ?)', [(item,) for item in docSum["keywords"]])
-    conn.commit()
-    conn.close()
-
-else:
-    vector_store = DuckDBVectorStore(1536, "vectorStore.duckdb", persist_dir= "appData/")
-    index = VectorStoreIndex.from_vector_store(vector_store)
-
-
 # ----------- SHINY APP -----------
 # *********************************
 
-uID = 2 #if registered users update later
+#Make new app DB if needed
+print(createAppDB(appDB, addDemo = True))
+
+# --- UI COMPONENTS ---
+uiUploadFile = div(ui.input_file(
+    "newFile", "Pick a file", width="100%",
+    accept=[".csv", ".pdf", ".docx", ".txt", ".md", ".epub", ".ipynb", ".ppt", ".pptx"]), id="uiUploadFile")
 
 # --- REACTIVE VARIABLES ---
 
@@ -250,7 +211,7 @@ sessionID = reactive.value(0)
 
 # Workaround until issue with reactive.cals is resolved
 # https://github.com/posit-dev/py-shiny/issues/1271
-conn = sqlite3.connect('appData/tutorBot.db')
+conn = sqlite3.connect(appDB)
 concepts = pd.read_sql_query("SELECT * FROM concept WHERE tID = 0", conn)
 files = pd.read_sql_query("SELECT * FROM file", conn)
 conn.close()
@@ -263,8 +224,9 @@ files = reactive.value(files)
 # Code to run at the start of the session (i.e. user connects)
 @reactive.effect
 def _():
-    #Register the session in the DB at start
-    conn = sqlite3.connect('appData/tutorBot.db')
+
+    #Register the session in the DB at start    
+    conn = sqlite3.connect(appDB)
     cursor = conn.cursor()
     #For now we only have anonymous users
     cursor.execute('INSERT INTO session (shinyToken, uID, start)'
@@ -283,7 +245,7 @@ def _():
 # Code to run at the end of the session (i.e. user disconnects)
 def theEnd(sID):
     #Add logs to the database after user exits
-    conn = sqlite3.connect('appData/tutorBot.db')
+    conn = sqlite3.connect(appDB)
     cursor = conn.cursor()
     cursor.execute(f'UPDATE session SET end = "{dt()}" WHERE sID = {sID}')
     conn.commit()
@@ -320,7 +282,7 @@ def addNewTopic():
         return
     
     #Add new topic to DB
-    conn = sqlite3.connect('appData/tutorBot.db')
+    conn = sqlite3.connect(appDB)
     cursor = conn.cursor()
     cursor.execute('INSERT INTO topic(topic, created, description)'
                    f'VALUES("{input.ntTopic()}", "{dt()}", "{input.ntDescr()}")')
@@ -354,7 +316,7 @@ def addNewTopic():
 # @reactive.event(input.ncEdit)  
 # def addNewConcept():
 #     cID = concepts().iloc[input.conceptsTable_selected_rows()]["cID"]
-#     conn = sqlite3.connect('appData/tutorBot.db')
+#     conn = sqlite3.connect(appDB)
 #     cursor = conn.cursor()
 #     cursor.execute(f'UPDATE concept SET concept = "{input.ecInput()}", '
 #                    f'modified = "{dt()}" WHERE cID = {cID}')
@@ -369,7 +331,7 @@ def addNewTopic():
 def _():
     if input.tID() is None: return
 
-    conn = sqlite3.connect('appData/tutorBot.db')
+    conn = sqlite3.connect(appDB)
     cursor = conn.cursor()
     cursor.execute('UPDATE topic SET archived = 1, '
                    f'modified = "{dt()}" WHERE tID = {input.tID()}')
@@ -384,7 +346,6 @@ def _():
     
     conn.commit()
     conn.close()
-
 
 
 # ---- CONCEPTS ----
@@ -416,7 +377,7 @@ def _():
         return
     
     #Add new topic to DB
-    conn = sqlite3.connect('appData/tutorBot.db')
+    conn = sqlite3.connect(appDB)
     cursor = conn.cursor()
     cursor.execute('INSERT INTO concept(tID, concept, created)'
                    f'VALUES({input.tID()}, "{input.ncInput()}", "{dt()}")')
@@ -426,7 +387,6 @@ def _():
     #Update concept table
     concepts.set(conceptList)
     ui.modal_remove()
-
 
 
 # --- Edit an existing concepts
@@ -459,7 +419,7 @@ def _():
     
     #Edit topic in DB
     cID = concepts.get().iloc[input.conceptsTable_selected_rows()]["cID"]
-    conn = sqlite3.connect('appData/tutorBot.db')
+    conn = sqlite3.connect(appDB)
     cursor = conn.cursor()
     cursor.execute(f'UPDATE concept SET concept = "{input.ecInput()}", '
                    f'modified = "{dt()}" WHERE cID = {cID}')
@@ -477,7 +437,7 @@ def _():
     if input.conceptsTable_selected_rows() == (): return
 
     cID = concepts.get().iloc[input.conceptsTable_selected_rows()]["cID"]
-    conn = sqlite3.connect('appData/tutorBot.db')
+    conn = sqlite3.connect(appDB)
     cursor = conn.cursor()
     cursor.execute('UPDATE concept SET archived = 1, '
                    f'modified = "{dt()}" WHERE cID = {cID}')
@@ -492,7 +452,7 @@ def _():
 def _():
     
     tID = input.tID() if input.tID() else 0
-    conn = sqlite3.connect('appData/tutorBot.db')
+    conn = sqlite3.connect(appDB)
     conceptList = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = {tID} AND archived = 0", conn)
     conn.close()
     concepts.set(conceptList)
@@ -504,7 +464,33 @@ def _():
 @reactive.event(input.newFile, ignore_init=True)
 def _():
     #Move the file to the uploadedFiles folder
-    move(input.newFile()[0]["datapath"], "appData/uploadedFiles/" + input.newFile()[0]["name"])
+    updateVectorDB(input.newFile()[0]["datapath"], vectorDB, appDB, storageFolder, 
+                input.newFile()[0]["name"])
+    ui.insert_ui(HTML(f'<div id=processFile><i>Processing {input.newFile()[0]["name"]}</i></div>'), 
+                 "#uiUploadFile", "afterEnd")
+    ui.remove_ui("#uiUploadFile")
+
+
+
+@reactive.extended_task
+async def updateVectorDB(newFile, vectorDB, appDB, storageFolder, newFileName):
+    print("Start adding file...")
+    return addFileToDB(newFile, vectorDB, appDB, storageFolder, newFileName)
+
+@reactive.effect
+def _():
+    insertionResult = updateVectorDB.result()[0]
+    msg = "File succesfully added to the vector database" if \
+        insertionResult == 0 else "A file with the same name already exists. Skipping upload"
+    ui.modal_show(
+        ui.modal(msg, title="Success" if insertionResult == 0 else "Issue")
+    )
+    conn = sqlite3.connect(appDB)
+    getFiles = pd.read_sql_query("SELECT * FROM file", conn)
+    files.set(getFiles)
+    conn.close()
+    ui.insert_ui(uiUploadFile, "#processFile", "afterEnd")
+    ui.remove_ui("#processFile")
 
 
 # --- RENDERING UI ---
@@ -561,6 +547,5 @@ with ui.navset_pill(id="tab"):
                 
         with ui.card():
                 ui.card_header("Upload a new file")
-                ui.input_file("newFile", "Pick a file", 
-                              accept=[".csv", ".pdf", ".docx", ".txt", ".md", ".epub", ".ipynb", ".ppt", ".pptx"])
+                uiUploadFile
 
