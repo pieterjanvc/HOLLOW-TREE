@@ -11,11 +11,12 @@ import regex as re
 import duckdb
 import json
 from shutil import move
+import asyncio
 # -- Llamaindex
 # pip install llama-index
 # pip install llama-index-vector-stores-duckdb
 # pip install llama-index-llms-openai
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
 from llama_index.core.extractors import TitleExtractor, KeywordExtractor
 from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
@@ -37,12 +38,16 @@ def inputCheck(input):
         False
 
 # Database to store app data (this is not the vector database!)
-if not os.path.exists('appData/tutorBot.db'):
-    #Create a new database 
-    with open('appData/createDB.sql', 'r') as file:
+def createAppDB(DBpath, addDemo = True):
+    
+    if os.path.exists(DBpath):
+        raise FileExistsError(f"{DBpath} already exists")
+    
+    #Create a new database from the SQL file
+    with open("appData/createDB.sql", 'r') as file:
         query = file.read().replace('\n', ' ').replace('\t', '').split(";")
 
-    conn = sqlite3.connect('appData/tutorBot.db')
+    conn = sqlite3.connect(DBpath)
     cursor = conn.cursor()
     
     for x in query:
@@ -51,6 +56,11 @@ if not os.path.exists('appData/tutorBot.db'):
     #Add the anonymous user and main admin
     _ = cursor.execute('INSERT INTO user(username, isAdmin, created)' 
                        f'VALUES("anonymous", 0, "{dt()}"), ("admin", 1, "{dt()}")')
+    
+    if not addDemo:
+        conn.commit()
+        conn.close()
+        return
     
     #Add a test topic (to be removed later)
     topic = "The central dogma of molecular biology"
@@ -75,6 +85,97 @@ if not os.path.exists('appData/tutorBot.db'):
                            f'VALUES({tID}, ?, "{dt()}")', concepts)
     conn.commit()
     conn.close()
+
+newFile = "backup/testData/Mendelian inheritance.txt"
+vectorDB = "backup/testData/testDB.duckdb"
+appDB = "backup/testData/appDB.db"
+storageFolder = "backup/testData/originalFiles"
+newFileName = None
+
+createAppDB(appDB)
+addFileToDB(newFile, vectorDB, appDB, storageFolder, newFileName)
+
+def addFileToDB(newFile, vectorDB, appDB, storageFolder = None, newFileName = None):
+
+    if not os.path.exists(appDB):
+        raise ConnectionError("The appDB was not found")
+    
+    # Move the file to permanent storage if requested
+    if storageFolder != None:
+        if not os.path.exists(storageFolder):
+            os.makedirs(storageFolder)
+        
+        newFileName = os.path.basename(newFile) if newFileName is None else newFileName        
+        newFilePath = os.path.join(storageFolder, '') + newFileName
+
+        if os.path.exists(newFilePath):
+            return (1, "A file with this name already exists. Skipping")
+
+        move(newFile, newFilePath)
+        newFile = newFilePath
+    
+    # Workaround for error: RuntimeError('Event loop is closed')
+    # https://github.com/run-llama/llama_index/issues/7244
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    # ---
+    # newFile='backup/testData/Mendelian inheritance.txt'
+    # newFile='backup/testData/Central_dogma_of_molecular_biology.pdf'
+    newData = SimpleDirectoryReader(input_files=[newFile]).load_data()
+
+    # Build the vector store https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/ 
+    vectorDB = 'backup/testData/testdb.duckdb'
+    if os.path.exists(vectorDB):
+        # vector_store = DuckDBVectorStore(1536, os.path.basename(vectorDB), persist_dir = os.path.dirname(vectorDB))
+        # # storage_context = StorageContext.from_defaults(index_store=os.path.basename(vectorDB), persist_dir=os.path.dirname(vectorDB))
+        # x = DuckDBVectorStore(embed_dim=1536)
+        # x
+        # vector_store = vector_store.from_local(vectorDB)
+        # index = VectorStoreIndex.from_vector_store(vector_store)
+        p = "D:/Documents/LocalProjects/TutorBot/backup/testData/"
+        StorageContext.from_defaults()
+        index = load_index_from_storage(storage_context)
+        index = VectorStoreIndex.from_vector_store(vector_store)
+        index = VectorStoreIndex.from_documents(newData, storage_context = storage_context, transformations=[TitleExtractor(), KeywordExtractor()])
+        index = index.insert(newData[0], storage_context = storage_context, transformations=[TitleExtractor(), KeywordExtractor()])
+    else:                  
+        vector_store = DuckDBVectorStore(1536, os.path.basename(vectorDB), persist_dir = p)
+        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+        index = VectorStoreIndex.from_documents(newData, storage_context = storage_context, transformations=[TitleExtractor(), KeywordExtractor()])
+    
+    #Get the metadata out of the DB excerpt_keywords document_title
+    fileName = newData[0].metadata["file_name"]
+    #vectorDB = "appData/vectorstore.duckdb"
+    con = duckdb.connect(vectorDB)
+    #con.query("SELECT metadata_ FROM documents").fetchall()
+    x = con.query(f'SELECT metadata_ ->> [\'document_title\', \'excerpt_keywords\'] FROM documents WHERE CAST(json_extract(metadata_, \'$.file_name\') as VARCHAR) = \'"{fileName}"\'').fetchall()
+    con.close()
+
+    chunkTitles = "* " + "\n* ".join(set([y[0][0] for y in x]))
+    chunkKeywords = ", ".join(set((", ".join([y[0][1] for y in x])).split(", ")))    
+
+    #Summarise everything using the LLM and add it to the DB
+    docSum = ("Below is a list of subheadings belonging to the same document."
+          f"Note that many of them might be near identical:\n\n{chunkTitles}"
+          f"\n\nYou also get a list of keywords describing the same content:\n\n{chunkKeywords}"
+          "\n\nAgain note that some key words are very related.\n"
+          "Your task is to summarize all of this into a single, succinct short title, a subtitle, "
+          "and a list of the top-10 keywords. Stay as close to the original titles as possible."
+          " The output should be in the following valid JSON format: \n\n"
+          '{"title": "", "subtitle": "", "keywords": []}')
+    docSum = json.loads(str(index.as_query_engine().query(docSum)))
+
+    conn = sqlite3.connect(appDB)
+    cursor = conn.cursor()
+    _ = cursor.execute(('INSERT INTO file(fileName, title, subtitle, created) '
+                       f'VALUES("{fileName}", "{docSum["title"]}", "{docSum["subtitle"]}", "{dt()}")'))
+    fID = cursor.lastrowid
+    _ = cursor.executemany('INSERT INTO keyword(fID, keyword) ' 
+                           f'VALUES("{fID}", ?)', [(item,) for item in docSum["keywords"]])
+    conn.commit()
+    conn.close()
+
+    return (0, "Completed")
 
 # --- Global variables
 
