@@ -11,7 +11,6 @@ import regex as re
 import duckdb
 import json
 from shutil import move
-import asyncio
 # -- Llamaindex
 # pip install llama-index
 # pip install llama-index-vector-stores-duckdb
@@ -108,13 +107,12 @@ def createAppDB(DBpath, sqlFile = "appData/createDB.sql", addDemo = True):
 
     return (0, "Creation completed")
 
-# newFile = "backup/testData/Mendelian inheritance.txt"
-# vectorDB = "backup/testData/testDB.duckdb"
-# appDB = "backup/testData/appDB.db"
-# storageFolder = "backup/testData/originalFiles"
+# newFile = "appData/Central_dogma_of_molecular_biology.pdf"
+# newFile = "appData/Mendelian inheritance.txt"
+# vectorDB = "appData/testDB.duckdb"
+# appDB = "appData/appDB.db"
+# storageFolder = "appData/uploadedFiles"
 # newFileName = None
-# createAppDB(appDB)
-# addFileToDB(newFile, vectorDB, appDB, storageFolder, newFileName)
 
 # Create DuckDB vector database and add files
 def addFileToDB(newFile, vectorDB, appDB, storageFolder = None, newFileName = None):
@@ -139,23 +137,16 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder = None, newFileName = No
         move(newFile, newFilePath)
         newFile = newFilePath
     
-    # Workaround for error: RuntimeError('Event loop is closed')
-    # https://github.com/run-llama/llama_index/issues/7244
-    # loop = asyncio.new_event_loop()
-    # asyncio.set_event_loop(loop)
-    # ---
-    # newFile='backup/testData/Mendelian inheritance.txt'
-    # newFile='backup/testData/Central_dogma_of_molecular_biology.pdf'
     newData = SimpleDirectoryReader(input_files=[newFile]).load_data()
 
     # Build the vector store https://docs.llamaindex.ai/en/stable/examples/vector_stores/DuckDBDemo/?h=duckdb
     if os.path.exists(vectorDB):
         vector_store = DuckDBVectorStore.from_local(vectorDB)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        index =VectorStoreIndex.from_vector_store(vector_store)
-        index = index.insert(newData, storage_context = storage_context, transformations=[TitleExtractor(), KeywordExtractor()])
+        index = VectorStoreIndex.from_documents(newData, storage_context = storage_context, 
+                                                transformations=[TitleExtractor(), KeywordExtractor()])
     else:                  
-        vector_store = DuckDBVectorStore(1536, os.path.basename(vectorDB), persist_dir = os.path.dirname(vectorDB))
+        vector_store = DuckDBVectorStore(os.path.basename(vectorDB), persist_dir = os.path.dirname(vectorDB))
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
         index = VectorStoreIndex.from_documents(newData, storage_context = storage_context, 
                                                 transformations=[TitleExtractor(), KeywordExtractor()])
