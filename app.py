@@ -21,41 +21,42 @@ from shiny import reactive
 from shiny.express import input, render, ui, session
 from htmltools import HTML, div
 
-#ONly run the app if the database exists
-if not os.path.exists('appData/tutorBot.db'):
-    raise ConnectionError("The app database was not found. Please run the admin app first")
-
-def dt():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
 # --- Global variables
 
-# Get the OpenAI API key and organistation
+appDB = "appData/appDB.db"
+vectorDB = "appData/vectordb.duckdb"
+# Get the OpenAI API key and organistation from the enviroment
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
 os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
 gptModel = "gpt-3.5-turbo-0125" # use gpt-3.5-turbo-0125 or gpt-4
+llm = OpenAI(model=gptModel)
 
-conn = sqlite3.connect('appData/tutorBot.db')
+if not os.path.exists(appDB):
+    raise ConnectionError("The app database was not found. Please run the admin app first")
 
-#Check if there are topics to discuss present before proceeding
+if not os.path.exists(vectorDB):
+    raise ConnectionError("The vector database was not found. Please run the admin app first")
+
+if os.environ["OPENAI_API_KEY"] is None:
+    raise ValueError("There is no OpenAI API key stored in the the OPENAI_API_KEY environment variable")
+
+#Check if there are topics to discuss before proceeding
+conn = sqlite3.connect(appDB)
 topics = pd.read_sql_query("SELECT * FROM topic WHERE archived = 0 AND tID IN"
                            "(SELECT DISTINCT tID from concept WHERE archived = 0)", conn)
 
 if topics.shape[0] == 0:
     raise ValueError("There are no active topics with at least one concept in the database."
                      " Please run the admin app first")
-
 conn.close()
 
-# TUTORIAL Llamaindex
-# https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
-
-# Use OpenAI LLM 
-llm = OpenAI(model=gptModel) # use gpt-3.5-turbo-0125	or gpt-4
-
-# Load the index from storage
-vector_store = DuckDBVectorStore(1536, "vectorStore.duckdb", persist_dir= "appData/")
+# Load the vector index from storage
+vector_store = DuckDBVectorStore.from_local(vectorDB)
 index = VectorStoreIndex.from_vector_store(vector_store)
+
+# --- GLOBAL FUNCTIONS
+def dt():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # ----------- SHINY APP -----------
 # *********************************
@@ -71,7 +72,7 @@ def tID():
 
 @reactive.calc
 def concepts():
-    conn = sqlite3.connect('appData/tutorBot.db')
+    conn = sqlite3.connect(appDB)
     concepts = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = {tID()} AND archived = 0", conn)
     conn.close()
     return concepts
@@ -103,8 +104,8 @@ uID = 1 #if registered users update later
 
 @reactive.calc
 def chatEngine():
-
-    # Prompt engineering
+    # TUTORIAL Llamaindex + Prompt engineering
+    # https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
     # https://docs.llamaindex.ai/en/stable/examples/customization/prompts/chat_prompts/
 
     # The two strings below have not been altered from the defaults set by llamaindex, 
@@ -231,7 +232,7 @@ def _():
 @reactive.effect
 def _():
     #Register the session in the DB at start
-    conn = sqlite3.connect('appData/tutorBot.db')
+    conn = sqlite3.connect(appDB)
     cursor = conn.cursor()
     #For now we only have anonymous users
     cursor.execute('INSERT INTO session (shinyToken, uID, start)'
@@ -253,7 +254,7 @@ def _():
 # Code to run at the end of the session (i.e. user disconnects)
 def theEnd(sID, dID, msg):
     #Add logs to the database after user exits
-    conn = sqlite3.connect('appData/tutorBot.db')
+    conn = sqlite3.connect(appDB)
     cursor = conn.cursor()
     cursor.execute(f'UPDATE session SET end = "{dt()}" WHERE sID = {sID}')
     cursor.execute(f'UPDATE discussion SET end = "{dt()}" WHERE dID = {dID}')
