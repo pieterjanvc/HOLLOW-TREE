@@ -61,10 +61,59 @@ def dt():
 # ----------- SHINY APP -----------
 # *********************************
 
+# --- RENDERING UI ---
+ui.page_opts(fillable=True)
+
+# Add some JS so that pressing enter can send the message too    
+ui.head_content(
+    HTML("""<script>
+         $(document).keyup(function(event) {
+            if ($("#newChat").is(":focus") && (event.key == "Enter") && event.ctrlKey) {
+                $("#send").click();
+            }
+        });
+         </script>""")
+)
+ui.include_css("www/styles.css")
+
+with ui.navset_pill(id="tab"): 
+    
+    with ui.nav_panel("BMIbot"):
+
+        # Render the chat window
+        with ui.layout_columns(col_widths=12):
+            with ui.card(id="topicSelection"):
+                ui.input_select("tID", "Pick a topic:", choices={1: "test"}, width="600px")  
+            
+            with ui.card(id="chatWindow", height="70vh"):
+                ui.card_header("Conversation")                
+                @render.ui
+                def chatLog():    
+                    return div(HTML(userLog.get()))                
+
+        #Render the text input (send button generated above)
+        @render.ui
+        def chatButton():
+            return chatInput.get()
+
+    with ui.nav_panel("Profile"):
+        with ui.layout_columns(col_widths= 12):  
+            with ui.card():
+                ui.card_header("User Progress")
+                "TODO"
+
+
 # --- REACTIVE VARIABLES ---
 
 sessionID = reactive.value(0)
 discussionID = reactive.value(0)
+
+# @reactive.calc
+# def topics():
+#     conn = sqlite3.connect(appDB)
+#     topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+#     ui.update_select("tID", choices=dict(zip(topics["tID"], topics["topic"])))
+#     return topics
 
 @reactive.calc
 def tID():
@@ -262,41 +311,3 @@ def theEnd(sID, dID, msg):
                    f'VALUES({dID}, ?, ?, ?)', msg)
     conn.commit()
     conn.close()
-
-# --- RENDERING UI ---
-ui.page_opts(fillable=True)
-
-# Add some JS so that pressing enter can send the message too    
-ui.head_content(
-    HTML("""<script>
-         $(document).keyup(function(event) {
-            if ($("#newChat").is(":focus") && (event.key == "Enter") && event.ctrlKey) {
-                $("#send").click();
-            }
-        });
-         </script>""")
-)
-ui.include_css("www/styles.css")
-
-with ui.navset_pill(id="tab"): 
-    
-    with ui.nav_panel("BMIbot"):
-
-        # Render the chat window
-        with ui.layout_columns():  
-            with ui.card(id="chatWindow", height="70vh"):
-                ui.card_header("Conversation")
-                @render.ui
-                def chatLog():    
-                    return div(HTML(userLog.get()))
-
-        #Render the text input (send button generated above)
-        @render.ui
-        def chatButton():
-            return chatInput.get()
-
-    with ui.nav_panel("Profile"):
-        with ui.layout_columns(col_widths= 12):  
-            with ui.card():
-                ui.card_header("User Progress")
-                "TODO"
