@@ -196,6 +196,63 @@ uiUploadFile = div(ui.input_file(
     "newFile", "Pick a file", width="100%",
     accept=[".csv", ".pdf", ".docx", ".txt", ".md", ".epub", ".ipynb", ".ppt", ".pptx"]), id="uiUploadFile")
 
+# --- RENDERING UI ---
+#**********************
+    
+ui.page_opts(fillable=True)
+
+# Add some JS so that pressing enter can send the message too    
+ui.head_content(
+    HTML("""<script>
+         $(document).keyup(function(event) {
+            if ($("#newChat").is(":focus") && (event.key == "Enter")) {
+                $("#send").click();
+            }
+        });
+         </script>""")
+)
+ui.include_css("www/styles.css")
+
+with ui.navset_pill(id="tab"): 
+    
+    with ui.nav_panel("Topics"):
+
+        with ui.layout_columns(col_widths= 12): 
+            with ui.card():
+                ui.card_header("Topic")
+                div(
+                    ui.input_action_button("tAdd", "Add new", width= "180px"),
+                    ui.input_action_button("tArchive", "Archive selected", width= "180px")
+                )
+                ui.input_select("tID", "Pick a topic", choices=[], width="400px")                
+            
+            with ui.card():
+                ui.card_header("Concepts related to the topic")
+                HTML('<i>Concepts are facts or pieces of information you want the Bot to check with your students.'
+                     'You can be very brief, as all context will be retrieved from the database of documents. '
+                     'Don\'t be too broad, as this might cause confusion (you\'ll have to test it). '
+                     'Try to limit the number of concepts to 4 - 8 as the AI might preform worse with a large number</i>')
+                div(ui.input_action_button("cAdd", "Add new", width= "180px"),
+                ui.input_action_button("cEdit", "Edit selected", width= "180px"),
+                ui.input_action_button("cArchive", "Archive selected", width= "180px"), style = "display:inline")
+                @render.data_frame
+                def conceptsTable():
+                    return render.DataTable(
+                        concepts.get()[["concept"]], width="100%", row_selection_mode="single")                
+
+    with ui.nav_panel("Vector Database"):
+        with ui.card():
+                ui.card_header("Vector database files")
+                @render.data_frame
+                def filesTable():
+                    return render.DataTable(
+                        files.get(), width="100%", row_selection_mode="single")
+                
+        with ui.card():
+                ui.card_header("Upload a new file")
+                uiUploadFile
+
+
 # --- REACTIVE VARIABLES ---
 
 sessionID = reactive.value(0)
@@ -482,61 +539,3 @@ def _():
     conn.close()
     ui.insert_ui(uiUploadFile, "#processFile", "afterEnd")
     ui.remove_ui("#processFile")
-
-
-# --- RENDERING UI ---
-#**********************
-    
-ui.page_opts(fillable=True)
-
-# Add some JS so that pressing enter can send the message too    
-ui.head_content(
-    HTML("""<script>
-         $(document).keyup(function(event) {
-            if ($("#newChat").is(":focus") && (event.key == "Enter")) {
-                $("#send").click();
-            }
-        });
-         </script>""")
-)
-ui.include_css("www/styles.css")
-
-with ui.navset_pill(id="tab"): 
-    
-    with ui.nav_panel("Topics"):
-
-        with ui.layout_columns(col_widths= 12): 
-            with ui.card():
-                ui.card_header("Topic")
-                div(
-                    ui.input_action_button("tAdd", "Add new", width= "180px"),
-                    ui.input_action_button("tArchive", "Archive selected", width= "180px")
-                )
-                ui.input_select("tID", "Pick a topic", choices=[], width="400px")                
-            
-            with ui.card():
-                ui.card_header("Concepts related to the topic")
-                HTML('<i>Concepts are facts or pieces of information you want the Bot to check with your students.'
-                     'You can be very brief, as all context will be retrieved from the database of documents. '
-                     'Don\'t be too broad, as this might cause confusion (you\'ll have to test it). '
-                     'Try to limit the number of concepts to 4 - 8 as the AI might preform worse with a large number</i>')
-                div(ui.input_action_button("cAdd", "Add new", width= "180px"),
-                ui.input_action_button("cEdit", "Edit selected", width= "180px"),
-                ui.input_action_button("cArchive", "Archive selected", width= "180px"), style = "display:inline")
-                @render.data_frame
-                def conceptsTable():
-                    return render.DataTable(
-                        concepts.get()[["concept"]], width="100%", row_selection_mode="single")                
-
-    with ui.nav_panel("Vector Database"):
-        with ui.card():
-                ui.card_header("Vector database files")
-                @render.data_frame
-                def filesTable():
-                    return render.DataTable(
-                        files.get(), width="100%", row_selection_mode="single")
-                
-        with ui.card():
-                ui.card_header("Upload a new file")
-                uiUploadFile
-

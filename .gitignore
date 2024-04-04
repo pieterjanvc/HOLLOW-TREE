@@ -4,3 +4,4 @@ appData/uploadedFiles/*
 backup/*
 *.svg
 *.duckdb
+.venv/*
