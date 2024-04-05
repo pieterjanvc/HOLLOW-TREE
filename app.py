@@ -48,7 +48,7 @@ with ui.navset_pill(id="tab"):
         # Render the chat window
         with ui.layout_columns(col_widths=12):
             with ui.card(id="topicSelection"):
-                ui.input_select("tID", "Pick a topic:", choices=[], width="600px")
+                ui.input_select("selTopic", "Pick a topic:", choices=[], width="600px")
 
             with ui.card(id="chatWindow", height="70vh"):
                 ui.card_header("Conversation")
@@ -73,6 +73,7 @@ with ui.navset_pill(id="tab"):
 
 sessionID = reactive.value(0)
 discussionID = reactive.value(0)
+
 chatInput = reactive.value(
     ui.TagList(
         ui.input_text_area(
@@ -84,8 +85,25 @@ chatInput = reactive.value(
 
 
 @reactive.calc
+@reactive.event(input.selTopic)
 def tID():
-    return topics.iloc[0]["tID"]  # todo make user select topic
+    tID = topics[topics["tID"] == int(input.selTopic())].iloc[0]["tID"]
+    conn = sqlite3.connect(shared.appDB)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO discussion (tID, sID, start)"
+        f'VALUES({tID}, {sessionID.get()}, "{shared.dt()}")'
+    )
+    discussionID.set(cursor.lastrowid)
+    conn.commit()
+    conn.close()
+    return tID  # todo make user select topic
+
+
+firstWelcome = (
+    'Hello, I\'m here to help you get a basic understanding of the following topic: '
+    f'{topics.iloc[0]["topic"]}. Have you heard about this before?'
+)
 
 
 @reactive.calc
@@ -97,13 +115,13 @@ def welcome():
 
 
 with reactive.isolate():
-    messages = reactive.value([(1, shared.dt(), welcome())])
+    messages = reactive.value([(1, shared.dt(), firstWelcome)])
     userLog = reactive.value(f"""<div class='botChat talk-bubble tri'>
                             <p>Hello, I'm here to help you get a basic understanding of 
-                            the following topic: <b>{topics[topics["tID"] == tID()].iloc[0]["topic"]}</b>. 
+                            the following topic: <b>{topics.iloc[0]["topic"]}</b>. 
                             Have you heard about this before?</p></div>""")
     botLog = reactive.value(
-        f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\n{welcome()}"""
+        f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\n{firstWelcome}"""
     )
 
 
@@ -119,17 +137,12 @@ def _():
         f'VALUES("{session.id}", {uID}, "{shared.dt()}")'
     )
     sID = cursor.lastrowid
-    cursor.execute(
-        "INSERT INTO discussion (tID, sID, start)"
-        f'VALUES({tID()}, {sID}, "{shared.dt()}")'
-    )
-    dID = cursor.lastrowid
     sessionID.set(sID)
-    discussionID.set(dID)
     conn.commit()
     conn.close()
 
-    ui.update_select("tID", choices=dict(zip(topics["tID"], topics["topic"])))
+    # Set the topics based on what's in the database
+    ui.update_select("selTopic", choices=dict(zip(topics["tID"], topics["topic"])))
 
     # Set the function to be called when the session ends
     dID = discussionID.get()
@@ -254,7 +267,7 @@ def chatEngine():
 
 # When the send button is clicked...
 @reactive.effect
-@reactive.event(input.send, ignore_init=True)
+@reactive.event(input.send)
 def _():
     newChat = input.newChat()  # prevent HTML injection from user
     if newChat == "":
