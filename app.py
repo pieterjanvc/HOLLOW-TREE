@@ -2,81 +2,33 @@
 # ----------- TUTORBOT -----------
 # *********************************
 
-# ----------- FUNCTIONS -----------
-# *********************************
-
 # General
-import os
 import sqlite3
-from datetime import datetime
 from html import escape
 import pandas as pd
 
 # Llamaindex
-from llama_index.core import VectorStoreIndex, ChatPromptTemplate
+from llama_index.core import ChatPromptTemplate
 from llama_index.core.llms import ChatMessage, MessageRole
-from llama_index.llms.openai import OpenAI
-from llama_index.vector_stores.duckdb import DuckDBVectorStore
 
 # Shiny
 from shiny import reactive
 from shiny.express import input, render, ui, session
 from htmltools import HTML, div
 
-# --- Global variables
-
-appDB = "appData/appDB.db"
-vectorDB = "appData/vectordb.duckdb"
-# Get the OpenAI API key and organistation from the enviroment
-os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
-os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
-gptModel = "gpt-3.5-turbo-0125"  # use gpt-3.5-turbo-0125 or gpt-4
-llm = OpenAI(model=gptModel)
-
-if not os.path.exists(appDB):
-    raise ConnectionError(
-        "The app database was not found. Please run the admin app first"
-    )
-
-if not os.path.exists(vectorDB):
-    raise ConnectionError(
-        "The vector database was not found. Please run the admin app first"
-    )
-
-if os.environ["OPENAI_API_KEY"] is None:
-    raise ValueError(
-        "There is no OpenAI API key stored in the the OPENAI_API_KEY environment variable"
-    )
-
-# Check if there are topics to discuss before proceeding
-conn = sqlite3.connect(appDB)
-topics = pd.read_sql_query(
-    "SELECT * FROM topic WHERE archived = 0 AND tID IN"
-    "(SELECT DISTINCT tID from concept WHERE archived = 0)",
-    conn,
-)
-
-if topics.shape[0] == 0:
-    raise ValueError(
-        "There are no active topics with at least one concept in the database."
-        " Please run the admin app first"
-    )
-conn.close()
-
-# Load the vector index from storage
-vector_store = DuckDBVectorStore.from_local(vectorDB)
-index = VectorStoreIndex.from_vector_store(vector_store)
-
-
-# --- GLOBAL FUNCTIONS
-def dt():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+import shared  # See shared.py for variables and functions shared across sessions
 
 # ----------- SHINY APP -----------
 # *********************************
 
-# --- RENDERING UI ---
+# Non-reactive session variables (loaded before session starts)
+uID = 1  # if registered users update later
+
+conn = sqlite3.connect(shared.appDB)
+topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+conn.close()
+
+# --- UI ---
 ui.page_opts(fillable=True)
 
 # Add some JS so that pressing enter can send the message too
@@ -96,9 +48,7 @@ with ui.navset_pill(id="tab"):
         # Render the chat window
         with ui.layout_columns(col_widths=12):
             with ui.card(id="topicSelection"):
-                ui.input_select(
-                    "tID", "Pick a topic:", choices={1: "test"}, width="600px"
-                )
+                ui.input_select("tID", "Pick a topic:", choices=[], width="600px")
 
             with ui.card(id="chatWindow", height="70vh"):
                 ui.card_header("Conversation")
@@ -119,32 +69,23 @@ with ui.navset_pill(id="tab"):
                 "TODO"
 
 
-# --- REACTIVE VARIABLES ---
+# --- REACTIVE VARIABLES & FUNCTIONS ---
 
 sessionID = reactive.value(0)
 discussionID = reactive.value(0)
-
-# @reactive.calc
-# def topics():
-#     conn = sqlite3.connect(appDB)
-#     topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
-#     ui.update_select("tID", choices=dict(zip(topics["tID"], topics["topic"])))
-#     return topics
+chatInput = reactive.value(
+    ui.TagList(
+        ui.input_text_area(
+            "newChat", "", value="", width="100%", spellcheck=True, resize=False
+        ),
+        ui.input_action_button("send", "Send"),
+    )
+)
 
 
 @reactive.calc
 def tID():
-    return topics[topics["tID"] == 1].iloc[0]["tID"]  # todo make user select topic
-
-
-@reactive.calc
-def concepts():
-    conn = sqlite3.connect(appDB)
-    concepts = pd.read_sql_query(
-        f"SELECT * FROM concept WHERE tID = {tID()} AND archived = 0", conn
-    )
-    conn.close()
-    return concepts
+    return topics.iloc[0]["tID"]  # todo make user select topic
 
 
 @reactive.calc
@@ -156,7 +97,7 @@ def welcome():
 
 
 with reactive.isolate():
-    messages = reactive.value([(1, dt(), welcome())])
+    messages = reactive.value([(1, shared.dt(), welcome())])
     userLog = reactive.value(f"""<div class='botChat talk-bubble tri'>
                             <p>Hello, I'm here to help you get a basic understanding of 
                             the following topic: <b>{topics[topics["tID"] == tID()].iloc[0]["topic"]}</b>. 
@@ -165,21 +106,64 @@ with reactive.isolate():
         f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\n{welcome()}"""
     )
 
-chatInput = reactive.value(
-    ui.TagList(
-        ui.input_text_area(
-            "newChat", "", value="", width="100%", spellcheck=True, resize=False
-        ),
-        ui.input_action_button("send", "Send"),
+
+# Run once the session initialised
+@reactive.effect
+def _():
+    # Register the session in the DB
+    conn = sqlite3.connect(shared.appDB)
+    cursor = conn.cursor()
+    # For now we only have anonymous users
+    cursor.execute(
+        "INSERT INTO session (shinyToken, uID, start)"
+        f'VALUES("{session.id}", {uID}, "{shared.dt()}")'
     )
-)
+    sID = cursor.lastrowid
+    cursor.execute(
+        "INSERT INTO discussion (tID, sID, start)"
+        f'VALUES({tID()}, {sID}, "{shared.dt()}")'
+    )
+    dID = cursor.lastrowid
+    sessionID.set(sID)
+    discussionID.set(dID)
+    conn.commit()
+    conn.close()
+
+    ui.update_select("tID", choices=dict(zip(topics["tID"], topics["topic"])))
+
+    # Set the function to be called when the session ends
+    dID = discussionID.get()
+    msg = messages.get()
+    _ = session.on_ended(lambda: theEnd(sID, dID, msg))
 
 
-# --- REACTIVE FUNCTIONS ---
+# Code to run at the end of the session (i.e. when user disconnects)
+def theEnd(sID, dID, msg):
+    # Add logs to the database after user exits
+    conn = sqlite3.connect(shared.appDB)
+    cursor = conn.cursor()
+    cursor.execute(f'UPDATE session SET end = "{shared.dt()}" WHERE sID = {sID}')
+    cursor.execute(f'UPDATE discussion SET end = "{shared.dt()}" WHERE dID = {dID}')
+    cursor.executemany(
+        f"INSERT INTO message(dID,isBot,timeStamp,message)" f"VALUES({dID}, ?, ?, ?)",
+        msg,
+    )
+    conn.commit()
+    conn.close()
 
-uID = 1  # if registered users update later
+
+# Get the concepts related to the topic
+@reactive.calc
+def concepts():
+    conn = sqlite3.connect(shared.appDB)
+    concepts = pd.read_sql_query(
+        f"SELECT * FROM concept WHERE tID = {tID()} AND archived = 0", conn
+    )
+    conn.close()
+    return concepts
 
 
+# Adapt the chat engine to the topic
 @reactive.calc
 def chatEngine():
     # TUTORIAL Llamaindex + Prompt engineering
@@ -260,10 +244,10 @@ def chatEngine():
     ]
     refine_template = ChatPromptTemplate(chat_refine_msgs)
 
-    return index.as_query_engine(
+    return shared.index.as_query_engine(
         text_qa_template=text_qa_template,
         refine_template=refine_template,
-        llm=llm,
+        llm=shared.llm,
         streaming=True,
     )
 
@@ -276,7 +260,7 @@ def _():
     if newChat == "":
         return
     msg = messages.get()
-    msg.append((False, dt(), newChat))
+    msg.append((False, shared.dt(), newChat))
     messages.set(msg)
     botIn = botLog.get() + "\n---- NEW RESPONSE FROM USER ----\n" + newChat
     userLog.set(
@@ -317,47 +301,5 @@ def _():
         )
     )
     msg = messages.get()
-    msg.append((True, dt(), resp))
+    msg.append((True, shared.dt(), resp))
     messages.set(msg)
-
-
-# Code to run at the start of the session (i.e. user connects)
-@reactive.effect
-def _():
-    # Register the session in the DB at start
-    conn = sqlite3.connect(appDB)
-    cursor = conn.cursor()
-    # For now we only have anonymous users
-    cursor.execute(
-        "INSERT INTO session (shinyToken, uID, start)"
-        f'VALUES("{session.id}", {uID}, "{dt()}")'
-    )
-    sID = cursor.lastrowid
-    cursor.execute(
-        "INSERT INTO discussion (tID, sID, start)" f'VALUES({tID()}, {sID}, "{dt()}")'
-    )
-    dID = cursor.lastrowid
-    sessionID.set(sID)
-    discussionID.set(dID)
-    conn.commit()
-    conn.close()
-
-    # Set the function to be called when the session ends
-    dID = discussionID.get()
-    msg = messages.get()
-    _ = session.on_ended(lambda: theEnd(sID, dID, msg))
-
-
-# Code to run at the end of the session (i.e. user disconnects)
-def theEnd(sID, dID, msg):
-    # Add logs to the database after user exits
-    conn = sqlite3.connect(appDB)
-    cursor = conn.cursor()
-    cursor.execute(f'UPDATE session SET end = "{dt()}" WHERE sID = {sID}')
-    cursor.execute(f'UPDATE discussion SET end = "{dt()}" WHERE dID = {dID}')
-    cursor.executemany(
-        f"INSERT INTO message(dID,isBot,timeStamp,message)" f"VALUES({dID}, ?, ?, ?)",
-        msg,
-    )
-    conn.commit()
-    conn.close()
