@@ -11,11 +11,13 @@ import sqlite3
 from datetime import datetime
 from html import escape
 import pandas as pd
+
 # Llamaindex
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
+
 # Shiny
 from shiny import reactive
 from shiny.express import input, render, ui, session
@@ -28,35 +30,48 @@ vectorDB = "appData/vectordb.duckdb"
 # Get the OpenAI API key and organistation from the enviroment
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
 os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
-gptModel = "gpt-3.5-turbo-0125" # use gpt-3.5-turbo-0125 or gpt-4
+gptModel = "gpt-3.5-turbo-0125"  # use gpt-3.5-turbo-0125 or gpt-4
 llm = OpenAI(model=gptModel)
 
 if not os.path.exists(appDB):
-    raise ConnectionError("The app database was not found. Please run the admin app first")
+    raise ConnectionError(
+        "The app database was not found. Please run the admin app first"
+    )
 
 if not os.path.exists(vectorDB):
-    raise ConnectionError("The vector database was not found. Please run the admin app first")
+    raise ConnectionError(
+        "The vector database was not found. Please run the admin app first"
+    )
 
 if os.environ["OPENAI_API_KEY"] is None:
-    raise ValueError("There is no OpenAI API key stored in the the OPENAI_API_KEY environment variable")
+    raise ValueError(
+        "There is no OpenAI API key stored in the the OPENAI_API_KEY environment variable"
+    )
 
-#Check if there are topics to discuss before proceeding
+# Check if there are topics to discuss before proceeding
 conn = sqlite3.connect(appDB)
-topics = pd.read_sql_query("SELECT * FROM topic WHERE archived = 0 AND tID IN"
-                           "(SELECT DISTINCT tID from concept WHERE archived = 0)", conn)
+topics = pd.read_sql_query(
+    "SELECT * FROM topic WHERE archived = 0 AND tID IN"
+    "(SELECT DISTINCT tID from concept WHERE archived = 0)",
+    conn,
+)
 
 if topics.shape[0] == 0:
-    raise ValueError("There are no active topics with at least one concept in the database."
-                     " Please run the admin app first")
+    raise ValueError(
+        "There are no active topics with at least one concept in the database."
+        " Please run the admin app first"
+    )
 conn.close()
 
 # Load the vector index from storage
 vector_store = DuckDBVectorStore.from_local(vectorDB)
 index = VectorStoreIndex.from_vector_store(vector_store)
 
+
 # --- GLOBAL FUNCTIONS
 def dt():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 
 # ----------- SHINY APP -----------
 # *********************************
@@ -64,7 +79,7 @@ def dt():
 # --- RENDERING UI ---
 ui.page_opts(fillable=True)
 
-# Add some JS so that pressing enter can send the message too    
+# Add some JS so that pressing enter can send the message too
 ui.head_content(
     HTML("""<script>
          $(document).keyup(function(event) {
@@ -76,28 +91,29 @@ ui.head_content(
 )
 ui.include_css("www/styles.css")
 
-with ui.navset_pill(id="tab"): 
-    
+with ui.navset_pill(id="tab"):
     with ui.nav_panel("BMIbot"):
-
         # Render the chat window
         with ui.layout_columns(col_widths=12):
             with ui.card(id="topicSelection"):
-                ui.input_select("tID", "Pick a topic:", choices={1: "test"}, width="600px")  
-            
-            with ui.card(id="chatWindow", height="70vh"):
-                ui.card_header("Conversation")                
-                @render.ui
-                def chatLog():    
-                    return div(HTML(userLog.get()))                
+                ui.input_select(
+                    "tID", "Pick a topic:", choices={1: "test"}, width="600px"
+                )
 
-        #Render the text input (send button generated above)
+            with ui.card(id="chatWindow", height="70vh"):
+                ui.card_header("Conversation")
+
+                @render.ui
+                def chatLog():
+                    return div(HTML(userLog.get()))
+
+        # Render the text input (send button generated above)
         @render.ui
         def chatButton():
             return chatInput.get()
 
     with ui.nav_panel("Profile"):
-        with ui.layout_columns(col_widths= 12):  
+        with ui.layout_columns(col_widths=12):
             with ui.card():
                 ui.card_header("User Progress")
                 "TODO"
@@ -115,22 +131,28 @@ discussionID = reactive.value(0)
 #     ui.update_select("tID", choices=dict(zip(topics["tID"], topics["topic"])))
 #     return topics
 
+
 @reactive.calc
 def tID():
-    return topics[topics["tID"] == 1].iloc[0]["tID"] # todo make user select topic
+    return topics[topics["tID"] == 1].iloc[0]["tID"]  # todo make user select topic
+
 
 @reactive.calc
 def concepts():
     conn = sqlite3.connect(appDB)
-    concepts = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = {tID()} AND archived = 0", conn)
+    concepts = pd.read_sql_query(
+        f"SELECT * FROM concept WHERE tID = {tID()} AND archived = 0", conn
+    )
     conn.close()
     return concepts
 
 
 @reactive.calc
 def welcome():
-    return(('Hello, I\'m here to help you get a basic understanding of the following topic: '
-           f'{topics[topics["tID"] == tID()].iloc[0]["topic"]}. Have you heard about this before?'))
+    return (
+        'Hello, I\'m here to help you get a basic understanding of the following topic: '
+        f'{topics[topics["tID"] == tID()].iloc[0]["topic"]}. Have you heard about this before?'
+    )
 
 
 with reactive.isolate():
@@ -139,17 +161,24 @@ with reactive.isolate():
                             <p>Hello, I'm here to help you get a basic understanding of 
                             the following topic: <b>{topics[topics["tID"] == tID()].iloc[0]["topic"]}</b>. 
                             Have you heard about this before?</p></div>""")
-    botLog = reactive.value(f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\n{welcome()}""")
+    botLog = reactive.value(
+        f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\n{welcome()}"""
+    )
 
-chatInput = reactive.value(ui.TagList(
-    ui.input_text_area("newChat", "", value="", width="100%", 
-                       spellcheck=True, resize=False), 
-    ui.input_action_button("send", "Send")))
+chatInput = reactive.value(
+    ui.TagList(
+        ui.input_text_area(
+            "newChat", "", value="", width="100%", spellcheck=True, resize=False
+        ),
+        ui.input_action_button("send", "Send"),
+    )
+)
 
 
 # --- REACTIVE FUNCTIONS ---
 
-uID = 1 #if registered users update later
+uID = 1  # if registered users update later
+
 
 @reactive.calc
 def chatEngine():
@@ -157,7 +186,7 @@ def chatEngine():
     # https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
     # https://docs.llamaindex.ai/en/stable/examples/customization/prompts/chat_prompts/
 
-    # The two strings below have not been altered from the defaults set by llamaindex, 
+    # The two strings below have not been altered from the defaults set by llamaindex,
     # but can be if needed
     qa_prompt_str = (
         "Context information is below.\n"
@@ -179,11 +208,11 @@ def chatEngine():
         "If the context isn't useful, output the original answer again.\n"
         "Original Answer: {existing_answer}"
     )
-    
-    topicList = "* "+"\n* ".join(concepts()["concept"]) 
+
+    topicList = "* " + "\n* ".join(concepts()["concept"])
 
     # System prompt
-    chat_text_qa_msgs = ([
+    chat_text_qa_msgs = [
         ChatMessage(
             role=MessageRole.SYSTEM,
             content=(
@@ -203,9 +232,9 @@ def chatEngine():
                 message for mistakes, like the use of incorrect terminology and correct if needed, this is very important!
                 """
             ),
-    ),
-    ChatMessage(role=MessageRole.USER, content=qa_prompt_str),
-    ])
+        ),
+        ChatMessage(role=MessageRole.USER, content=qa_prompt_str),
+    ]
     text_qa_template = ChatPromptTemplate(chat_text_qa_msgs)
 
     # Refine Prompt
@@ -231,83 +260,104 @@ def chatEngine():
     ]
     refine_template = ChatPromptTemplate(chat_refine_msgs)
 
-    return(
-        index.as_query_engine(
-            text_qa_template=text_qa_template,
-            refine_template=refine_template,
-            llm=llm,
-            streaming = True
-    )
+    return index.as_query_engine(
+        text_qa_template=text_qa_template,
+        refine_template=refine_template,
+        llm=llm,
+        streaming=True,
     )
 
-#When the send button is clicked...
+
+# When the send button is clicked...
 @reactive.effect
 @reactive.event(input.send, ignore_init=True)
 def _():
-    newChat = input.newChat() #prevent HTML injection from user
-    if newChat == "": return
-    msg = messages.get()    
-    msg.append((False,dt(), newChat))
+    newChat = input.newChat()  # prevent HTML injection from user
+    if newChat == "":
+        return
+    msg = messages.get()
+    msg.append((False, dt(), newChat))
     messages.set(msg)
-    botIn = botLog.get() + "\n---- NEW RESPONSE FROM USER ----\n" + newChat    
-    userLog.set(userLog.get() + "<div class='userChat talk-bubble tri'><p>" + escape(newChat) + "</p></div>")
-    botLog.set(botLog.get() + f"\n--- USER:\n{newChat}")   
+    botIn = botLog.get() + "\n---- NEW RESPONSE FROM USER ----\n" + newChat
+    userLog.set(
+        userLog.get()
+        + "<div class='userChat talk-bubble tri'><p>"
+        + escape(newChat)
+        + "</p></div>"
+    )
+    botLog.set(botLog.get() + f"\n--- USER:\n{newChat}")
     chatInput.set(HTML("<hr><i>The BioBot is thinking hard ...</i>"))
     botResponse(chatEngine(), botIn)
+
 
 # Async Shiny task waiting for LLM reply
 @reactive.extended_task
 async def botResponse(chatEngine, botIn):
     return str(chatEngine.query(botIn))
 
+
 # Processing LLM response
 @reactive.effect
 def _():
     resp = botResponse.result()
     with reactive.isolate():
-        userLog.set(userLog.get() +  
-                    "<div class='botChat talk-bubble tri'><p>" + 
-                    resp + "</p></div>")
-        botLog.set(botLog.get() + "\n--- YOU:\n" + resp) 
-    chatInput.set(ui.TagList(
-        ui.input_text_area("newChat", "", value="", width="100%", 
-                       spellcheck=True, resize=False),
-        ui.input_action_button("send", "Send")))
+        userLog.set(
+            userLog.get()
+            + "<div class='botChat talk-bubble tri'><p>"
+            + resp
+            + "</p></div>"
+        )
+        botLog.set(botLog.get() + "\n--- YOU:\n" + resp)
+    chatInput.set(
+        ui.TagList(
+            ui.input_text_area(
+                "newChat", "", value="", width="100%", spellcheck=True, resize=False
+            ),
+            ui.input_action_button("send", "Send"),
+        )
+    )
     msg = messages.get()
-    msg.append((True,dt(), resp))
+    msg.append((True, dt(), resp))
     messages.set(msg)
+
 
 # Code to run at the start of the session (i.e. user connects)
 @reactive.effect
 def _():
-    #Register the session in the DB at start
+    # Register the session in the DB at start
     conn = sqlite3.connect(appDB)
     cursor = conn.cursor()
-    #For now we only have anonymous users
-    cursor.execute('INSERT INTO session (shinyToken, uID, start)'
-                   f'VALUES("{session.id}", {uID}, "{dt()}")')
+    # For now we only have anonymous users
+    cursor.execute(
+        "INSERT INTO session (shinyToken, uID, start)"
+        f'VALUES("{session.id}", {uID}, "{dt()}")'
+    )
     sID = cursor.lastrowid
-    cursor.execute('INSERT INTO discussion (tID, sID, start)'
-                   f'VALUES({tID()}, {sID}, "{dt()}")')
+    cursor.execute(
+        "INSERT INTO discussion (tID, sID, start)" f'VALUES({tID()}, {sID}, "{dt()}")'
+    )
     dID = cursor.lastrowid
     sessionID.set(sID)
     discussionID.set(dID)
     conn.commit()
     conn.close()
 
-    #Set the function to be called when the session ends
+    # Set the function to be called when the session ends
     dID = discussionID.get()
     msg = messages.get()
     _ = session.on_ended(lambda: theEnd(sID, dID, msg))
 
+
 # Code to run at the end of the session (i.e. user disconnects)
 def theEnd(sID, dID, msg):
-    #Add logs to the database after user exits
+    # Add logs to the database after user exits
     conn = sqlite3.connect(appDB)
     cursor = conn.cursor()
     cursor.execute(f'UPDATE session SET end = "{dt()}" WHERE sID = {sID}')
     cursor.execute(f'UPDATE discussion SET end = "{dt()}" WHERE dID = {dID}')
-    cursor.executemany(f'INSERT INTO message(dID,isBot,timeStamp,message)' 
-                   f'VALUES({dID}, ?, ?, ?)', msg)
+    cursor.executemany(
+        f"INSERT INTO message(dID,isBot,timeStamp,message)" f"VALUES({dID}, ?, ?, ?)",
+        msg,
+    )
     conn.commit()
     conn.close()
