@@ -10,6 +10,7 @@ import os
 import sqlite3
 from datetime import datetime
 import pandas as pd
+import toml
 
 # Llamaindex
 from llama_index.core import VectorStoreIndex
@@ -18,12 +19,18 @@ from llama_index.vector_stores.duckdb import DuckDBVectorStore
 
 # --- VARIABLES ---
 
-appDB = "appData/appDB.db"
-vectorDB = "appData/vectordb.duckdb"
-# Get the OpenAI API key and organistation from the enviroment
+with open("config.toml", "r") as f:
+    config = toml.load(f)
+
+appDB = config["data"]["appDB"]
+vectorDB = config["data"]["vectorDB"]
+# keep files user uploads, if set to None, original not kept
+storageFolder = config["data"]["storageFolder"]
+
+# Get the OpenAI API key and organistation
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
 os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
-gptModel = "gpt-3.5-turbo-0125"  # use gpt-3.5-turbo-0125 or gpt-4
+gptModel = config["LLM"]["gptModel"]
 llm = OpenAI(model=gptModel)
 
 if not os.path.exists(appDB):

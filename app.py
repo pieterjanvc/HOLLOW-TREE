@@ -128,6 +128,15 @@ with reactive.isolate():
 # Run once the session initialised
 @reactive.effect
 def _():
+    # Set the function to be called when the session ends
+    dID = discussionID.get()
+    msg = messages.get()
+    sID = sessionID.get()
+    _ = session.on_ended(lambda: theEnd(sID, dID, msg))
+
+    if sessionID.get() != 0:
+        return
+
     # Register the session in the DB
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
@@ -137,17 +146,12 @@ def _():
         f'VALUES("{session.id}", {uID}, "{shared.dt()}")'
     )
     sID = cursor.lastrowid
-    sessionID.set(sID)
     conn.commit()
     conn.close()
+    sessionID.set(sID)
 
     # Set the topics based on what's in the database
     ui.update_select("selTopic", choices=dict(zip(topics["tID"], topics["topic"])))
-
-    # Set the function to be called when the session ends
-    dID = discussionID.get()
-    msg = messages.get()
-    _ = session.on_ended(lambda: theEnd(sID, dID, msg))
 
 
 # Code to run at the end of the session (i.e. when user disconnects)
