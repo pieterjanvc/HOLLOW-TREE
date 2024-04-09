@@ -277,7 +277,7 @@ def _():
 
     # Empty the concept table is last topic was removed
     if topics.shape[0] == 0:
-        conceptList = pd.read_sql_query(f"SELECT * FROM concept WHERE tID = 0", conn)
+        conceptList = pd.read_sql_query("SELECT * FROM concept WHERE tID = 0", conn)
         concepts.set(conceptList)
 
     conn.commit()

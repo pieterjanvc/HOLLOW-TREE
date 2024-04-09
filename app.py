@@ -1,6 +1,6 @@
-# *********************************
-# ----------- TUTORBOT -----------
-# *********************************
+# ********************************
+# ----------- MAIN APP -----------
+# ********************************
 
 # General
 import sqlite3
@@ -47,10 +47,19 @@ with ui.navset_pill(id="tab"):
     with ui.nav_panel("BMIbot"):
         # Render the chat window
         with ui.layout_columns(col_widths=12):
+            with ui.card(id="about"):
+                HTML("""<p>This chatbot has been programmed to gauge your knowledge on specific topics 
+                     relevant to your coursework. It will guide you though impotant concepts by asking you
+                     a series of questions. Note that it will try and make you think for yourself, and not simply
+                     provide answers.<br><br><i>NOTE: This application is experimental and can you should still talk
+                     to your course instructors / teaching fellows if you have questions or concerns. 
+                     Though anonymous, we are still collecting all data (including chat history) for research purposes
+                     so don't share any personal information and keep to the topic at hand.</i></p>""")
             with ui.card(id="topicSelection"):
-                ui.input_select("selTopic", "Pick a topic:", choices=[], width="600px")
+                ui.card_header("Pick a topic")
+                ui.input_select("selTopic", None, choices=[], width="600px")
 
-            with ui.card(id="chatWindow", height="70vh"):
+            with ui.card(id="chatWindow", height="55vh"):
                 ui.card_header("Conversation")
 
                 @render.ui
