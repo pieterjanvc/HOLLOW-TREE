@@ -1,7 +1,9 @@
 # **************************************
 # ----------- TUTORBOT ADMIN -----------
 # **************************************
-import shared
+
+# See admin\admin_shared.py for variables and functions shared across sessions
+import admin_shared as shared
 
 # -- General
 import sqlite3
