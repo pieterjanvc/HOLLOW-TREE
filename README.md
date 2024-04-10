@@ -2,13 +2,13 @@
 
 This applications aims to provide students with an LLM-based knowledge check on specific topics relevant to their coursework. Admins can set the topic and add sub-concepts to guide the conversation. By uplaoding specific and relevant files to a vector database, the app will use Retrieval Augmented Generation (RAG) to ensure the quality and accuracy of the LLM responses is high and on topic.
 
-## Student facing app (app.py, shared.py)
+## Student facing app (app.py, app_shared.py)
 
 * Select a topic to check their knowlege on relevant to the coursework
 * Interact with the LLM in conversation led by the topic and consepts set by the instuctor
 * The LLM should adapt the conversation to the student's anwers and keep them engaged and on topic
 
-## Admin facing app (admin/admin.py, admin/shared.py)
+## Admin facing app (admin/admin.py, admin/admin_shared.py)
 
 * Create / edit topics to be discussed
 * Create / edit specific concepts for each topic to help guide the converstaion

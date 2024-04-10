@@ -2,6 +2,9 @@
 # ----------- MAIN APP -----------
 # ********************************
 
+# See app_shared.py for variables and functions shared across sessions
+import app_shared as shared 
+
 # General
 import sqlite3
 from html import escape
@@ -16,7 +19,6 @@ from shiny import reactive
 from shiny.express import input, render, ui, session
 from htmltools import HTML, div
 
-import app_shared as shared  # See app_shared.py for variables and functions shared across sessions
 
 # ----------- SHINY APP -----------
 # *********************************
@@ -296,7 +298,7 @@ def _():
         + "</p></div>"
     )
     botLog.set(botLog.get() + f"\n--- USER:\n{newChat}")
-    chatInput.set(HTML("<hr><i>The BioBot is thinking hard ...</i>"))
+    chatInput.set(HTML("<hr><p style='color: white'><i>The BioBot is thinking hard ...</i></p>"))
     botResponse(chatEngine(), botIn)
 
 

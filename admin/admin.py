@@ -9,6 +9,11 @@ import admin_shared as shared
 import sqlite3
 import pandas as pd
 
+# -- Llamaindex
+# Llamaindex
+from llama_index.core import ChatPromptTemplate
+from llama_index.core.llms import ChatMessage, MessageRole
+
 # -- Shiny
 from shiny import reactive
 from shiny.express import input, render, ui, session
@@ -24,6 +29,9 @@ nest_asyncio.apply()
 # *********************************
 
 uID = 2  # if registered admins make reactive later
+conn = sqlite3.connect(shared.appDB)
+topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+conn.close()
 
 # Make new app DB if needed
 print(shared.createAppDB(shared.appDB, addDemo=True))
@@ -71,22 +79,26 @@ with ui.navset_pill(id="tab"):
         with ui.layout_columns(col_widths=12):
             with ui.card():
                 ui.card_header("Topic")
+                ui.input_select("tID", "Pick a topic", choices=[], width="400px")
                 div(
                     ui.input_action_button("tAdd", "Add new", width="180px"),
                     ui.input_action_button(
                         "tArchive", "Archive selected", width="180px"
                     ),
                 )
-                ui.input_select("tID", "Pick a topic", choices=[], width="400px")
+                
 
             with ui.card():
                 ui.card_header("Concepts related to the topic")
-                HTML(
-                    "<i>Concepts are facts or pieces of information you want the Bot to check with your students."
-                    "You can be very brief, as all context will be retrieved from the database of documents. "
-                    "Don't be too broad, as this might cause confusion (you'll have to test it). "
-                    "Try to limit the number of concepts to 4 - 8 as the AI might preform worse with a large number</i>"
-                )
+                
+                @render.data_frame
+                def conceptsTable():
+                    return render.DataTable(
+                        concepts.get()[["concept"]],
+                        width="100%",
+                        row_selection_mode="single",
+                    )
+                
                 div(
                     ui.input_action_button("cAdd", "Add new", width="180px"),
                     ui.input_action_button("cEdit", "Edit selected", width="180px"),
@@ -95,15 +107,28 @@ with ui.navset_pill(id="tab"):
                     ),
                     style="display:inline",
                 )
+                HTML(
+                    "<i>Concepts are facts or pieces of information you want the Bot to check with your students."
+                    "You can be very brief, as all context will be retrieved from the database of documents. "
+                    "Don't be too broad, as this might cause confusion (you'll have to test it). "
+                    "Try to limit the number of concepts to 4 - 8 as the AI might preform worse with a large number</i>"
+                )
 
-                @render.data_frame
-                def conceptsTable():
-                    return render.DataTable(
-                        concepts.get()[["concept"]],
-                        width="100%",
-                        row_selection_mode="single",
-                    )
-
+    with ui.nav_panel("Quiz Questions"):
+        with ui.card(id="xxx"):
+            ui.card_header("Questions by Topic")            
+            ui.input_select("qtID", "Pick a topic", choices=[], width="400px")
+            ui.input_select("qID", "Question", choices=[], width="400px")
+            div(
+                    ui.input_action_button("qAdd", "Add new", width="180px"),
+                    ui.input_action_button("qEdit", "Edit selected", width="180px"),
+                    ui.input_action_button(
+                        "qArchive", "Archive selected", width="180px"
+                    ),
+                    style="display:inline",
+                )
+            
+    
     with ui.nav_panel("Vector Database"):
         with ui.card():
             ui.card_header("Vector database files")
@@ -478,3 +503,81 @@ def _():
     conn.close()
     ui.insert_ui(uiUploadFile, "#processFile", "afterEnd")
     ui.remove_ui("#processFile")
+
+@reactive.effect
+@reactive.event(input.nqBtn)
+def _():    
+  
+    qa_prompt_str = (
+        "Context information is below.\n"
+        "---------------------\n"
+        "{context_str}\n"
+        "---------------------\n"
+        "Given the context information and not prior knowledge, "
+        "answer the question: {query_str}\n"
+    )
+
+    refine_prompt_str = (
+        "We have the opportunity to refine the original answer "
+        "(only if needed) with some more context below.\n"
+        "------------\n"
+        "{context_msg}\n"
+        "------------\n"
+        "Given the new context, refine the original answer to better "
+        "answer the question: {query_str}. "
+        "If the context isn't useful, output the original answer again.\n"
+        "Original Answer: {existing_answer}"
+    )
+
+    conn = sqlite3.connect(shared.appDB)    
+    topicList = pd.read_sql_query(f"SELECT concept FROM concept WHERE tID = {input.qtID()} AND archived = 0", conn)
+    topicList = "* " + "\n* ".join(topicList["concept"])
+    conn.close()
+
+    # System prompt
+    chat_text_qa_msgs = [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                f"""
+                You will generate 3 multiple choice questions to test a student who just learned about the following topic: 
+                {topics[topics["tID"] == input.qtID()].iloc[0]["topic"]}
+                ----
+                The student is expected to demonstate understanding of the following sub-concepts:
+                {topicList}
+                ----
+                """ 
+                '''
+                Try to generate questions that integrate across one or more of the concepts above. You can provide some additional context if needed.
+                Don't just ask for short definitions, but try to generate more elaborate examples or scenarios that force the student to think critically.
+                For each question, generate 4 possible answers, with only ONE correct option, and an explanation why each option is correct or incorrect.
+                You will output a valid JSON string based on the following (truncated) template:
+                {"Q1":["question": "", "options": {"answer":"", "correct":"true", "explanation": ""}, {"answer":"", "correct":"true", "explanation": ""}]}
+                '''
+                
+            ),
+        ),
+        ChatMessage(role=MessageRole.USER, content=qa_prompt_str),
+    ]
+    text_qa_template = ChatPromptTemplate(chat_text_qa_msgs)
+
+    # Refine Prompt
+    chat_refine_msgs = [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                """
+                Make sure the response is in valid JSON format
+                """
+            ),
+        ),
+        ChatMessage(role=MessageRole.USER, content=refine_prompt_str),
+    ]
+    refine_template = ChatPromptTemplate(chat_refine_msgs)
+
+    return shared.index.as_query_engine(
+        text_qa_template=text_qa_template,
+        refine_template=refine_template,
+        llm=shared.llm,
+        streaming=True,
+    )

@@ -14,6 +14,7 @@ import duckdb
 import json
 from shutil import move
 import toml
+import pandas as pd
 
 # -- Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
@@ -38,6 +39,7 @@ gptModel = config["LLM"]["gptModel"]
 
 # Use OpenAI LLM from Llamaindex
 llm = OpenAI(model=gptModel)
+
 
 # ----------- FUNCTIONS -----------
 # *********************************
@@ -90,18 +92,18 @@ def createAppDB(DBpath, sqlFile="appData/createDB.sql", addDemo=True):
     # Add topic concepts (to be removed later)
     concepts = [
         ("DNA is made up of 4 bases that encode all information needed for life",),
-        ("A protein is encoded in the DNA as a seqeunce of bases",),
+        ("A protein is encoded in the DNA as a sequence of bases",),
         ("To create a protein, you first have to transcribe the DNA into RNA",),
         (
             "RNA is similar to DNA but instead of ACTG it has ACUG and is single stranded",
         ),
         ("RNA is processed by removing introns, keeping only exons",),
         (
-            "RNA is translated into protein. 3 RNA bases form a codon, and each codon)"
-            "represents an amino acid, or the start / stop of the seqeunce",
+            "RNA is translated into protein. 3 RNA bases form a codon, and each codon"
+            "represents an amino acid, or the start / stop of the sequence",
         ),
         (
-            "Based on RNA codons, amino acids are chained together into a single protrein strand",
+            "Based on RNA codons, amino acids are chained together into a single protein strand",
         ),
         (
             "The protein will fold into a 3D shape to become functional,"

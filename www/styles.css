@@ -10,7 +10,7 @@ body {
     --userCol: #A65E23;
 }
 
-.card-body {
+#chatWindow .card-body {
     flex-direction: column-reverse;
 }
 
