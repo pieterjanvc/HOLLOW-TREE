@@ -29,12 +29,12 @@ nest_asyncio.apply()
 # *********************************
 
 uID = 2  # if registered admins make reactive later
-conn = sqlite3.connect(shared.appDB)
-topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
-conn.close()
 
 # Make new app DB if needed
 print(shared.createAppDB(shared.appDB, addDemo=True))
+conn = sqlite3.connect(shared.appDB)
+topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+conn.close()
 
 # --- UI COMPONENTS ---
 uiUploadFile = div(
