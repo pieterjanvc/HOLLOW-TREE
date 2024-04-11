@@ -23,6 +23,8 @@ Data is stored in two separate databases
 * The vector database used for RAG is implemented with DuckDB (note that original files uploaded to the app can be stored as well depending on the settings)
 * All app data and logs are stored in a custom SQLite database (schema below).
 This data is used for app operation, monitoring and research
+* If the databases to not exist when the app is run, they will be created.
+Note that the admin app needs to be run before the student app the first time.
 
 ![App DB Schema](https://drive.usercontent.google.com/download?id=1kOzuVdI-p1K5Ej6EaRh4dJZuxyCATCfT)
 

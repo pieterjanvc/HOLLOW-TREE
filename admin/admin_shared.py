@@ -126,6 +126,7 @@ def createAppDB(DBpath, sqlFile="appData/createDB.sql", addDemo=True):
 # storageFolder = "appData/uploadedFiles"
 # newFileName = None
 
+
 # Create DuckDB vector database and add files
 def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
     if not os.path.exists(appDB):

@@ -61,7 +61,7 @@ uiUploadFile = div(
 )
 
 # --- RENDERING UI ---
-# **********************
+# ********************
 
 ui.page_opts(fillable=True)
 
@@ -89,11 +89,10 @@ with ui.navset_pill(id="tab"):
                         "tArchive", "Archive selected", width="180px"
                     ),
                 )
-                
 
             with ui.card():
                 ui.card_header("Concepts related to the topic")
-                
+
                 @render.data_frame
                 def conceptsTable():
                     return render.DataTable(
@@ -101,7 +100,7 @@ with ui.navset_pill(id="tab"):
                         width="100%",
                         row_selection_mode="single",
                     )
-                
+
                 div(
                     ui.input_action_button("cAdd", "Add new", width="180px"),
                     ui.input_action_button("cEdit", "Edit selected", width="180px"),
@@ -119,42 +118,59 @@ with ui.navset_pill(id="tab"):
 
     with ui.nav_panel("Quiz Questions"):
         with ui.card():
-            ui.card_header("Questions by Topic")            
-            ui.input_select("qtID", "Pick a topic", choices={1: "Central Dogma"}, width="400px")
+            ui.card_header("Questions by Topic")
+            ui.input_select(
+                "qtID", "Pick a topic", choices={1: "Central Dogma"}, width="400px"
+            )
             ui.input_select("qID", "Question", choices={1: "test"}, width="400px")
             with ui.panel_conditional("output.busyMsg != 'Generating new question...'"):
-                    ui.input_action_button("qGenerate", "Generate new", width="180px"),
-                    ui.input_action_button("qEdit", "Edit selected", width="180px"),
-                    ui.input_action_button(
-                        "qArchive", "Archive selected", width="180px"
-                    ),
-                    style="display:inline",
+                (ui.input_action_button("qGenerate", "Generate new", width="180px"),)
+                (ui.input_action_button("qEdit", "Edit selected", width="180px"),)
+                (ui.input_action_button("qArchive", "Archive selected", width="180px"),)
+                style = ("display:inline",)
+
             @render.text
             def busyMsg():
                 return genMsg.get()
-        
-        with ui.panel_conditional('input.qID'):
+
+        with ui.panel_conditional("input.qID"):
             with ui.card():
                 ui.card_header("Review question")
-                
+
                 @render.ui
                 def quizQuestionPreview():
-                    return HTML(f"<b>{input.rqQuestion()}</b><ol type='A'><li>{input.rqOA()}</li>"
-                                f"<li>{input.rqOB()}</li><li>{input.rqOC()}</li>"
-                                f"<li>{input.rqOD()}</li></ol><i>Correct answer: {input.rqCorrect()}</i><hr>")
-                
-                ui.input_text_area("rqQuestion", "Question", width="100%", autoresize=True)
-                ui.input_radio_buttons("rqCorrect", "Correct answer", choices=["A", "B", "C", "D"], inline=True)
+                    return HTML(
+                        f"<b>{input.rqQuestion()}</b><ol type='A'><li>{input.rqOA()}</li>"
+                        f"<li>{input.rqOB()}</li><li>{input.rqOC()}</li>"
+                        f"<li>{input.rqOD()}</li></ol><i>Correct answer: {input.rqCorrect()}</i><hr>"
+                    )
+
+                ui.input_text_area(
+                    "rqQuestion", "Question", width="100%", autoresize=True
+                )
+                ui.input_radio_buttons(
+                    "rqCorrect",
+                    "Correct answer",
+                    choices=["A", "B", "C", "D"],
+                    inline=True,
+                )
                 ui.input_text("rqOA", "Option A", width="100%")
-                ui.input_text_area("rqOAexpl", "Explanation A", width="100%", autoresize=True)
+                ui.input_text_area(
+                    "rqOAexpl", "Explanation A", width="100%", autoresize=True
+                )
                 ui.input_text("rqOB", "Option B", width="100%")
-                ui.input_text_area("rqOBexpl", "Explanation B", width="100%", autoresize=True)
+                ui.input_text_area(
+                    "rqOBexpl", "Explanation B", width="100%", autoresize=True
+                )
                 ui.input_text("rqOC", "Option C", width="100%")
-                ui.input_text_area("rqOCexpl", "Explanation C", width="100%", autoresize=True)
+                ui.input_text_area(
+                    "rqOCexpl", "Explanation C", width="100%", autoresize=True
+                )
                 ui.input_text("rqOD", "Option D", width="100%")
-                ui.input_text_area("rqODexpl", "Explanation D", width="100%", autoresize=True)
-            
-    
+                ui.input_text_area(
+                    "rqODexpl", "Explanation D", width="100%", autoresize=True
+                )
+
     with ui.nav_panel("Vector Database"):
         with ui.card():
             ui.card_header("Vector database files")
@@ -185,7 +201,9 @@ conn.close()
 concepts = reactive.value(concepts)
 files = reactive.value(files)
 
-index = reactive.value(VectorStoreIndex.from_vector_store(DuckDBVectorStore.from_local(shared.vectorDB)))
+index = reactive.value(
+    VectorStoreIndex.from_vector_store(DuckDBVectorStore.from_local(shared.vectorDB))
+)
 # index = VectorStoreIndex.from_vector_store(DuckDBVectorStore.from_local("appData/vectordb.duckdb"))
 # --- REACTIVE FUNCTIONS ---
 
@@ -530,14 +548,18 @@ def _():
     getFiles = pd.read_sql_query("SELECT * FROM file", conn)
     files.set(getFiles)
     conn.close()
-    index.set(VectorStoreIndex.from_vector_store(DuckDBVectorStore.from_local(shared.vectorDB)))
+    index.set(
+        VectorStoreIndex.from_vector_store(
+            DuckDBVectorStore.from_local(shared.vectorDB)
+        )
+    )
     ui.insert_ui(uiUploadFile, "#processFile", "afterEnd")
     ui.remove_ui("#processFile")
 
+
 # Generate multiple choice questions on a topic
 @reactive.calc
-def quizEngine():    
-  
+def quizEngine():
     qa_prompt_str = (
         "Context information is below.\n"
         "---------------------\n"
@@ -563,16 +585,15 @@ def quizEngine():
     chat_text_qa_msgs = [
         ChatMessage(
             role=MessageRole.SYSTEM,
-            content=(               
+            content=(
                 """
                 Generate questions that integrate across multiple of the provided concepts (you might need to write a longer question). 
-                If you cannot test all concetps, randomly select them (don't just start at the top of the list).
+                If you cannot test all concepts, randomly select them (don't just start at the top of the list).
                 Don't just ask for short definitions, but try to generate more elaborate examples or scenarios that force the student to think critically.
                 For each question, generate 4 possible answers, with only ONE correct option, and an explanation why each option is correct or incorrect.
                 You will output a valid JSON string based on the following (truncated) template:
                 [{{"qID":2,"question":"","answer":"B","optionA":"","explanationA":"","optionB":"","explanationB":""}},{{"qID":2,"question":"","answer":"C","optionA":"","explanationA":""}}]
                 """
-                
             ),
         ),
         ChatMessage(role=MessageRole.USER, content=qa_prompt_str),
@@ -600,6 +621,7 @@ def quizEngine():
         streaming=True,
     )
 
+
 # When the send button is clicked...
 @reactive.effect
 @reactive.event(input.qGenerate)
@@ -607,17 +629,21 @@ def _():
     genMsg.set("Generating new question...")
 
     conn = sqlite3.connect(shared.appDB)
-    topic = pd.read_sql_query(f"SELECT topic FROM topic WHERE tID = {input.qtID()}", conn)    
-    topicList = pd.read_sql_query(f"SELECT concept FROM concept WHERE tID = {input.qtID()} AND archived = 0", conn)
+    topic = pd.read_sql_query(
+        f"SELECT topic FROM topic WHERE tID = {input.qtID()}", conn
+    )
+    topicList = pd.read_sql_query(
+        f"SELECT concept FROM concept WHERE tID = {input.qtID()} AND archived = 0", conn
+    )
     topicList = "* " + "\n* ".join(topicList.sample(nQuestions)["concept"])
     conn.close()
 
     info = f"""Generate {nQuestions} multiple choice questions to test a student who just learned about the following topic: 
     {topic.iloc[0]["topic"]}
     ----
-    The student is expected to demonstate understanding of the following sub-concepts:
+    The student is expected to demonstrate understanding of the following sub-concepts:
     {topicList}
-    """ 
+    """
     botResponse(quizEngine(), info)
 
 
@@ -642,7 +668,7 @@ async def botResponse(quizEngine, info):
 def _():
     # Populate the respective UI outputs with the questions details
     resp = botResponse.result()
-    q = resp.iloc[0] # For now only processing one
+    q = resp.iloc[0]  # For now only processing one
     ui.update_text_area("rqQuestion", value=q["question"])
     ui.update_text("rqOA", value=q["optionA"])
     ui.update_text_area("rqOAexpl", value=q["explanationA"])
