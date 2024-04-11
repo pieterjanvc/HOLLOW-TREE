@@ -8,11 +8,12 @@ import admin_shared as shared
 # -- General
 import sqlite3
 import pandas as pd
+import json
 
 # -- Llamaindex
-# Llamaindex
-from llama_index.core import ChatPromptTemplate
+from llama_index.core import VectorStoreIndex, ChatPromptTemplate
 from llama_index.core.llms import ChatMessage, MessageRole
+from llama_index.vector_stores.duckdb import DuckDBVectorStore
 
 # -- Shiny
 from shiny import reactive
@@ -29,11 +30,13 @@ nest_asyncio.apply()
 # *********************************
 
 uID = 2  # if registered admins make reactive later
+nQuestions = 3
 
 # Make new app DB if needed
 print(shared.createAppDB(shared.appDB, addDemo=True))
 conn = sqlite3.connect(shared.appDB)
 topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+print(topics)
 conn.close()
 
 # --- UI COMPONENTS ---
@@ -115,18 +118,41 @@ with ui.navset_pill(id="tab"):
                 )
 
     with ui.nav_panel("Quiz Questions"):
-        with ui.card(id="xxx"):
+        with ui.card():
             ui.card_header("Questions by Topic")            
-            ui.input_select("qtID", "Pick a topic", choices=[], width="400px")
-            ui.input_select("qID", "Question", choices=[], width="400px")
-            div(
-                    ui.input_action_button("qAdd", "Add new", width="180px"),
+            ui.input_select("qtID", "Pick a topic", choices={1: "Central Dogma"}, width="400px")
+            ui.input_select("qID", "Question", choices={1: "test"}, width="400px")
+            with ui.panel_conditional("output.busyMsg != 'Generating new question...'"):
+                    ui.input_action_button("qGenerate", "Generate new", width="180px"),
                     ui.input_action_button("qEdit", "Edit selected", width="180px"),
                     ui.input_action_button(
                         "qArchive", "Archive selected", width="180px"
                     ),
                     style="display:inline",
-                )
+            @render.text
+            def busyMsg():
+                return genMsg.get()
+        
+        with ui.panel_conditional('input.qID'):
+            with ui.card():
+                ui.card_header("Review question")
+                
+                @render.ui
+                def quizQuestionPreview():
+                    return HTML(f"<b>{input.rqQuestion()}</b><ol type='A'><li>{input.rqOA()}</li>"
+                                f"<li>{input.rqOB()}</li><li>{input.rqOC()}</li>"
+                                f"<li>{input.rqOD()}</li></ol><i>Correct answer: {input.rqCorrect()}</i><hr>")
+                
+                ui.input_text_area("rqQuestion", "Question", width="100%", autoresize=True)
+                ui.input_radio_buttons("rqCorrect", "Correct answer", choices=["A", "B", "C", "D"], inline=True)
+                ui.input_text("rqOA", "Option A", width="100%")
+                ui.input_text_area("rqOAexpl", "Explanation A", width="100%", autoresize=True)
+                ui.input_text("rqOB", "Option B", width="100%")
+                ui.input_text_area("rqOBexpl", "Explanation B", width="100%", autoresize=True)
+                ui.input_text("rqOC", "Option C", width="100%")
+                ui.input_text_area("rqOCexpl", "Explanation C", width="100%", autoresize=True)
+                ui.input_text("rqOD", "Option D", width="100%")
+                ui.input_text_area("rqODexpl", "Explanation D", width="100%", autoresize=True)
             
     
     with ui.nav_panel("Vector Database"):
@@ -147,6 +173,7 @@ with ui.navset_pill(id="tab"):
 # --- REACTIVE VARIABLES ---
 
 sessionID = reactive.value(0)
+genMsg = reactive.value("")
 
 # Workaround until issue with reactive.cals is resolved
 # https://github.com/posit-dev/py-shiny/issues/1271
@@ -158,6 +185,8 @@ conn.close()
 concepts = reactive.value(concepts)
 files = reactive.value(files)
 
+index = reactive.value(VectorStoreIndex.from_vector_store(DuckDBVectorStore.from_local(shared.vectorDB)))
+# index = VectorStoreIndex.from_vector_store(DuckDBVectorStore.from_local("appData/vectordb.duckdb"))
 # --- REACTIVE FUNCTIONS ---
 
 
@@ -501,12 +530,13 @@ def _():
     getFiles = pd.read_sql_query("SELECT * FROM file", conn)
     files.set(getFiles)
     conn.close()
+    index.set(VectorStoreIndex.from_vector_store(DuckDBVectorStore.from_local(shared.vectorDB)))
     ui.insert_ui(uiUploadFile, "#processFile", "afterEnd")
     ui.remove_ui("#processFile")
 
-@reactive.effect
-@reactive.event(input.nqBtn)
-def _():    
+# Generate multiple choice questions on a topic
+@reactive.calc
+def quizEngine():    
   
     qa_prompt_str = (
         "Context information is below.\n"
@@ -529,31 +559,19 @@ def _():
         "Original Answer: {existing_answer}"
     )
 
-    conn = sqlite3.connect(shared.appDB)    
-    topicList = pd.read_sql_query(f"SELECT concept FROM concept WHERE tID = {input.qtID()} AND archived = 0", conn)
-    topicList = "* " + "\n* ".join(topicList["concept"])
-    conn.close()
-
     # System prompt
     chat_text_qa_msgs = [
         ChatMessage(
             role=MessageRole.SYSTEM,
-            content=(
-                f"""
-                You will generate 3 multiple choice questions to test a student who just learned about the following topic: 
-                {topics[topics["tID"] == input.qtID()].iloc[0]["topic"]}
-                ----
-                The student is expected to demonstate understanding of the following sub-concepts:
-                {topicList}
-                ----
-                """ 
-                '''
-                Try to generate questions that integrate across one or more of the concepts above. You can provide some additional context if needed.
+            content=(               
+                """
+                Generate questions that integrate across multiple of the provided concepts (you might need to write a longer question). 
+                If you cannot test all concetps, randomly select them (don't just start at the top of the list).
                 Don't just ask for short definitions, but try to generate more elaborate examples or scenarios that force the student to think critically.
                 For each question, generate 4 possible answers, with only ONE correct option, and an explanation why each option is correct or incorrect.
                 You will output a valid JSON string based on the following (truncated) template:
-                {"Q1":["question": "", "options": {"answer":"", "correct":"true", "explanation": ""}, {"answer":"", "correct":"true", "explanation": ""}]}
-                '''
+                [{{"qID":2,"question":"","answer":"B","optionA":"","explanationA":"","optionB":"","explanationB":""}},{{"qID":2,"question":"","answer":"C","optionA":"","explanationA":""}}]
+                """
                 
             ),
         ),
@@ -575,9 +593,64 @@ def _():
     ]
     refine_template = ChatPromptTemplate(chat_refine_msgs)
 
-    return shared.index.as_query_engine(
+    return index.get().as_query_engine(
         text_qa_template=text_qa_template,
         refine_template=refine_template,
         llm=shared.llm,
         streaming=True,
     )
+
+# When the send button is clicked...
+@reactive.effect
+@reactive.event(input.qGenerate)
+def _():
+    genMsg.set("Generating new question...")
+
+    conn = sqlite3.connect(shared.appDB)
+    topic = pd.read_sql_query(f"SELECT topic FROM topic WHERE tID = {input.qtID()}", conn)    
+    topicList = pd.read_sql_query(f"SELECT concept FROM concept WHERE tID = {input.qtID()} AND archived = 0", conn)
+    topicList = "* " + "\n* ".join(topicList.sample(nQuestions)["concept"])
+    conn.close()
+
+    info = f"""Generate {nQuestions} multiple choice questions to test a student who just learned about the following topic: 
+    {topic.iloc[0]["topic"]}
+    ----
+    The student is expected to demonstate understanding of the following sub-concepts:
+    {topicList}
+    """ 
+    botResponse(quizEngine(), info)
+
+
+# Async Shiny task waiting for LLM reply
+@reactive.extended_task
+async def botResponse(quizEngine, info):
+    # Given the LLM output might not be correct JSON (or fails to convert to a DF, try again if needed)
+    valid = False
+    while not valid:
+        try:
+            resp = str(quizEngine.query(info))
+            resp = pd.json_normalize(json.loads(resp))
+            valid = True
+        except Exception:
+            valid = False
+
+    return resp
+
+
+# Processing LLM response
+@reactive.effect
+def _():
+    # Populate the respective UI outputs with the questions details
+    resp = botResponse.result()
+    q = resp.iloc[0] # For now only processing one
+    ui.update_text_area("rqQuestion", value=q["question"])
+    ui.update_text("rqOA", value=q["optionA"])
+    ui.update_text_area("rqOAexpl", value=q["explanationA"])
+    ui.update_text("rqOB", value=q["optionB"])
+    ui.update_text_area("rqOBexpl", value=q["explanationB"])
+    ui.update_text("rqOC", value=q["optionC"])
+    ui.update_text_area("rqOCexpl", value=q["explanationC"])
+    ui.update_text("rqOD", value=q["optionD"])
+    ui.update_text_area("rqODexpl", value=q["explanationD"])
+    ui.update_radio_buttons("rqCorrect", selected=q["answer"])
+    genMsg.set("")
