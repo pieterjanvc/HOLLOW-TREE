@@ -1,30 +1,58 @@
 # About
 
-This applications aims to provide students with an LLM-based knowledge check on specific topics relevant to their coursework. Admins can set the topic and add sub-concepts to guide the conversation. By uplaoding specific and relevant files to a vector database, the app will use Retrieval Augmented Generation (RAG) to ensure the quality and accuracy of the LLM responses is high and on topic.
+This applications aims to provide students with an LLM-based knowledge check on specific topics relevant to their coursework. Admins can set the topic and add sub-concepts to guide the conversation. By uploading specific and relevant files to a vector database, the app will use Retrieval Augmented Generation (RAG) to ensure the quality and accuracy of the LLM responses is high and on topic.
 
-## Student facing app (app.py, app_shared.py)
+# Apps and Data
 
-* Select a topic to check their knowlege on relevant to the coursework
-* Interact with the LLM in conversation led by the topic and consepts set by the instuctor
-* The LLM should adapt the conversation to the student's anwers and keep them engaged and on topic
+## Software and Libraries
 
-## Admin facing app (admin/admin.py, admin/admin_shared.py)
+The apps are written in Python and use the following core libraries:
+
+* The [Llamaindex](https://www.llamaindex.ai/) framework is a wrapper for working with 
+various LLMs (e.g. ChatGPT) and implement Retrieval Augmented Generation for increasing
+accuracy
+* The [Shiny framework](https://shiny.posit.co/py/) is used for generating the 
+apps' UI and Server components
+* For a list of all dependencies, see the [requirements.txt](./requirements.txt) file
+* App wide settings are listed in the [config.toml](./config.toml) file
+
+## Data storage
+
+Data is stored in two separate databases
+
+* The vector database used for RAG is implemented with DuckDB
+* The original files uploaded to the app can be stored as well depending on the settings
+* All app data and logs are stored in a custom SQLite database (schema below).
+This data is used for app operation, monitoring and research
+
+![App DB Schema](https://drive.google.com/uc?id=1kOGDViA8fEOLcQoRhDdH6SbdF3OyZ7R6)
+
+## Source code of the apps
+
+The apps are written using the Shiny Express syntax. 
+
+*Note: For scoping reasons, functions and variables that are shared between sessions
+are in a separate file so they only have to be loaded once. All code put in the
+main app files is run for each new session*
+
+## Admin App ([admin/admin.py](./admin/admin.py), [admin/admin_shared.py](./admin/admin_shared.py))
 
 * Create / edit topics to be discussed
-* Create / edit specific concepts for each topic to help guide the converstaion
+* Create / edit specific concepts (facts) for each topic to help guide the conversation
 * Upload new files to the vector database (RAG)
 
-# ToDo
 
-* Check with IRB to see what we can collect / study
-* Implement Multiple-choice generator: Admin can generate multiple choice questiones based on a topic and concepts, then edit (track this) if needed and validate. This will be added to the DB and students can test themselves after finishing the conversation with the bot. 
-* Flagging incorrect / weird   / bot responses for easier analysis
+## Student App ([app.py](./app.py), [app_shared.py](./app_shared.py))
 
-# App set-up and deployment
+* Students can select a topic to check their knowledge on
+* Interact with the LLM in conversation led by the topic and concepts set by the instructor
+* The LLM should adapt the conversation to the student's answers and keep them engaged and on topic
+
+# Set-up and deployment
 
 ## Setting up the project in a virtual Python environment on Windows
 
-Tutorial for setting up Shiny within a virtual enviroment found on 
+Tutorial for setting up Shiny within a virtual environment found on 
 [website](https://shiny.posit.co/py/docs/install-create-run.html#install)
 
 The command below should be run on the CMD on Windows (*not* PowerShell)
@@ -53,4 +81,7 @@ deactivate
 ```
 *You should see (.venv) disappear from the prompt*
 
-If workin in VS Code, the enviroment can be set to default to the virtual environment for this project without the need for (de)activation. To select an environment open the Command Palette and type “Python: Select Interpreter”
+If working in VS Code, the environment can be set to default to the virtual environment for this project without the need for (de)activation. To select an environment open the Command Palette and type “Python: Select Interpreter”
+
+## hosting the app
+<todo>
