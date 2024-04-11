@@ -6,7 +6,7 @@ This applications aims to provide students with an LLM-based knowledge check on 
 
 ## Software and Libraries
 
-The apps are written in Python and use the following core libraries:
+The apps are written in Python and use the following important libraries:
 
 * The [Llamaindex](https://www.llamaindex.ai/) framework is a wrapper for working with 
 various LLMs (e.g. ChatGPT) and implement Retrieval Augmented Generation for increasing
@@ -20,8 +20,7 @@ apps' UI and Server components
 
 Data is stored in two separate databases
 
-* The vector database used for RAG is implemented with DuckDB
-* The original files uploaded to the app can be stored as well depending on the settings
+* The vector database used for RAG is implemented with DuckDB (note that original files uploaded to the app can be stored as well depending on the settings)
 * All app data and logs are stored in a custom SQLite database (schema below).
 This data is used for app operation, monitoring and research
 
@@ -29,20 +28,24 @@ This data is used for app operation, monitoring and research
 
 ## Source code of the apps
 
-The apps are written using the Shiny Express syntax. 
+The apps are written with the Shiny Express syntax. 
 
 *Note: For scoping reasons, functions and variables that are shared between sessions
 are in a separate file so they only have to be loaded once. All code put in the
 main app files is run for each new session*
 
-## Admin App ([admin/admin.py](./admin/admin.py), [admin/admin_shared.py](./admin/admin_shared.py))
+## Admin App ([admin/admin.py](./admin/admin.py))
+
+*Shared variables and functions are sources in from [admin/admin_shared.py](./admin/admin_shared.py)*
 
 * Create / edit topics to be discussed
 * Create / edit specific concepts (facts) for each topic to help guide the conversation
 * Upload new files to the vector database (RAG)
 
 
-## Student App ([app.py](./app.py), [app_shared.py](./app_shared.py))
+## Student App ([app.py](./app.py))
+
+*Shared variables and functions are sources in from [app_shared.py](./app_shared.py)*
 
 * Students can select a topic to check their knowledge on
 * Interact with the LLM in conversation led by the topic and concepts set by the instructor
@@ -83,5 +86,5 @@ deactivate
 
 If working in VS Code, the environment can be set to default to the virtual environment for this project without the need for (de)activation. To select an environment open the Command Palette and type “Python: Select Interpreter”
 
-## hosting the app
+## Hosting the app
 <todo>
