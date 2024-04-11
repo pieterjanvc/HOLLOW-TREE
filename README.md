@@ -25,7 +25,7 @@ Data is stored in two separate databases
 * All app data and logs are stored in a custom SQLite database (schema below).
 This data is used for app operation, monitoring and research
 
-![App DB Schema](https://drive.google.com/uc?id=1kOGDViA8fEOLcQoRhDdH6SbdF3OyZ7R6)
+![App DB Schema](https://drive.usercontent.google.com/download?id=1kOzuVdI-p1K5Ej6EaRh4dJZuxyCATCfT)
 
 ## Source code of the apps
 
