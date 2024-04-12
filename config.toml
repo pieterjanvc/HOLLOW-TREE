@@ -1,3 +1,6 @@
+[general]
+addDemo = "True"
+
 [data]
 appDB = "appData/appDB.db"
 vectorDB = "appData/vectordb.duckdb"

@@ -14,6 +14,7 @@ import duckdb
 import json
 from shutil import move
 import toml
+from urllib.request import urlretrieve
 
 # -- Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
@@ -21,15 +22,19 @@ from llama_index.core.extractors import TitleExtractor, KeywordExtractor
 from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
 
+import nest_asyncio
+nest_asyncio.apply()
+
 # --- Global variables
 
 with open("config.toml", "r") as f:
     config = toml.load(f)
 
+addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
 appDB = config["data"]["appDB"]
 vectorDB = config["data"]["vectorDB"]
 # keep files user uploads, if set to None, original not kept
-storageFolder = config["data"]["storageFolder"]
+storageFolder = os.path.join(config["data"]["storageFolder"],"")
 
 # Get the OpenAI API key and organistation
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
@@ -56,7 +61,7 @@ def inputCheck(input):
 
 
 # Database to store app data (this is not the vector database!)
-def createAppDB(DBpath, sqlFile="appData/createDB.sql", addDemo=True):
+def createAppDB(DBpath, sqlFile="appData/createDB.sql", addDemo=False):
     if os.path.exists(DBpath):
         return (1, "Database already exists. Skipping")
 
@@ -118,25 +123,29 @@ def createAppDB(DBpath, sqlFile="appData/createDB.sql", addDemo=True):
 
     return (0, "Creation completed")
 
-
-# newFile = "appData/Central_dogma_of_molecular_biology.pdf"
-# newFile = "appData/Mendelian inheritance.txt"
-# vectorDB = "appData/testDB.duckdb"
-# appDB = "appData/appDB.db"
-# storageFolder = "appData/uploadedFiles"
-# newFileName = None
-
+# Make new app DB if needed
+print(createAppDB(appDB, addDemo=addDemo))
 
 # Create DuckDB vector database and add files
 def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
     if not os.path.exists(appDB):
         raise ConnectionError("The appDB was not found")
+    
+    # In case the file is a URL download it first 
+    isURL = False
+    if newFile.startswith("http://") or newFile.startswith("https://"):
+        if not os.path.exists("appData/temp"):
+            os.makedirs("appData/temp")
+        
+        isURL = True
+        urlretrieve(newFile, "appData/temp/" + os.path.basename(newFile))
+        newFile = "appData/temp/" + os.path.basename(newFile)
 
     if not os.path.exists(newFile):
         raise ConnectionError(f"The newFile was not found at {newFile}")
 
     # Move the file to permanent storage if requested
-    if storageFolder is not None:
+    if (storageFolder is not None) & (not isURL):
         if not os.path.exists(storageFolder):
             os.makedirs(storageFolder)
 
@@ -151,6 +160,10 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
 
     newData = SimpleDirectoryReader(input_files=[newFile]).load_data()
 
+    # Delete the file from URL if not set to be kept
+    if (storageFolder is None) & isURL:
+        os.remove(newFile)
+
     # Build the vector store https://docs.llamaindex.ai/en/stable/examples/vector_stores/DuckDBDemo/?h=duckdb
     if os.path.exists(vectorDB):
         vector_store = DuckDBVectorStore.from_local(vectorDB)
@@ -160,7 +173,7 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
             storage_context=storage_context,
             transformations=[TitleExtractor(), KeywordExtractor()],
         )
-    else:
+    else:        
         vector_store = DuckDBVectorStore(
             os.path.basename(vectorDB), persist_dir=os.path.dirname(vectorDB)
         )
@@ -170,7 +183,7 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
             storage_context=storage_context,
             transformations=[TitleExtractor(), KeywordExtractor()],
         )
-
+        
     # Get the metadata out of the DB excerpt_keywords document_title
     fileName = newData[0].metadata["file_name"]
     # vectorDB = "appData/vectorstore.duckdb"
@@ -184,7 +197,7 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
     chunkTitles = "* " + "\n* ".join(set([y[0][0] for y in x]))
     chunkKeywords = ", ".join(set((", ".join([y[0][1] for y in x])).split(", ")))
 
-    # Summarise everything using the LLM and add it to the DB
+    # Summarise everything using the LLM and add it to the appDB
     docSum = (
         "Below is a list of subheadings belonging to the same document."
         f"Note that many of them might be near identical:\n\n{chunkTitles}"
@@ -214,3 +227,9 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
     conn.close()
 
     return (0, "Completed")
+
+# When demo data is to be added use a file stored in a GitHub issue
+# TODO Replace URL once public!
+if addDemo & (not os.path.exists(vectorDB)):
+    newFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
+    addFileToDB(newFile, vectorDB, appDB)

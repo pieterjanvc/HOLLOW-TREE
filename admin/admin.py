@@ -14,6 +14,7 @@ import json
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
+from llama_index.core.indices import EmptyIndex
 
 # -- Shiny
 from shiny import reactive
@@ -32,8 +33,7 @@ nest_asyncio.apply()
 uID = 2  # if registered admins make reactive later
 nQuestions = 3
 
-# Make new app DB if needed
-print(shared.createAppDB(shared.appDB, addDemo=True))
+# CGet the topics from the app DB
 conn = sqlite3.connect(shared.appDB)
 topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
 print(topics)
@@ -203,6 +203,8 @@ files = reactive.value(files)
 
 index = reactive.value(
     VectorStoreIndex.from_vector_store(DuckDBVectorStore.from_local(shared.vectorDB))
+    # EmptyIndex()
+
 )
 # index = VectorStoreIndex.from_vector_store(DuckDBVectorStore.from_local("appData/vectordb.duckdb"))
 # --- REACTIVE FUNCTIONS ---
@@ -617,8 +619,7 @@ def quizEngine():
     return index.get().as_query_engine(
         text_qa_template=text_qa_template,
         refine_template=refine_template,
-        llm=shared.llm,
-        streaming=True,
+        llm=shared.llm
     )
 
 
@@ -655,6 +656,7 @@ async def botResponse(quizEngine, info):
     while not valid:
         try:
             resp = str(quizEngine.query(info))
+            print(resp)
             resp = pd.json_normalize(json.loads(resp))
             valid = True
         except Exception:

@@ -275,8 +275,7 @@ def chatEngine():
     return shared.index.as_query_engine(
         text_qa_template=text_qa_template,
         refine_template=refine_template,
-        llm=shared.llm,
-        streaming=True,
+        llm=shared.llm
     )
 
 
