@@ -1,4 +1,4 @@
-# About
+# SCUIRREL: Science Concept Understanding with Interactive Research RAG Educational LLM
 
 This applications aims to provide students with an LLM-based knowledge check on specific topics relevant to their coursework. Admins can set the topic and add sub-concepts to guide the conversation. By uploading specific and relevant files to a vector database, the app will use Retrieval Augmented Generation (RAG) to ensure the quality and accuracy of the LLM responses is high and on topic.
 
@@ -15,6 +15,23 @@ accuracy
 apps' UI and Server components
 * For a list of all dependencies, see the [requirements.txt](./requirements.txt) file
 * App wide settings are listed in the [config.toml](./config.toml) file
+
+## The LLM
+The app is currently configured to run with OpenAI's GPT models. This requires
+your own active API key. If your are part of an organization, you will also need the 
+organization ID. Make sure the keys are available to Python as environment
+variables with the following names:
+
+* OPENAI_API_KEY
+* OPENAI_ORGANIZATION
+
+They will be accessed in the code like this
+```
+os.environ["OPENAI_ORGANIZATION"]
+os.environ.get("OPENAI_ORGANIZATION")
+```
+*You can read this [online guide](https://chlee.co/how-to-setup-environment-variables-for-windows-mac-and-linux/) 
+for more info on how to set these up*
 
 ## Data storage
 
@@ -36,22 +53,28 @@ The apps are written with the Shiny Express syntax.
 are in a separate file so they only have to be loaded once. All code put in the
 main app files is run for each new session*
 
-## Admin App ([admin/admin.py](./admin/admin.py))
+## SCUIRRELL ([app.py](./app.py))
 
-*Shared variables and functions are sources in from [admin/admin_shared.py](./admin/admin_shared.py)*
-
-* Create / edit topics to be discussed
-* Create / edit specific concepts (facts) for each topic to help guide the conversation
-* Upload new files to the vector database (RAG)
-
-
-## Student App ([app.py](./app.py))
+SCUIRREL or Science Concept Understanding with Interactive Research RAG Educational LLM 
+is the main application. In this app, users will interact  with the LLM exploring the 
+topics and concepts setup in ACCORNS (admin app, see below)
 
 *Shared variables and functions are sources in from [app_shared.py](./app_shared.py)*
 
 * Students can select a topic to check their knowledge on
 * Interact with the LLM in conversation led by the topic and concepts set by the instructor
 * The LLM should adapt the conversation to the student's answers and keep them engaged and on topic
+
+## ACCORNS: Admin App ([admin/admin.py](./admin/admin.py))
+
+ACCORNS or Admin Control Center Overseeing RAG Needed for SCUIRREL, is a secondary
+applications where instructors can set-up, manage and monitor SCUIRRELL
+
+*Shared variables and functions are sources in from [admin/admin_shared.py](./admin/admin_shared.py)*
+
+* Create / edit topics to be discussed
+* Create / edit specific concepts (facts) for each topic to help guide the conversation
+* Upload new files to the vector database for retrieval augmented generation (RAG)
 
 # Set-up and deployment
 
@@ -89,4 +112,4 @@ deactivate
 If working in VS Code, the environment can be set to default to the virtual environment for this project without the need for (de)activation. To select an environment open the Command Palette and type “Python: Select Interpreter”
 
 ## Hosting the app
-<todo>
+*add details here ...*

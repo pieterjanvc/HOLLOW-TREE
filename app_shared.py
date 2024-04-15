@@ -1,6 +1,6 @@
-# ********************************************
-# ----------- MAIN APP SHARED CODE -----------
-# ********************************************
+# ************************************************
+# ----------- SCUIRREL APP SHARED CODE -----------
+# ************************************************
 
 # All variables and functions below are shared across different session
 # https://shiny.posit.co/py/docs/express-in-depth.html#shared-objects

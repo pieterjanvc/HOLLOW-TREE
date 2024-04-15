@@ -1,6 +1,9 @@
-# ********************************
-# ----------- MAIN APP -----------
-# ********************************
+# ******************************************
+# ----------- SCUIRREL: MAIN APP -----------
+# ******************************************
+
+# Welcome to SCUIRREL:
+# Science Concept Understanding with Interactive Research RAG Educational LLM
 
 # See app_shared.py for variables and functions shared across sessions
 import app_shared as shared 
@@ -30,8 +33,53 @@ conn = sqlite3.connect(shared.appDB)
 topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
 conn.close()
 
-# --- UI ---
+
+# --- RENDERING UI ---
+# ********************
+
 ui.page_opts(fillable=True)
+ui.include_css("www/styles.css")
+
+# --- CUSTOM JS FUNCTIONS (move to separate file later) ---
+
+# This function allows you to hide/show/disable/enable elements by ID or data-value
+# The latter is needed because tabs don't use ID's but data-value
+ui.tags.script(
+    """
+    Shiny.addCustomMessageHandler("hideShow", function(x) {
+
+        if (document.getElementById(x.id)) {
+            var element = document.getElementById(x.id);
+        } else if (document.querySelector('[data-value="' + x.id + '"]')) {
+            var element = document.querySelector('[data-value="' + x.id + '"]');
+        } else {
+            alert("No element found with an ID or data-value of:" + x.id);
+            return;
+        }
+
+        switch(x.effect) {
+            case "d":
+                element.setAttribute("disabled", true);
+                break;
+            case "e":
+                element.setAttribute("disabled", false);
+                break;
+            case "h":
+                element.style.display = "none";
+                break;
+            case "s":
+                element.style.display = "";
+                break;
+        }
+        
+    });
+    """
+)
+
+def elementDisplay(id, effect):
+    @reactive.effect
+    async def _():
+        await session.send_custom_message("hideShow", {"id": id, "effect": effect})
 
 # Add some JS so that pressing enter can send the message too
 ui.head_content(
@@ -43,36 +91,44 @@ ui.head_content(
         });
          </script>""")
 )
-ui.include_css("www/styles.css")
 
+# --- UI LAYOUT ---
 with ui.navset_pill(id="tab"):
-    with ui.nav_panel("BMIbot"):
+    # MAIN CHAT TAB
+    with ui.nav_panel("SCUIRREL"):
         # Render the chat window
         with ui.layout_columns(col_widths=12):
             with ui.card(id="about"):
-                HTML("""<p>This chatbot has been programmed to gauge your knowledge on specific topics 
-                     relevant to your coursework. It will guide you though impotant concepts by asking you
-                     a series of questions. Note that it will try and make you think for yourself, and not simply
-                     provide answers.<br><br><i>NOTE: This application is experimental and can you should still talk
-                     to your course instructors / teaching fellows if you have questions or concerns. 
-                     Though anonymous, we are still collecting all data (including chat history) for research purposes
-                     so don't share any personal information and keep to the topic at hand.</i></p>""")
+                HTML("""<p>Hello, I'm Scuirrel (Science Concept Understanding with Interactive Research RAG Educational LLM). 
+                     I'm here to help you test your knowledge on specific concepts
+                     related to topics relevant to your coursework. I will guide you though these concepts by asking you
+                     a series of questions. Note that I will try and make you think for yourself, and not simply
+                     provide answers. However, I sometimes go nuts so please talk to your course instructors / teaching 
+                     fellows if you have questions or concerns.<br><br><i>NOTE:
+                     Though this app is anonymous, I still like to collect data acorns (including chat history) for 
+                     research purposes so don't share any personal information and keep to the topic at hand.</i></p>""")
             with ui.card(id="topicSelection"):
                 ui.card_header("Pick a topic")
                 ui.input_select("selTopic", None, choices=[], width="600px")
 
-            with ui.card(id="chatWindow", height="55vh"):
+            with ui.card(id="chatWindow", height="45vh"):
                 ui.card_header("Conversation")
 
                 @render.ui
                 def chatLog():
                     return div(HTML(userLog.get()))
 
-        # Render the text input (send button generated above)
-        @render.ui
-        def chatButton():
-            return chatInput.get()
-
+        # User input, send button and wait message
+        div(
+            ui.input_text_area(
+                "newChat", "", value="", width="100%", spellcheck=True, resize=False
+            ),
+            ui.input_action_button("send", "Send"),
+            id = "chatIn"),
+        div(HTML("<p style='color: white'><i>Scuirrel is foraging for an answer ...</i></p>"), 
+            id = "waitResp", style="display: none;")
+    
+    # USER PROGRESS TAB
     with ui.nav_panel("Profile"):
         with ui.layout_columns(col_widths=12):
             with ui.card():
@@ -84,16 +140,6 @@ with ui.navset_pill(id="tab"):
 
 sessionID = reactive.value(0)
 discussionID = reactive.value(0)
-
-chatInput = reactive.value(
-    ui.TagList(
-        ui.input_text_area(
-            "newChat", "", value="", width="100%", spellcheck=True, resize=False
-        ),
-        ui.input_action_button("send", "Send"),
-    )
-)
-
 
 @reactive.calc
 @reactive.event(input.selTopic)
@@ -257,7 +303,7 @@ def chatEngine():
                 """
                 If necessary, make edits to ensure the following:
                 - Do not keep repeating the topic title in your answer, focus on what's currently going on
-                - You should stay on topic, and make sure all sub-concpets are evaluated 
+                - You should stay on topic, and make sure all sub-concepts are evaluated 
                 (but don't give them away accidentally!)
                 - If a user seems confused or does not know something, you should explain some of the theory 
                 in light of their current perceived knowledge
@@ -282,10 +328,15 @@ def chatEngine():
 # When the send button is clicked...
 @reactive.effect
 @reactive.event(input.send)
-def _():
-    newChat = input.newChat()  # prevent HTML injection from user
-    if newChat == "":
+def _():    
+
+    newChat = input.newChat()
+
+    if (newChat == "") | (newChat.isspace()):
         return
+    
+    elementDisplay("waitResp", "s")
+    elementDisplay("chatIn", "h")
     msg = messages.get()
     msg.append((False, shared.dt(), newChat))
     messages.set(msg)
@@ -293,11 +344,10 @@ def _():
     userLog.set(
         userLog.get()
         + "<div class='userChat talk-bubble tri'><p>"
-        + escape(newChat)
+        + escape(newChat) # prevent HTML injection from user
         + "</p></div>"
     )
-    botLog.set(botLog.get() + f"\n--- USER:\n{newChat}")
-    chatInput.set(HTML("<hr><p style='color: white'><i>The BioBot is thinking hard ...</i></p>"))
+    botLog.set(botLog.get() + f"\n--- USER:\n{newChat}")    
     botResponse(chatEngine(), botIn)
 
 
@@ -319,14 +369,10 @@ def _():
             + "</p></div>"
         )
         botLog.set(botLog.get() + "\n--- YOU:\n" + resp)
-    chatInput.set(
-        ui.TagList(
-            ui.input_text_area(
-                "newChat", "", value="", width="100%", spellcheck=True, resize=False
-            ),
-            ui.input_action_button("send", "Send"),
-        )
-    )
+    # Now the LLM has finished the user can send a new response
+    elementDisplay("waitResp", "h")
+    ui.update_text_area("newChat", value=None)
+    elementDisplay("chatIn", "s")
     msg = messages.get()
     msg.append((True, shared.dt(), resp))
     messages.set(msg)

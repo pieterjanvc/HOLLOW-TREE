@@ -1,6 +1,9 @@
-# **************************************
-# ----------- TUTORBOT ADMIN -----------
-# **************************************
+# ******************************************
+# ----------- ACCORNS: ADMIN APP -----------
+# ******************************************
+
+# Welcome to ACCORNS:
+# Admin Control Center Overseeing RAG Needed for SCUIRREL
 
 # See admin\admin_shared.py for variables and functions shared across sessions
 import admin_shared as shared
@@ -63,133 +66,12 @@ uiUploadFile = div(
 # ********************
 
 ui.page_opts(fillable=True)
-
-# Add some JS so that pressing enter can send the message too
-ui.head_content(
-    HTML("""<script>
-         $(document).keyup(function(event) {
-            if ($("#newChat").is(":focus") && (event.key == "Enter")) {
-                $("#send").click();
-            }
-        });
-         </script>""")
-)
 ui.include_css("www/styles.css")
 
-with ui.navset_pill(id="tab"):
-    # TAB 1
-    with ui.nav_panel("Vector Database", value = "vTab"):
-        with ui.card(id="blankDBMsg", style="display: none;"):
-            HTML('<i>Welcome! In order to get started, please add at least one file to the vector database</i>')
-        with ui.card():
-            ui.card_header("Vector database files")
-
-            @render.data_frame
-            def filesTable():
-                return render.DataTable(
-                    files.get(), width="100%", row_selection_mode="single"
-                )
-
-        with ui.card():
-            ui.card_header("Upload a new file")
-            uiUploadFile
-    # TAB 2
-    with ui.nav_panel("Topics", value = "tTab"):
-        with ui.layout_columns(col_widths=12):
-            with ui.card():
-                ui.card_header("Topic")
-                ui.input_select("tID", "Pick a topic", choices=[], width="400px")
-                div(
-                    ui.input_action_button("tAdd", "Add new", width="180px"),
-                    ui.input_action_button(
-                        "tArchive", "Archive selected", width="180px"
-                    ),
-                )
-
-            with ui.card():
-                ui.card_header("Concepts related to the topic")
-
-                @render.data_frame
-                def conceptsTable():
-                    return render.DataTable(
-                        concepts.get()[["concept"]],
-                        width="100%",
-                        row_selection_mode="single",
-                    )
-
-                div(
-                    ui.input_action_button("cAdd", "Add new", width="180px"),
-                    ui.input_action_button("cEdit", "Edit selected", width="180px"),
-                    ui.input_action_button(
-                        "cArchive", "Archive selected", width="180px"
-                    ),
-                    style="display:inline",
-                )
-                HTML(
-                    "<i>Concepts are facts or pieces of information you want the Bot to check with your students."
-                    "You can be very brief, as all context will be retrieved from the database of documents. "
-                    "Don't be too broad, as this might cause confusion (you'll have to test it). "
-                    "Try to limit the number of concepts to 4 - 8 as the AI might preform worse with a large number</i>"
-                )
-    # TAB 3
-    with ui.nav_panel("Quiz Questions", value = "qTab"):
-        with ui.card():
-            ui.card_header("Questions by Topic")
-            ui.input_select(
-                "qtID", "Pick a topic", choices={1: "Central Dogma"}, width="400px"
-            )
-            ui.input_select("qID", "Question", choices={1: "test"}, width="400px")
-            with ui.panel_conditional("output.busyMsg != 'Generating new question...'"):
-                (ui.input_action_button("qGenerate", "Generate new", width="180px"),)
-                (ui.input_action_button("qEdit", "Edit selected", width="180px"),)
-                (ui.input_action_button("qArchive", "Archive selected", width="180px"),)
-                style = ("display:inline",)
-
-            @render.text
-            def busyMsg():
-                return genMsg.get()
-
-        with ui.panel_conditional("input.qID"):
-            with ui.card():
-                ui.card_header("Review question")
-
-                @render.ui
-                def quizQuestionPreview():
-                    return HTML(
-                        f"<b>{input.rqQuestion()}</b><ol type='A'><li>{input.rqOA()}</li>"
-                        f"<li>{input.rqOB()}</li><li>{input.rqOC()}</li>"
-                        f"<li>{input.rqOD()}</li></ol><i>Correct answer: {input.rqCorrect()}</i><hr>"
-                    )
-
-                ui.input_text_area(
-                    "rqQuestion", "Question", width="100%", autoresize=True
-                )
-                ui.input_radio_buttons(
-                    "rqCorrect",
-                    "Correct answer",
-                    choices=["A", "B", "C", "D"],
-                    inline=True,
-                )
-                ui.input_text("rqOA", "Option A", width="100%")
-                ui.input_text_area(
-                    "rqOAexpl", "Explanation A", width="100%", autoresize=True
-                )
-                ui.input_text("rqOB", "Option B", width="100%")
-                ui.input_text_area(
-                    "rqOBexpl", "Explanation B", width="100%", autoresize=True
-                )
-                ui.input_text("rqOC", "Option C", width="100%")
-                ui.input_text_area(
-                    "rqOCexpl", "Explanation C", width="100%", autoresize=True
-                )
-                ui.input_text("rqOD", "Option D", width="100%")
-                ui.input_text_area(
-                    "rqODexpl", "Explanation D", width="100%", autoresize=True
-                )    
-
-# --- CUSTOM JS FUNCTIONS ---
+# --- CUSTOM JS FUNCTIONS (move to separate file later) ---
 
 # This function allows you to hide/show/disable/enable elements by ID or data-value
+# The latter is needed because tabs don't use ID's but data-value
 ui.tags.script(
     """
     Shiny.addCustomMessageHandler("hideShow", function(x) {
@@ -227,12 +109,128 @@ def elementDisplay(id, effect):
     async def _():
         await session.send_custom_message("hideShow", {"id": id, "effect": effect})
 
+# --- UI LAYOUT ---
+
+with ui.navset_pill(id="tab"):
+    
+    # TAB 1 - VECTOR DATABASE
+    with ui.nav_panel("Vector Database", value = "vTab"):
+        with ui.card(id="blankDBMsg", style="display: none;"):
+            HTML('<i>Welcome to ACCORNS, the Admin Control Center Overseeing RAG Needed for SCUIRREL!'
+                 'In order to get started, please add at least one file to the vector database</i>')
+        # Tables of the files that are in the DB
+        with ui.card():
+            ui.card_header("Vector database files")
+
+            @render.data_frame
+            def filesTable():
+                return render.DataTable(
+                    files.get(), width="100%", row_selection_mode="single"
+                )
+        # Option to add bew files
+        with ui.card():
+            ui.card_header("Upload a new file")
+            uiUploadFile
+    
+    # TAB 2 - TOPICS
+    with ui.nav_panel("Topics", value = "tTab"):
+        with ui.layout_columns(col_widths=12):
+            # Select, add or archive a topic 
+            with ui.card():
+                ui.card_header("Topic")
+                ui.input_select("tID", "Pick a topic", choices=[], width="400px")
+                div(
+                    ui.input_action_button("tAdd", "Add new", width="180px"),
+                    ui.input_action_button(
+                        "tArchive", "Archive selected", width="180px"
+                    ),
+                )
+            # Table of concepts per topic with option to add, edit or archive
+            with ui.card():
+                ui.card_header("Concepts related to the topic")
+
+                @render.data_frame
+                def conceptsTable():
+                    return render.DataTable(
+                        concepts.get()[["concept"]],
+                        width="100%",
+                        row_selection_mode="single",
+                    )
+
+                div(
+                    ui.input_action_button("cAdd", "Add new", width="180px"),
+                    ui.input_action_button("cEdit", "Edit selected", width="180px"),
+                    ui.input_action_button(
+                        "cArchive", "Archive selected", width="180px"
+                    ),
+                    style="display:inline",
+                )
+                HTML(
+                    "<i>Concepts are facts or pieces of information you want SCUIRREL to check with your students. "
+                    "You can be very brief, as all context will be retrieved from the database of documents. "
+                    "Don't be too broad, as this might cause confusion (you'll have to test it). "
+                    "Try to limit the number of concepts to 4 - 8 as the AI might preform worse with a large number</i>"
+                )
+    # TAB 3 - QUIZ QUESTIONS
+    with ui.nav_panel("Quiz Questions", value = "qTab"):
+        # Select a topic and a question with options to add or archive
+        with ui.card():
+            ui.card_header("Questions by Topic")
+            # Dropdown of topics and questions per topic
+            ui.input_select(
+                "qtID", "Pick a topic", choices={1: "Central Dogma"}, width="400px"
+            )
+            ui.input_select("qID", "Question", choices={1: "test"}, width="400px")
+            # Buttons to add or archive questions and message when busy generating
+            div(ui.input_action_button("qGenerate", "Generate new", width="180px"),
+                ui.input_action_button("qArchive", "Archive selected", width="180px"),
+                id = "qBtnSet", style = "display:inline")
+            div(HTML("<i>Generating a new question...</i>"), id="qBusyMsg", style="display: none;")
+
+        # Only show this panel if there is at least one question
+        with ui.panel_conditional("input.qID"):
+            with ui.card():
+                ui.card_header("Review question")
+                # Show a preview of the question
+                @render.ui
+                def quizQuestionPreview():
+                    return HTML(
+                        f"<b>{input.rqQuestion()}</b><ol type='A'><li>{input.rqOA()}</li>"
+                        f"<li>{input.rqOB()}</li><li>{input.rqOC()}</li>"
+                        f"<li>{input.rqOD()}</li></ol><i>Correct answer: {input.rqCorrect()}</i><hr>"
+                    )
+                # Fields to edit any part of the question
+                ui.input_text_area(
+                    "rqQuestion", "Question", width="100%", autoresize=True
+                )
+                ui.input_radio_buttons(
+                    "rqCorrect",
+                    "Correct answer",
+                    choices=["A", "B", "C", "D"],
+                    inline=True,
+                )
+                ui.input_text("rqOA", "Option A", width="100%")
+                ui.input_text_area(
+                    "rqOAexpl", "Explanation A", width="100%", autoresize=True
+                )
+                ui.input_text("rqOB", "Option B", width="100%")
+                ui.input_text_area(
+                    "rqOBexpl", "Explanation B", width="100%", autoresize=True
+                )
+                ui.input_text("rqOC", "Option C", width="100%")
+                ui.input_text_area(
+                    "rqOCexpl", "Explanation C", width="100%", autoresize=True
+                )
+                ui.input_text("rqOD", "Option D", width="100%")
+                ui.input_text_area(
+                    "rqODexpl", "Explanation D", width="100%", autoresize=True
+                )    
+
 # --- REACTIVE VARIABLES ---
 
 sessionID = reactive.value(0)
-genMsg = reactive.value("")
 
-# Workaround until issue with reactive.cals is resolved
+# Workaround until issue with reactive.calls is resolved
 # https://github.com/posit-dev/py-shiny/issues/1271
 conn = sqlite3.connect(shared.appDB)
 concepts = pd.read_sql_query("SELECT * FROM concept WHERE tID = 0", conn)
@@ -351,39 +349,6 @@ def addNewTopic():
     )
     ui.modal_remove()
 
-
-# # --- Edit an existing concepts
-# @reactive.effect
-# @reactive.event(input.cEdit)
-# def show_login_modal():
-#     if input.conceptsTable_selected_rows() is None: return
-#     concept = concepts().iloc[input.conceptsTable_selected_rows()]["concept"]
-#     m = ui.modal(
-#         ui.tags.p(HTML('<i>Make sure to only make edits that do not change the concept. '
-#                        'Otherwise add or delete instead</i>')),
-#         ui.input_text("ecInput", "New concept:", width="100%", value = concept),
-#         ui.input_action_button("ncEdit", "Update"),
-#         title="Edit and existing topic",
-#         easy_close=True,
-#         size = "l",
-#         footer=None,
-#     )
-#     ui.modal_show(m)
-
-# @reactive.effect
-# @reactive.event(input.ncEdit)
-# def addNewConcept():
-#     cID = concepts().iloc[input.conceptsTable_selected_rows()]["cID"]
-#     conn = sqlite3.connect(shared.appDB)
-#     cursor = conn.cursor()
-#     cursor.execute(f'UPDATE concept SET concept = "{input.ecInput()}", '
-#                    f'modified = "{shared.dt()}" WHERE cID = {cID}')
-#     conn.commit()
-#     conn.close()
-
-#     ui.modal_remove()
-
-
 # --- Archive a topic
 @reactive.effect
 @reactive.event(input.tArchive)
@@ -411,7 +376,6 @@ def _():
 
 
 # ---- CONCEPTS ----
-
 
 # --- Add a new concepts
 @reactive.effect
@@ -559,7 +523,6 @@ def _():
 
 # ---- VECTOR DATABASE ----
 
-
 @reactive.effect
 @reactive.event(input.newFile, ignore_init=True)
 def _():
@@ -580,12 +543,10 @@ def _():
     )
     ui.remove_ui("#uiUploadFile")
 
-
 @reactive.extended_task
 async def updateVectorDB(newFile, vectorDB, appDB, storageFolder, newFileName):
     print("Start adding file...")
     return shared.addFileToDB(newFile, vectorDB, appDB, storageFolder, newFileName)
-
 
 @reactive.effect
 def _():
@@ -610,7 +571,6 @@ def _():
     elementDisplay("qTab", "s")
     ui.insert_ui(uiUploadFile, "#processFile", "afterEnd")
     ui.remove_ui("#processFile")
-
 
 # Generate multiple choice questions on a topic
 @reactive.calc
@@ -675,12 +635,12 @@ def quizEngine():
         llm=shared.llm
     )
 
-
 # When the send button is clicked...
 @reactive.effect
 @reactive.event(input.qGenerate)
 def _():
-    genMsg.set("Generating new question...")
+    elementDisplay("qBusyMsg", "s")
+    elementDisplay("qBtnSet", "h")
 
     conn = sqlite3.connect(shared.appDB)
     topic = pd.read_sql_query(
@@ -700,7 +660,6 @@ def _():
     """
     botResponse(quizEngine(), info)
 
-
 # Async Shiny task waiting for LLM reply
 @reactive.extended_task
 async def botResponse(quizEngine, info):
@@ -716,7 +675,6 @@ async def botResponse(quizEngine, info):
             valid = False
 
     return resp
-
 
 # Processing LLM response
 @reactive.effect
@@ -734,4 +692,6 @@ def _():
     ui.update_text("rqOD", value=q["optionD"])
     ui.update_text_area("rqODexpl", value=q["explanationD"])
     ui.update_radio_buttons("rqCorrect", selected=q["answer"])
-    genMsg.set("")
+    
+    elementDisplay("qBusyMsg", "h")
+    elementDisplay("qBtnSet", "s")
