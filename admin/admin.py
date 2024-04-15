@@ -14,7 +14,6 @@ import json
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
-from llama_index.core.indices import EmptyIndex
 
 # -- Shiny
 from shiny import reactive
@@ -78,7 +77,24 @@ ui.head_content(
 ui.include_css("www/styles.css")
 
 with ui.navset_pill(id="tab"):
-    with ui.nav_panel("Topics"):
+    # TAB 1
+    with ui.nav_panel("Vector Database", value = "vTab"):
+        with ui.card(id="blankDBMsg", style="display: none;"):
+            HTML('<i>Welcome! In order to get started, please add at least one file to the vector database</i>')
+        with ui.card():
+            ui.card_header("Vector database files")
+
+            @render.data_frame
+            def filesTable():
+                return render.DataTable(
+                    files.get(), width="100%", row_selection_mode="single"
+                )
+
+        with ui.card():
+            ui.card_header("Upload a new file")
+            uiUploadFile
+    # TAB 2
+    with ui.nav_panel("Topics", value = "tTab"):
         with ui.layout_columns(col_widths=12):
             with ui.card():
                 ui.card_header("Topic")
@@ -115,8 +131,8 @@ with ui.navset_pill(id="tab"):
                     "Don't be too broad, as this might cause confusion (you'll have to test it). "
                     "Try to limit the number of concepts to 4 - 8 as the AI might preform worse with a large number</i>"
                 )
-
-    with ui.nav_panel("Quiz Questions"):
+    # TAB 3
+    with ui.nav_panel("Quiz Questions", value = "qTab"):
         with ui.card():
             ui.card_header("Questions by Topic")
             ui.input_select(
@@ -169,22 +185,47 @@ with ui.navset_pill(id="tab"):
                 ui.input_text("rqOD", "Option D", width="100%")
                 ui.input_text_area(
                     "rqODexpl", "Explanation D", width="100%", autoresize=True
-                )
+                )    
 
-    with ui.nav_panel("Vector Database"):
-        with ui.card():
-            ui.card_header("Vector database files")
+# --- CUSTOM JS FUNCTIONS ---
 
-            @render.data_frame
-            def filesTable():
-                return render.DataTable(
-                    files.get(), width="100%", row_selection_mode="single"
-                )
+# This function allows you to hide/show/disable/enable elements by ID or data-value
+ui.tags.script(
+    """
+    Shiny.addCustomMessageHandler("hideShow", function(x) {
 
-        with ui.card():
-            ui.card_header("Upload a new file")
-            uiUploadFile
+        if (document.getElementById(x.id)) {
+            var element = document.getElementById(x.id);
+        } else if (document.querySelector('[data-value="' + x.id + '"]')) {
+            var element = document.querySelector('[data-value="' + x.id + '"]');
+        } else {
+            alert("No element found with an ID or data-value of:" + x.id);
+            return;
+        }
 
+        switch(x.effect) {
+            case "d":
+                element.setAttribute("disabled", true);
+                break;
+            case "e":
+                element.setAttribute("disabled", false);
+                break;
+            case "h":
+                element.style.display = "none";
+                break;
+            case "s":
+                element.style.display = "";
+                break;
+        }
+        
+    });
+    """
+)
+
+def elementDisplay(id, effect):
+    @reactive.effect
+    async def _():
+        await session.send_custom_message("hideShow", {"id": id, "effect": effect})
 
 # --- REACTIVE VARIABLES ---
 
@@ -196,23 +237,32 @@ genMsg = reactive.value("")
 conn = sqlite3.connect(shared.appDB)
 concepts = pd.read_sql_query("SELECT * FROM concept WHERE tID = 0", conn)
 files = pd.read_sql_query("SELECT * FROM file", conn)
+
+# Hide the topic and question tab if the vector database is empty and show welcome message
+if files.shape[0] == 0:
+    elementDisplay("tTab", "h")
+    elementDisplay("qTab", "h")
+    elementDisplay("blankDBMsg", "s")
+    
 conn.close()
 
+if files.shape[0] == 0:
+    index = None
+else:
+    index = VectorStoreIndex.from_vector_store(DuckDBVectorStore.from_local(shared.vectorDB))
+
+index = reactive.value(index)
 concepts = reactive.value(concepts)
 files = reactive.value(files)
 
-index = reactive.value(
-    VectorStoreIndex.from_vector_store(DuckDBVectorStore.from_local(shared.vectorDB))
-    # EmptyIndex()
 
-)
-# index = VectorStoreIndex.from_vector_store(DuckDBVectorStore.from_local("appData/vectordb.duckdb"))
+
 # --- REACTIVE FUNCTIONS ---
-
 
 # Code to run at the start of the session (i.e. user connects)
 @reactive.effect
 def _():
+
     # Register the session in the DB at start
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
@@ -555,6 +605,9 @@ def _():
             DuckDBVectorStore.from_local(shared.vectorDB)
         )
     )
+    elementDisplay("blankDBMsg", "h")
+    elementDisplay("tTab", "s")
+    elementDisplay("qTab", "s")
     ui.insert_ui(uiUploadFile, "#processFile", "afterEnd")
     ui.remove_ui("#processFile")
 
