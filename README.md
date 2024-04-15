@@ -53,7 +53,7 @@ The apps are written with the Shiny Express syntax.
 are in a separate file so they only have to be loaded once. All code put in the
 main app files is run for each new session*
 
-## SCUIRRELL ([app.py](./app.py))
+## SCUIRREL ([app.py](./app.py))
 
 SCUIRREL or Science Concept Understanding with Interactive Research RAG Educational LLM 
 is the main application. In this app, users will interact  with the LLM exploring the 
@@ -68,7 +68,7 @@ topics and concepts setup in ACCORNS (admin app, see below)
 ## ACCORNS: Admin App ([admin/admin.py](./admin/admin.py))
 
 ACCORNS or Admin Control Center Overseeing RAG Needed for SCUIRREL, is a secondary
-applications where instructors can set-up, manage and monitor SCUIRRELL
+applications where instructors can set-up, manage and monitor SCUIRREL
 
 *Shared variables and functions are sources in from [admin/admin_shared.py](./admin/admin_shared.py)*
 
