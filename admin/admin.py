@@ -104,20 +104,23 @@ ui.tags.script(
     """
 )
 
+
 def elementDisplay(id, effect):
     @reactive.effect
     async def _():
         await session.send_custom_message("hideShow", {"id": id, "effect": effect})
 
+
 # --- UI LAYOUT ---
 
 with ui.navset_pill(id="tab"):
-    
     # TAB 1 - VECTOR DATABASE
-    with ui.nav_panel("Vector Database", value = "vTab"):
+    with ui.nav_panel("Vector Database", value="vTab"):
         with ui.card(id="blankDBMsg", style="display: none;"):
-            HTML('<i>Welcome to ACCORNS, the Admin Control Center Overseeing RAG Needed for SCUIRREL!'
-                 'In order to get started, please add at least one file to the vector database</i>')
+            HTML(
+                "<i>Welcome to ACCORNS, the Admin Control Center Overseeing RAG Needed for SCUIRREL!"
+                "In order to get started, please add at least one file to the vector database</i>"
+            )
         # Tables of the files that are in the DB
         with ui.card():
             ui.card_header("Vector database files")
@@ -127,15 +130,16 @@ with ui.navset_pill(id="tab"):
                 return render.DataTable(
                     files.get(), width="100%", row_selection_mode="single"
                 )
+
         # Option to add bew files
         with ui.card():
             ui.card_header("Upload a new file")
             uiUploadFile
-    
+
     # TAB 2 - TOPICS
-    with ui.nav_panel("Topics", value = "tTab"):
+    with ui.nav_panel("Topics", value="tTab"):
         with ui.layout_columns(col_widths=12):
-            # Select, add or archive a topic 
+            # Select, add or archive a topic
             with ui.card():
                 ui.card_header("Topic")
                 ui.input_select("tID", "Pick a topic", choices=[], width="400px")
@@ -172,7 +176,7 @@ with ui.navset_pill(id="tab"):
                     "Try to limit the number of concepts to 4 - 8 as the AI might preform worse with a large number</i>"
                 )
     # TAB 3 - QUIZ QUESTIONS
-    with ui.nav_panel("Quiz Questions", value = "qTab"):
+    with ui.nav_panel("Quiz Questions", value="qTab"):
         # Select a topic and a question with options to add or archive
         with ui.card():
             ui.card_header("Questions by Topic")
@@ -182,15 +186,23 @@ with ui.navset_pill(id="tab"):
             )
             ui.input_select("qID", "Question", choices={1: "test"}, width="400px")
             # Buttons to add or archive questions and message when busy generating
-            div(ui.input_action_button("qGenerate", "Generate new", width="180px"),
+            div(
+                ui.input_action_button("qGenerate", "Generate new", width="180px"),
                 ui.input_action_button("qArchive", "Archive selected", width="180px"),
-                id = "qBtnSet", style = "display:inline")
-            div(HTML("<i>Generating a new question...</i>"), id="qBusyMsg", style="display: none;")
+                id="qBtnSet",
+                style="display:inline",
+            )
+            div(
+                HTML("<i>Generating a new question...</i>"),
+                id="qBusyMsg",
+                style="display: none;",
+            )
 
         # Only show this panel if there is at least one question
         with ui.panel_conditional("input.qID"):
             with ui.card():
                 ui.card_header("Review question")
+
                 # Show a preview of the question
                 @render.ui
                 def quizQuestionPreview():
@@ -199,6 +211,7 @@ with ui.navset_pill(id="tab"):
                         f"<li>{input.rqOB()}</li><li>{input.rqOC()}</li>"
                         f"<li>{input.rqOD()}</li></ol><i>Correct answer: {input.rqCorrect()}</i><hr>"
                     )
+
                 # Fields to edit any part of the question
                 ui.input_text_area(
                     "rqQuestion", "Question", width="100%", autoresize=True
@@ -224,7 +237,7 @@ with ui.navset_pill(id="tab"):
                 ui.input_text("rqOD", "Option D", width="100%")
                 ui.input_text_area(
                     "rqODexpl", "Explanation D", width="100%", autoresize=True
-                )    
+                )
 
 # --- REACTIVE VARIABLES ---
 
@@ -241,26 +254,27 @@ if files.shape[0] == 0:
     elementDisplay("tTab", "h")
     elementDisplay("qTab", "h")
     elementDisplay("blankDBMsg", "s")
-    
+
 conn.close()
 
 if files.shape[0] == 0:
     index = None
 else:
-    index = VectorStoreIndex.from_vector_store(DuckDBVectorStore.from_local(shared.vectorDB))
+    index = VectorStoreIndex.from_vector_store(
+        DuckDBVectorStore.from_local(shared.vectorDB)
+    )
 
 index = reactive.value(index)
 concepts = reactive.value(concepts)
 files = reactive.value(files)
 
 
-
 # --- REACTIVE FUNCTIONS ---
+
 
 # Code to run at the start of the session (i.e. user connects)
 @reactive.effect
 def _():
-
     # Register the session in the DB at start
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
@@ -349,6 +363,7 @@ def addNewTopic():
     )
     ui.modal_remove()
 
+
 # --- Archive a topic
 @reactive.effect
 @reactive.event(input.tArchive)
@@ -376,6 +391,7 @@ def _():
 
 
 # ---- CONCEPTS ----
+
 
 # --- Add a new concepts
 @reactive.effect
@@ -523,6 +539,7 @@ def _():
 
 # ---- VECTOR DATABASE ----
 
+
 @reactive.effect
 @reactive.event(input.newFile, ignore_init=True)
 def _():
@@ -543,10 +560,12 @@ def _():
     )
     ui.remove_ui("#uiUploadFile")
 
+
 @reactive.extended_task
 async def updateVectorDB(newFile, vectorDB, appDB, storageFolder, newFileName):
     print("Start adding file...")
     return shared.addFileToDB(newFile, vectorDB, appDB, storageFolder, newFileName)
+
 
 @reactive.effect
 def _():
@@ -571,6 +590,7 @@ def _():
     elementDisplay("qTab", "s")
     ui.insert_ui(uiUploadFile, "#processFile", "afterEnd")
     ui.remove_ui("#processFile")
+
 
 # Generate multiple choice questions on a topic
 @reactive.calc
@@ -632,8 +652,9 @@ def quizEngine():
     return index.get().as_query_engine(
         text_qa_template=text_qa_template,
         refine_template=refine_template,
-        llm=shared.llm
+        llm=shared.llm,
     )
+
 
 # When the send button is clicked...
 @reactive.effect
@@ -660,6 +681,7 @@ def _():
     """
     botResponse(quizEngine(), info)
 
+
 # Async Shiny task waiting for LLM reply
 @reactive.extended_task
 async def botResponse(quizEngine, info):
@@ -675,6 +697,7 @@ async def botResponse(quizEngine, info):
             valid = False
 
     return resp
+
 
 # Processing LLM response
 @reactive.effect
@@ -692,6 +715,6 @@ def _():
     ui.update_text("rqOD", value=q["optionD"])
     ui.update_text_area("rqODexpl", value=q["explanationD"])
     ui.update_radio_buttons("rqCorrect", selected=q["answer"])
-    
+
     elementDisplay("qBusyMsg", "h")
     elementDisplay("qBtnSet", "s")

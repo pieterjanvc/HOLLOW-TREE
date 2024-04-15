@@ -6,7 +6,7 @@
 # Science Concept Understanding with Interactive Research RAG Educational LLM
 
 # See app_shared.py for variables and functions shared across sessions
-import app_shared as shared 
+import app_shared as shared
 
 # General
 import sqlite3
@@ -76,10 +76,12 @@ ui.tags.script(
     """
 )
 
+
 def elementDisplay(id, effect):
     @reactive.effect
     async def _():
         await session.send_custom_message("hideShow", {"id": id, "effect": effect})
+
 
 # Add some JS so that pressing enter can send the message too
 ui.head_content(
@@ -119,15 +121,23 @@ with ui.navset_pill(id="tab"):
                     return div(HTML(userLog.get()))
 
         # User input, send button and wait message
-        div(
-            ui.input_text_area(
-                "newChat", "", value="", width="100%", spellcheck=True, resize=False
+        (
+            div(
+                ui.input_text_area(
+                    "newChat", "", value="", width="100%", spellcheck=True, resize=False
+                ),
+                ui.input_action_button("send", "Send"),
+                id="chatIn",
             ),
-            ui.input_action_button("send", "Send"),
-            id = "chatIn"),
-        div(HTML("<p style='color: white'><i>Scuirrel is foraging for an answer ...</i></p>"), 
-            id = "waitResp", style="display: none;")
-    
+        )
+        div(
+            HTML(
+                "<p style='color: white'><i>Scuirrel is foraging for an answer ...</i></p>"
+            ),
+            id="waitResp",
+            style="display: none;",
+        )
+
     # USER PROGRESS TAB
     with ui.nav_panel("Profile"):
         with ui.layout_columns(col_widths=12):
@@ -140,6 +150,7 @@ with ui.navset_pill(id="tab"):
 
 sessionID = reactive.value(0)
 discussionID = reactive.value(0)
+
 
 @reactive.calc
 @reactive.event(input.selTopic)
@@ -321,20 +332,19 @@ def chatEngine():
     return shared.index.as_query_engine(
         text_qa_template=text_qa_template,
         refine_template=refine_template,
-        llm=shared.llm
+        llm=shared.llm,
     )
 
 
 # When the send button is clicked...
 @reactive.effect
 @reactive.event(input.send)
-def _():    
-
+def _():
     newChat = input.newChat()
 
     if (newChat == "") | (newChat.isspace()):
         return
-    
+
     elementDisplay("waitResp", "s")
     elementDisplay("chatIn", "h")
     msg = messages.get()
@@ -344,10 +354,10 @@ def _():
     userLog.set(
         userLog.get()
         + "<div class='userChat talk-bubble tri'><p>"
-        + escape(newChat) # prevent HTML injection from user
+        + escape(newChat)  # prevent HTML injection from user
         + "</p></div>"
     )
-    botLog.set(botLog.get() + f"\n--- USER:\n{newChat}")    
+    botLog.set(botLog.get() + f"\n--- USER:\n{newChat}")
     botResponse(chatEngine(), botIn)
 
 

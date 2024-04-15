@@ -23,6 +23,7 @@ from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
 
 import nest_asyncio
+
 nest_asyncio.apply()
 
 # --- Global variables
@@ -34,7 +35,7 @@ addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1
 appDB = config["data"]["appDB"]
 vectorDB = config["data"]["vectorDB"]
 # keep files user uploads, if set to None, original not kept
-storageFolder = os.path.join(config["data"]["storageFolder"],"")
+storageFolder = os.path.join(config["data"]["storageFolder"], "")
 
 # Get the OpenAI API key and organistation
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
@@ -123,20 +124,22 @@ def createAppDB(DBpath, sqlFile="appData/createDB.sql", addDemo=False):
 
     return (0, "Creation completed")
 
+
 # Make new app DB if needed
 print(createAppDB(appDB, addDemo=addDemo))
+
 
 # Create DuckDB vector database and add files
 def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
     if not os.path.exists(appDB):
         raise ConnectionError("The appDB was not found")
-    
-    # In case the file is a URL download it first 
+
+    # In case the file is a URL download it first
     isURL = False
     if newFile.startswith("http://") or newFile.startswith("https://"):
         if not os.path.exists("appData/temp"):
             os.makedirs("appData/temp")
-        
+
         isURL = True
         urlretrieve(newFile, "appData/temp/" + os.path.basename(newFile))
         newFile = "appData/temp/" + os.path.basename(newFile)
@@ -173,7 +176,7 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
             storage_context=storage_context,
             transformations=[TitleExtractor(), KeywordExtractor()],
         )
-    else:        
+    else:
         vector_store = DuckDBVectorStore(
             os.path.basename(vectorDB), persist_dir=os.path.dirname(vectorDB)
         )
@@ -183,7 +186,7 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
             storage_context=storage_context,
             transformations=[TitleExtractor(), KeywordExtractor()],
         )
-        
+
     # Get the metadata out of the DB excerpt_keywords document_title
     fileName = newData[0].metadata["file_name"]
     # vectorDB = "appData/vectorstore.duckdb"
@@ -227,6 +230,7 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
     conn.close()
 
     return (0, "Completed")
+
 
 # When demo data is to be added use a file stored in a GitHub issue
 # TODO Replace URL once public!
