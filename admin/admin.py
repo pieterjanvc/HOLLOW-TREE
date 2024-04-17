@@ -350,8 +350,8 @@ def addNewTopic():
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO topic(topic, created, description)"
-        f'VALUES("{input.ntTopic()}", "{shared.dt()}", "{input.ntDescr()}")'
+        "INSERT INTO topic(topic, created, modified, description)"
+        f'VALUES("{input.ntTopic()}", "{shared.dt()}", "{shared.dt()}", "{input.ntDescr()}")'
     )
     tID = cursor.lastrowid
     topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
@@ -433,8 +433,8 @@ def _():
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO concept(tID, concept, created)"
-        f'VALUES({input.tID()}, "{input.ncInput()}", "{shared.dt()}")'
+        "INSERT INTO concept(tID, concept, created, modified)"
+        f'VALUES({input.tID()}, "{input.ncInput()}", "{shared.dt()}", "{shared.dt()}")'
     )
     conceptList = pd.read_sql_query(
         f"SELECT * FROM concept WHERE tID = {input.tID()} AND archived = 0", conn
@@ -484,10 +484,13 @@ def _():
         )
         return
 
-    # Edit topic in DB
+    # Update the DB
     cID = concepts.get().iloc[input.conceptsTable_selected_rows()]["cID"]
     conn = sqlite3.connect(shared.appDB)
-    cursor = conn.cursor()
+    cursor = conn.cursor()   
+    # Backup old value
+    shared.backupQuery(cursor, sessionID.get(), "concept", cID, "concept", False)
+    # Update to new 
     cursor.execute(
         f'UPDATE concept SET concept = "{input.ecInput()}", '
         f'modified = "{shared.dt()}" WHERE cID = {cID}'

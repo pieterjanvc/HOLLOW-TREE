@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS "user" (
 	"username" TEXT UNIQUE,
   "isAdmin" INTEGER DEFAULT 0,
   "email" TEXT,
-  "created" TEXT
+  "created" TEXT,
+  "modified" TEXT
 );
 
 DROP TABLE IF EXISTS "session";
@@ -106,10 +107,15 @@ CREATE TABLE IF NOT EXISTS "answer" (
 DROP TABLE IF EXISTS "backup";
 CREATE TABLE IF NOT EXISTS "backup" (
 	"bID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "sID" INTEGER NOT NULL,
+  "modified" TEXT NOT NULL,
   "table" TEXT NOT NULL,
   "rowID" INTEGER NOT NULL,
   "attribute" TEXT NOT NULL,
 	"created" TEXT,
   "isBot" INTEGER,
-  "value" TEXT
+  "tValue" TEXT,
+  "iValue" INTEGER,
+  FOREIGN KEY("sID") REFERENCES "session"("sID") 
+	  ON DELETE CASCADE ON UPDATE CASCADE
 );
