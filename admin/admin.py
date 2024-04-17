@@ -35,12 +35,6 @@ nest_asyncio.apply()
 uID = 2  # if registered admins make reactive later
 nQuestions = 3
 
-# CGet the topics from the app DB
-conn = sqlite3.connect(shared.appDB)
-topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
-print(topics)
-conn.close()
-
 # --- UI COMPONENTS ---
 uiUploadFile = div(
     ui.input_file(
@@ -145,6 +139,7 @@ with ui.navset_pill(id="tab"):
                 ui.input_select("tID", "Pick a topic", choices=[], width="400px")
                 div(
                     ui.input_action_button("tAdd", "Add new", width="180px"),
+                    ui.input_action_button("tEdit", "Edit selected", width="180px"),
                     ui.input_action_button(
                         "tArchive", "Archive selected", width="180px"
                     ),
@@ -246,7 +241,8 @@ sessionID = reactive.value(0)
 # Workaround until issue with reactive.calls is resolved
 # https://github.com/posit-dev/py-shiny/issues/1271
 conn = sqlite3.connect(shared.appDB)
-concepts = pd.read_sql_query("SELECT * FROM concept WHERE tID = 0", conn)
+topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+concepts = pd.read_sql_query("SELECT * FROM concept WHERE tID = 0", conn) # get empty df
 files = pd.read_sql_query("SELECT * FROM file", conn)
 
 # Hide the topic and question tab if the vector database is empty and show welcome message
@@ -265,6 +261,7 @@ else:
     )
 
 index = reactive.value(index)
+topics = reactive.value(topics)
 concepts = reactive.value(concepts)
 files = reactive.value(files)
 
@@ -285,12 +282,13 @@ def _():
     )
     sID = cursor.lastrowid
     sessionID.set(sID)
-    topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+    newTopics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
     conn.commit()
     conn.close()
-    # Update the topics select input
-    ui.update_select("tID", choices=dict(zip(topics["tID"], topics["topic"])))
 
+    # Update the topics select input
+    ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])))
+    topics.set(newTopics)
     # Set the function to be called when the session ends
     _ = session.on_ended(lambda: theEnd(sID))
 
@@ -321,12 +319,11 @@ def addTopic_modal():
             )
         ),
         ui.input_text("ntTopic", "New topic:", width="100%"),
-        ui.input_text("ntDescr", "Description (optional):", width="100%"),
-        ui.input_action_button("ntAdd", "Add"),
+        ui.input_text("ntDescr", "Description (optional):", width="100%"),        
         title="Add a topic",
         easy_close=True,
         size="l",
-        footer=None,
+        footer=ui.TagList(ui.input_action_button("ntAdd", "Add"),ui.modal_button("Cancel")),
     )
     ui.modal_show(m)
 
@@ -336,12 +333,12 @@ def addTopic_modal():
 def addNewTopic():
     # Only proceed if the input is valid
     if not shared.inputCheck(input.ntTopic()):
-        ui.remove_ui("#notGood")
+        ui.remove_ui("#noGoodTopic")
         ui.insert_ui(
             HTML(
-                "<div id=notGood style='color: red'>New topic must be at least 6 characters</div>"
+                "<div id=noGoodTopic style='color: red'>New topic must be at least 6 characters</div>"
             ),
-            "#ntAdd",
+            "#ntDescr",
             "afterEnd",
         )
         return
@@ -350,17 +347,85 @@ def addNewTopic():
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO topic(topic, created, description)"
-        f'VALUES("{input.ntTopic()}", "{shared.dt()}", "{input.ntDescr()}")'
+        "INSERT INTO topic(topic, created, modified, description)"
+        f'VALUES("{input.ntTopic()}", "{shared.dt()}", "{shared.dt()}", "{input.ntDescr()}")'
     )
     tID = cursor.lastrowid
-    topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+    newTopics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
     conn.commit()
     conn.close()
-    # Update the topic list
-    ui.update_select(
-        "tID", choices=dict(zip(topics["tID"], topics["topic"])), selected=tID
+
+    # Update the topics select input
+    ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])), selected=tID)
+    topics.set(newTopics)
+    ui.modal_remove()
+
+# --- Edit an existing topic
+@reactive.effect
+@reactive.event(input.tEdit)
+def _():
+    if input.tID() is not None:
+        topic = topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["topic"]
+        m = ui.modal(
+            ui.tags.p(
+                HTML(
+                    "<i>Make sure to only make small edits that do not change the topic. "
+                    "Otherwise add or delete instead</i>"
+                )
+            ),
+            ui.input_text("etInput", "Updated topic:", width="100%", value=topic),
+            
+            title="Edit an existing topic",
+            easy_close=True,
+            size="l",
+            footer=ui.TagList(ui.input_action_button("etEdit", "Update"),ui.modal_button("Cancel")),
+        )
+        ui.modal_show(m)
+
+
+@reactive.effect
+@reactive.event(input.etEdit)
+def _():
+    # Only proceed if the input is valid
+    if not shared.inputCheck(input.etInput()):
+        ui.remove_ui("#noGoodTopic")
+        ui.insert_ui(
+            HTML(
+                "<div id=noGoodTopic style='color: red'>A topic must be at least 6 characters</div>"
+            ),
+            "#etInput",
+            "afterEnd",
+        )
+        return
+
+    if topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["topic"] == input.etInput():
+        ui.remove_ui("#noGoodTopic")
+        ui.insert_ui(
+            HTML(
+                "<div id=noGoodTopic style='color: red'>No change detected</div>"
+            ),
+            "#etInput",
+            "afterEnd",
+        )
+        return
+
+    # Update the DB    
+    conn = sqlite3.connect(shared.appDB)
+    cursor = conn.cursor()   
+    # Backup old value
+    shared.backupQuery(cursor, sessionID.get(), "topic", input.tID(), "topic", False)
+    # Update to new 
+    cursor.execute(
+        f'UPDATE topic SET topic = "{input.etInput()}", '
+        f'modified = "{shared.dt()}" WHERE tID = {input.tID()}'
     )
+    newTopics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+    conn.commit()
+    conn.close()
+
+    # Update the topics select input
+    ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])), selected=input.tID())
+    topics.set(newTopics)
     ui.modal_remove()
 
 
@@ -377,9 +442,7 @@ def _():
         "UPDATE topic SET archived = 1, "
         f'modified = "{shared.dt()}" WHERE tID = {input.tID()}'
     )
-    topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
-
-    ui.update_select("tID", choices=dict(zip(topics["tID"], topics["topic"])))
+    newTopics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
 
     # Empty the concept table is last topic was removed
     if topics.shape[0] == 0:
@@ -388,6 +451,10 @@ def _():
 
     conn.commit()
     conn.close()
+
+    # Update the topics select input
+    ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])))
+    topics.set(newTopics)
 
 
 # ---- CONCEPTS ----
@@ -404,12 +471,11 @@ def _():
                 "There is no need to provide context as this will come from the database</i>"
             )
         ),
-        ui.input_text("ncInput", "New concept:", width="100%"),
-        ui.input_action_button("ncAdd", "Add"),
+        ui.input_text("ncInput", "New concept:", width="100%"),        
         title="Add a new concept to the topic",
         easy_close=True,
         size="l",
-        footer=None,
+        footer=ui.TagList(ui.input_action_button("ncAdd", "Add"),ui.modal_button("Cancel")),
     )
     ui.modal_show(m)
 
@@ -419,12 +485,12 @@ def _():
 def _():
     # Only proceed if the input is valid
     if not shared.inputCheck(input.ncInput()):
-        ui.remove_ui("#notGood")
+        ui.remove_ui("#noGoodConcept")
         ui.insert_ui(
             HTML(
-                "<div id=notGood style='color: red'>New concept must be at least 6 characters</div>"
+                "<div id=noGoodConcept style='color: red'>New concept must be at least 6 characters</div>"
             ),
-            "#ncAdd",
+            "#ncInput",
             "afterEnd",
         )
         return
@@ -433,8 +499,8 @@ def _():
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO concept(tID, concept, created)"
-        f'VALUES({input.tID()}, "{input.ncInput()}", "{shared.dt()}")'
+        "INSERT INTO concept(tID, concept, created, modified)"
+        f'VALUES({input.tID()}, "{input.ncInput()}", "{shared.dt()}", "{shared.dt()}")'
     )
     conceptList = pd.read_sql_query(
         f"SELECT * FROM concept WHERE tID = {input.tID()} AND archived = 0", conn
@@ -459,12 +525,11 @@ def _():
                     "Otherwise add or delete instead</i>"
                 )
             ),
-            ui.input_text("ecInput", "New concept:", width="100%", value=concept),
-            ui.input_action_button("ncEdit", "Update"),
+            ui.input_text("ecInput", "New concept:", width="100%", value=concept),            
             title="Edit and existing topic",
             easy_close=True,
             size="l",
-            footer=None,
+            footer=ui.TagList(ui.input_action_button("ncEdit", "Update"),ui.modal_button("Cancel")),
         )
         ui.modal_show(m)
 
@@ -474,20 +539,34 @@ def _():
 def _():
     # Only proceed if the input is valid
     if not shared.inputCheck(input.ecInput()):
-        ui.remove_ui("#notGood")
+        ui.remove_ui("#noGoodConcept")
         ui.insert_ui(
             HTML(
-                "<div id=notGood style='color: red'>A concept must be at least 6 characters</div>"
+                "<div id=noGoodConcept style='color: red'>A concept must be at least 6 characters</div>"
             ),
-            "#ncEdit",
+            "#ecInput",
+            "afterEnd",
+        )
+        return
+    
+    if concepts.get().iloc[input.conceptsTable_selected_rows()]["concept"] == input.ecInput():
+        ui.remove_ui("#noGoodConcept")
+        ui.insert_ui(
+            HTML(
+                "<div id=noGoodConcept style='color: red'>No change detected</div>"
+            ),
+            "#ecInput",
             "afterEnd",
         )
         return
 
-    # Edit topic in DB
+    # Update the DB
     cID = concepts.get().iloc[input.conceptsTable_selected_rows()]["cID"]
     conn = sqlite3.connect(shared.appDB)
-    cursor = conn.cursor()
+    cursor = conn.cursor()   
+    # Backup old value
+    shared.backupQuery(cursor, sessionID.get(), "concept", cID, "concept", False)
+    # Update to new 
     cursor.execute(
         f'UPDATE concept SET concept = "{input.ecInput()}", '
         f'modified = "{shared.dt()}" WHERE cID = {cID}'

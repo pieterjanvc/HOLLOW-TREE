@@ -78,8 +78,8 @@ def createAppDB(DBpath, sqlFile="appData/createDB.sql", addDemo=False):
 
     # Add the anonymous user and main admin
     _ = cursor.execute(
-        "INSERT INTO user(username, isAdmin, created)"
-        f'VALUES("anonymous", 0, "{dt()}"), ("admin", 1, "{dt()}")'
+        "INSERT INTO user(username, isAdmin, created, modified)"
+        f'VALUES("anonymous", 0, "{dt()}", "{dt()}"), ("admin", 1, "{dt()}", "{dt()}")'
     )
 
     if not addDemo:
@@ -90,7 +90,7 @@ def createAppDB(DBpath, sqlFile="appData/createDB.sql", addDemo=False):
     # Add a test topic (to be removed later)
     topic = "The central dogma of molecular biology"
     _ = cursor.execute(
-        "INSERT INTO topic(topic, created)" f'VALUES("{topic}", "{dt()}")'
+        "INSERT INTO topic(topic, created, modified)" f'VALUES("{topic}", "{dt()}", "{dt()}")'
     )
     tID = cursor.lastrowid
 
@@ -116,7 +116,7 @@ def createAppDB(DBpath, sqlFile="appData/createDB.sql", addDemo=False):
         ),
     ]
     _ = cursor.executemany(
-        "INSERT INTO concept(tID, concept, created) " f'VALUES({tID}, ?, "{dt()}")',
+        "INSERT INTO concept(tID, concept, created, modified) " f'VALUES({tID}, ?, "{dt()}", "{dt()}")',
         concepts,
     )
     conn.commit()
@@ -237,3 +237,23 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
 if addDemo & (not os.path.exists(vectorDB)):
     newFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
     addFileToDB(newFile, vectorDB, appDB)
+
+def backupQuery(cursor, sID, table, rowID, attribute, isBot = None):
+    
+    #Check if the table exists
+    if cursor.execute(f'SELECT * FROM sqlite_master WHERE tbl_name = "{table}"').fetchone() is None:
+        raise sqlite3.DataError("The table '{table}' does not exist in the database")
+    #Get the Primary Key
+    PK = cursor.execute(f"SELECT name FROM pragma_table_info('{table}') WHERE pk = 1").fetchone()[0]
+    #Check if the attribute exists
+    if cursor.execute(f"SELECT name FROM pragma_table_info('{table}') WHERE name = '{attribute}'").fetchone() is None:
+        raise sqlite3.DataError(f"'{attribute}' is not a column of table '{table}'")
+    #Check isBot and assign 0, 1 or Null when False, True, None
+    isBot = isBot + 0 if isBot is not None else "NULL"
+    #Insert into backup
+    cursor.execute(
+        f"INSERT INTO backup (sID, modified, 'table', 'rowID', created, isBot, 'attribute', tValue) "
+        f"SELECT {sID} as sID, '{dt()}' as 'modified', '{table}' as 'table', {rowID} as 'rowID', "
+        f"modified as 'created', {isBot} as isBot, '{attribute}' as 'attribute', {attribute} as 'tValue' "
+        f"FROM {table} WHERE {PK} = {rowID}"
+    )
