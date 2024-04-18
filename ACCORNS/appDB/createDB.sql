@@ -88,19 +88,27 @@ CREATE TABLE IF NOT EXISTS "keyword" (
 DROP TABLE IF EXISTS "question";
 CREATE TABLE IF NOT EXISTS "question" (
 	"qID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "sID" INTEGER,
   "tID" INTEGER,
+  "cID" INTEGER,
   "question" TEXT,
+  "answer" TEXT,
   "archived" TEXT,
 	"created" TEXT,
-  "modified" TEXT
-);
-
-DROP TABLE IF EXISTS "answer";
-CREATE TABLE IF NOT EXISTS "answer" (
-  "aID" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "qID" INTEGER NOT NULL,
-  "correct" INTEGER,
-  FOREIGN KEY("qID") REFERENCES "question"("qID") 
+  "modified" TEXT,
+  "optionA" TEXT,
+  "explanationA" TEXT,
+  "optionB" TEXT,
+  "explanationB" TEXT,
+  "optionC" TEXT,
+  "explanationC" TEXT,
+  "optionD" TEXT,
+  "explanationD" TEXT,
+  FOREIGN KEY("sID") REFERENCES "session"("sID") 
+	  ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("tID") REFERENCES "topic"("tID") 
+	  ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("cID") REFERENCES "concept"("cID") 
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
 

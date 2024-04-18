@@ -33,7 +33,6 @@ nest_asyncio.apply()
 # *********************************
 
 uID = 2  # if registered admins make reactive later
-nQuestions = 3
 
 # --- UI COMPONENTS ---
 uiUploadFile = div(
@@ -179,7 +178,7 @@ with ui.navset_pill(id="tab"):
             ui.input_select(
                 "qtID", "Pick a topic", choices={1: "Central Dogma"}, width="400px"
             )
-            ui.input_select("qID", "Question", choices={1: "test"}, width="400px")
+            ui.input_select("qID", "Question", choices=[], width="400px")
             # Buttons to add or archive questions and message when busy generating
             div(
                 ui.input_action_button("qGenerate", "Generate new", width="180px"),
@@ -670,8 +669,9 @@ def _():
     ui.insert_ui(uiUploadFile, "#processFile", "afterEnd")
     ui.remove_ui("#processFile")
 
+# ---- QUIZ QUESTIONS ----
 
-# Generate multiple choice questions on a topic
+# LLM engine for generation
 @reactive.calc
 def quizEngine():
     qa_prompt_str = (
@@ -701,13 +701,14 @@ def quizEngine():
             role=MessageRole.SYSTEM,
             content=(
                 """
-                Generate questions that integrate across multiple of the provided concepts (you might need to write a longer question). 
-                If you cannot test all concepts, randomly select them (don't just start at the top of the list).
-                Don't just ask for short definitions, but try to generate more elaborate examples or scenarios that force the student to think critically.
-                For each question, generate 4 possible answers, with only ONE correct option, and an explanation why each option is correct or incorrect.
-                You will output a valid JSON string based on the following (truncated) template:
-                [{{"qID":2,"question":"","answer":"B","optionA":"","explanationA":"","optionB":"","explanationB":""}},{{"qID":2,"question":"","answer":"C","optionA":"","explanationA":""}}]
-                """
+Generate a question focused on the highlighted concept and take the following into account:
+* If possible integrate across multiple concepts. 
+* Do NOT mention the topic as part of the question (that's inferred) 
+* Try to generate a question that that forces the student to think critically (not just a short definition).
+* Generate 4 possible answers, with only ONE correct option, and an explanation why each option is correct or incorrect.
+
+You will output a python dictionary string according to this template:
+{{"question":"<add question>","answer":"<e.g. A>","optionA":"","explanationA":"","optionB":"","explanationB":"","optionC":"","explanationC":"","optionD":"","explanationD":""}}"""
             ),
         ),
         ChatMessage(role=MessageRole.USER, content=qa_prompt_str),
@@ -719,9 +720,7 @@ def quizEngine():
         ChatMessage(
             role=MessageRole.SYSTEM,
             content=(
-                """
-                Make sure the response is in valid JSON format
-                """
+                "Make sure the provided response is a Python dictionary. Double check correct use of quotes"
             ),
         ),
         ChatMessage(role=MessageRole.USER, content=refine_prompt_str),
@@ -735,7 +734,7 @@ def quizEngine():
     )
 
 
-# When the send button is clicked...
+# When the generate button is clicked...
 @reactive.effect
 @reactive.event(input.qGenerate)
 def _():
@@ -743,39 +742,53 @@ def _():
     elementDisplay("qBtnSet", "h")
 
     conn = sqlite3.connect(shared.appDB)
-    topic = pd.read_sql_query(
-        f"SELECT topic FROM topic WHERE tID = {input.qtID()}", conn
-    )
-    topicList = pd.read_sql_query(
-        f"SELECT concept FROM concept WHERE tID = {input.qtID()} AND archived = 0", conn
-    )
-    topicList = "* " + "\n* ".join(topicList.sample(nQuestions)["concept"])
+    topic = pd.read_sql_query(f"SELECT topic FROM topic WHERE tID = {input.qtID()}", conn)    
+    conceptList = pd.read_sql_query(f"SELECT cID, max(concept) as concept, count() as n FROM (SELECT cID, concept FROM concept WHERE tID = {input.qtID()} "
+                                    f"UNION ALL SELECT cID, '' as concept FROM question where tID = {input.qtID()}) GROUP BY cID", conn)  
+    cID = int(conceptList[conceptList["n"] == min(conceptList["n"])].sample(1)["cID"])
+    prevQuestions = pd.read_sql_query(f"SELECT question FROM question WHERE cID = {cID} AND archived = 0", conn)
     conn.close()
 
-    info = f"""Generate {nQuestions} multiple choice questions to test a student who just learned about the following topic: 
-    {topic.iloc[0]["topic"]}
-    ----
-    The student is expected to demonstrate understanding of the following sub-concepts:
-    {topicList}
-    """
-    botResponse(quizEngine(), info)
+    focusConcept = "* ".join(conceptList[conceptList["cID"] == cID]["concept"])
+    conceptList = "* " + "\n* ".join(conceptList["concept"])
+    if  prevQuestions.shape[0] == 0:
+        prevQuestions = ""
+    else:        
+        prevQuestions = ("The following questions have already been generated so try to focus on a different aspect "
+                         "related to the concept if possible:\n"
+                         "* " + "\n* ".join(prevQuestions["question"]))
+
+    info = f"""Generate a multiple choice question to test a student who just learned about the following topic: 
+{topic.iloc[0]["topic"]}.\n
+The following concepts were covered in this topic:
+{conceptList}\n
+The question should center around the following concept:
+{focusConcept}\n
+{prevQuestions}"""
+    
+    print(info)
+
+    botResponse(quizEngine(), info, cID)
 
 
 # Async Shiny task waiting for LLM reply
 @reactive.extended_task
-async def botResponse(quizEngine, info):
-    # Given the LLM output might not be correct JSON (or fails to convert to a DF, try again if needed)
+async def botResponse(quizEngine, info, cID):
+    # Given the LLM output might not be correct format (or fails to convert to a DF, try again if needed)
     valid = False
+    tries = 0
     while not valid:
         try:
             resp = str(quizEngine.query(info))
-            print(resp)
             resp = pd.json_normalize(json.loads(resp))
             valid = True
         except Exception:
-            valid = False
+            print(("Failed to generate quiz question"))
+            if tries > 1:                
+                return {"resp": None, "cID": cID}
+            tries += 1
 
-    return resp
+    return {"resp": resp, "cID": cID}
 
 
 # Processing LLM response
@@ -783,7 +796,59 @@ async def botResponse(quizEngine, info):
 def _():
     # Populate the respective UI outputs with the questions details
     resp = botResponse.result()
-    q = resp.iloc[0]  # For now only processing one
+    elementDisplay("qBusyMsg", "h")
+    elementDisplay("qBtnSet", "s")
+    
+    if resp["resp"] is None:
+        m = ui.modal(
+            "The generation of a question with the LLM failed, try again later",                      
+            title="Question generation error",
+            easy_close=True,
+            size="l",
+            footer=ui.TagList(ui.modal_button("Close")),
+        )
+        ui.modal_show(m)
+        return
+    
+    with reactive.isolate():
+        q = resp["resp"].iloc[0]  # For now only processing one
+        #Save the questions in the appAB
+        conn = sqlite3.connect(shared.appDB)
+        cursor = conn.cursor()   
+        # Insert question 
+        cursor.execute(
+            'INSERT INTO question(sID,tID,cID,question,answer,archived,created,modified,'
+            'optionA,explanationA,optionB,explanationB,optionC,explanationC,optionD,explanationD)'
+            f'VALUES({sessionID.get()},{input.tID()},{resp["cID"]},"{q["question"]}","{q["answer"]}",0,"{shared.dt()}","{shared.dt()}",'
+            f'"{q["optionA"]}","{q["explanationA"]}","{q["optionB"]}","{q["explanationB"]}","{q["optionC"]}",'
+            f'"{q["explanationC"]}","{q["optionD"]}","{q["explanationD"]}")'
+        )
+        qID = cursor.lastrowid
+        q = pd.read_sql_query(f"SELECT qID, question FROM question WHERE tID = {input.qtID()} AND archived = 0", conn)
+        conn.commit()
+        conn.close()
+        #Update the UI    
+        ui.update_select("qID", choices=dict(zip(q["qID"], q["question"])), selected=qID)
+
+
+@reactive.effect
+@reactive.event(input.qtID)
+def _():  
+    #Get the question info from the DB
+    conn = sqlite3.connect(shared.appDB)
+    q = pd.read_sql_query(f"SELECT qID, question FROM question WHERE tID = {input.qtID()} AND archived = 0", conn)
+    conn.close() 
+    #Update the UI
+    ui.update_select("qID", choices=dict(zip(q["qID"], q["question"])))
+
+@reactive.effect
+@reactive.event(input.qID)
+def _():  
+    #Get the question info from the DB
+    conn = sqlite3.connect(shared.appDB)
+    q = pd.read_sql_query(f"SELECT * FROM question WHERE qID = {input.qID()}",conn).iloc[0]
+    conn.close() 
+    #Update the UI
     ui.update_text_area("rqQuestion", value=q["question"])
     ui.update_text("rqOA", value=q["optionA"])
     ui.update_text_area("rqOAexpl", value=q["explanationA"])
@@ -795,5 +860,3 @@ def _():
     ui.update_text_area("rqODexpl", value=q["explanationD"])
     ui.update_radio_buttons("rqCorrect", selected=q["answer"])
 
-    elementDisplay("qBusyMsg", "h")
-    elementDisplay("qBtnSet", "s")
