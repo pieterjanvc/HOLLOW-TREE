@@ -5,8 +5,8 @@
 # Welcome to ACCORNS:
 # Admin Control Center Overseeing RAG Needed for SCUIRREL
 
-# See admin\admin_shared.py for variables and functions shared across sessions
-import admin_shared as shared
+# See app_shared.py for variables and functions shared across sessions
+import app_shared as shared
 
 # -- General
 import sqlite3
