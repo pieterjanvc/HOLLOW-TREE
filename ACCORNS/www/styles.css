@@ -6,8 +6,6 @@ html {
 
 body {
     background: #252525;
-    --botCol: #236ba6;
-    --userCol: #A65E23;
 }
 
 /* The folowing two fix bugs in DT rendering */
