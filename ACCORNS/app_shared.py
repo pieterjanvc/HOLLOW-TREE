@@ -34,7 +34,7 @@ with open("config.toml", "r") as f:
 addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
 appDB = config["data"]["appDB"]
 vectorDB = config["data"]["vectorDB"]
-# keep files user uploads, if set to None, original not kept
+tempFolder = os.path.join(config["data"]["tempFolder"], "")
 storageFolder = os.path.join(config["data"]["storageFolder"], "")
 
 # Get the OpenAI API key and organistation
@@ -62,12 +62,12 @@ def inputCheck(input):
 
 
 # Database to store app data (this is not the vector database!)
-def createAppDB(DBpath, sqlFile="appData/createDB.sql", addDemo=False):
+def createAppDB(DBpath, addDemo=False):
     if os.path.exists(DBpath):
         return (1, "Database already exists. Skipping")
 
     # Create a new database from the SQL file
-    with open(sqlFile, "r") as file:
+    with open("appDB/createDB.sql", "r") as file:
         query = file.read().replace("\n", " ").replace("\t", "").split(";")
 
     conn = sqlite3.connect(DBpath)
@@ -137,12 +137,12 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
     # In case the file is a URL download it first
     isURL = False
     if newFile.startswith("http://") or newFile.startswith("https://"):
-        if not os.path.exists("appData/temp"):
-            os.makedirs("appData/temp")
+        if not os.path.exists(tempFolder):
+            os.makedirs(tempFolder)
 
         isURL = True
-        urlretrieve(newFile, "appData/temp/" + os.path.basename(newFile))
-        newFile = "appData/temp/" + os.path.basename(newFile)
+        urlretrieve(newFile, tempFolder + os.path.basename(newFile))
+        newFile = tempFolder + os.path.basename(newFile)
 
     if not os.path.exists(newFile):
         raise ConnectionError(f"The newFile was not found at {newFile}")
