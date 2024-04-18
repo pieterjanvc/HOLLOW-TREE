@@ -1,0 +1,11 @@
+[general]
+addDemo = "True"
+
+[data]
+appDB = "../appData/appDB.db"
+vectorDB = "../appData/vectordb.duckdb"
+storageFolder = "../appData/uploadedFiles"
+tempFolder = "../appData/temp"
+
+[LLM]
+gptModel = "gpt-3.5-turbo-0125"  # use gpt-3.5-turbo-0125 or gpt-4

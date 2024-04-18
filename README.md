@@ -14,7 +14,6 @@ accuracy
 * The [Shiny framework](https://shiny.posit.co/py/) is used for generating the 
 apps' UI and Server components
 * For a list of all dependencies, see the [requirements.txt](./requirements.txt) file
-* App wide settings are listed in the [config.toml](./config.toml) file
 
 ## The LLM
 The app is currently configured to run with OpenAI's GPT models. This requires
@@ -53,32 +52,26 @@ The apps are written with the Shiny Express syntax.
 are in a separate file so they only have to be loaded once. All code put in the
 main app files is run for each new session*
 
-## SCUIRREL ([app.py](./app.py))
+## SCUIRREL ([SCUIRREL/app.py](SCUIRREL/app.py))
 
 SCUIRREL or Science Concept Understanding with Interactive Research RAG Educational LLM 
 is the main application. In this app, users will interact  with the LLM exploring the 
 topics and concepts setup in ACCORNS (admin app, see below)
 
-*Shared variables and functions are sources in from [app_shared.py](./app_shared.py)*
+Details can be found in the [SCUIRREL README](SCUIRREL/README.md)
 
-* Students can select a topic to check their knowledge on
-* Interact with the LLM in conversation led by the topic and concepts set by the instructor
-* The LLM should adapt the conversation to the student's answers and keep them engaged and on topic
-
-## ACCORNS: Admin App ([admin/admin.py](./admin/admin.py))
+## ACCORNS: Admin App ([ACCORNS/app.py](ACCORNS/app.py))
 
 ACCORNS or Admin Control Center Overseeing RAG Needed for SCUIRREL, is a secondary
 applications where instructors can set-up, manage and monitor SCUIRREL
 
-*Shared variables and functions are sources in from [admin/admin_shared.py](./admin/admin_shared.py)*
-
-* Create / edit topics to be discussed
-* Create / edit specific concepts (facts) for each topic to help guide the conversation
-* Upload new files to the vector database for retrieval augmented generation (RAG)
+Details can be found in the [ACCORNS README](ACCORNS/README.md)
 
 # Set-up and deployment
 
-## Setting up the project in a virtual Python environment on Windows
+## Setting up the project in a virtual Python environment 
+
+### Windows
 
 Tutorial for setting up Shiny within a virtual environment found on 
 [website](https://shiny.posit.co/py/docs/install-create-run.html#install)
@@ -97,11 +90,11 @@ To install any project dependencies run
 py -m pip install -r requirements.txt
 ```
 
-To run Shiny run
+To run Shiny fir navigate to the SCUIRREL or ACCORNS folder (otherwise PATH errors) then run
 ```
 shiny run --reload --launch-browser app.py
 ```
-*Note: Using the Run Python File button in VS code to start the app will likely cause a weird error*
+*Note: See below on how to run / debug Shiny from within VS code*
 
 To deactivate the virtual environment run
 ```
@@ -109,7 +102,32 @@ deactivate
 ```
 *You should see (.venv) disappear from the prompt*
 
-If working in VS Code, the environment can be set to default to the virtual environment for this project without the need for (de)activation. To select an environment open the Command Palette and type “Python: Select Interpreter”
+## Working with Shiny apps in VS code
 
-## Hosting the app
+To easily run / debug the apps from within VS code and make use of the integrated 
+[Shiny extensenion](https://marketplace.visualstudio.com/items?itemName=Posit.shiny-python) 
+do the following:
+
+### Create workspaces and add folders
+1) Create a new workspace (save to the root project folder)
+2) Add the following folders (File-> Add folder to workspace):
+    * SCUIRREL (Main project folder)
+    * SCUIRREL\SCUIRREL (Subfolder)
+    * SCUIRREL\ACCORNS  (Subfolder)
+This is needed because using the sub-folders it will change the working directory when running the Shiny apps
+from within VS code
+3) Install the Python and Shiny extensions
+4) Set the default Python interpreter to be the one from the virtual environment.
+In case of errors or not found, set it manually: 
+`Python: Select interpreter -> Select at workspace level -> Enter interpreter Path -> find .venv\Scripts\python.exe`
+
+### Run / Debug your Shiny apps
+
+1) Open the app.py file in the SCUIRREL\SCUIRREL or SCUIRREL\ACCORNS folder in your environment
+(Do *not* open it via the main SCUIRREL folder or the working directory will be incorrect)
+2) You will see a 'Run Shiny App' button appear on the top-right 
+3) Clicking the button should start the app in an integrated browser. 
+Alternatively, choose the dropdown and choose 'Debug Shiny App' to run in debug mode
+
+## Hosting the apps
 *add details here ...*

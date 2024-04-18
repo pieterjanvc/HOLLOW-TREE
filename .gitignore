@@ -6,3 +6,4 @@ backup/*
 *.duckdb
 .venv/*
 .vscode/*
+*.code-workspace
