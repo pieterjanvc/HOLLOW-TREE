@@ -14,7 +14,7 @@ body {
     flex-direction: column-reverse;
 }
 
-.btn {
+.action-button {
     background-color: #007bc2;
     color: white;
 }

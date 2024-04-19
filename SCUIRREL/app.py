@@ -76,7 +76,6 @@ ui.tags.script(
     """
 )
 
-
 def elementDisplay(id, effect):
     @reactive.effect
     async def _():
@@ -111,7 +110,8 @@ with ui.navset_pill(id="tab"):
                      research purposes so don't share any personal information and keep to the topic at hand.</i></p>""")
             with ui.card(id="topicSelection"):
                 ui.card_header("Pick a topic")
-                ui.input_select("selTopic", None, choices=[], width="600px")
+                ui.input_select("selTopic", None, choices=[], width="600px"), 
+                ui.input_action_button("quiz", "Give me a quiz question", width="300px")
 
             with ui.card(id="chatWindow", height="45vh"):
                 ui.card_header("Conversation")
@@ -165,7 +165,7 @@ def tID():
     discussionID.set(cursor.lastrowid)
     conn.commit()
     conn.close()
-    return tID  # todo make user select topic
+    return tID
 
 
 firstWelcome = (
@@ -381,8 +381,61 @@ def _():
         botLog.set(botLog.get() + "\n--- YOU:\n" + resp)
     # Now the LLM has finished the user can send a new response
     elementDisplay("waitResp", "h")
-    ui.update_text_area("newChat", value=None)
     elementDisplay("chatIn", "s")
+    ui.update_text_area("newChat", value="")
     msg = messages.get()
     msg.append((True, shared.dt(), resp))
     messages.set(msg)
+
+# -- QUIZ
+ 
+quizQuestion = reactive.value()
+
+# Clicking the quiz button shows a modal
+@reactive.effect
+@reactive.event(input.quiz)
+def _():
+
+    # Get a random question on the topic from the DB
+    conn = sqlite3.connect(shared.appDB)
+    q = pd.read_sql_query(f"SELECT * FROM question WHERE tID = {tID()} AND archived = 0", conn)
+    conn.close()
+    q = q.sample(1).iloc[0]    
+
+    # UI for the quiz question popup (saved as a variable)
+    @render.express
+    def quizUI(): 
+        HTML(f'<b>{q["question"]}</b><br><br>')
+        ui.input_radio_buttons("quizOptions", None, width="100%", 
+                                choices={"X":HTML("<i>Select an option below:</i>"),"A": q["optionA"],"B": q["optionB"],
+                                        "C": q["optionC"],"D": q["optionD"]})
+        ui.input_action_button("checkAnswer", "Check answer")    
+        @render.ui
+        def _():
+            return checkAnswer()
+    # The modal
+    m = ui.modal(        
+        quizUI,        
+        title="Test your knowledge",
+        easy_close=True,
+        size="l",
+        footer=ui.TagList(ui.modal_button("Close")),
+    )
+    ui.modal_show(m)
+    quizQuestion.set(q)
+    
+
+# Clicking the check answer button will show result + explanation
+@reactive.calc
+@reactive.event(input.checkAnswer)
+def checkAnswer():
+    # User must select a valid option
+    if input.quizOptions() == "X":
+        return HTML("<hr><i>Select an option first!</i>")
+    
+    # CHeck Answer
+    q = quizQuestion.get()
+    correct = input.quizOptions() == q["answer"]
+    return HTML(f'<hr><h3>{"Correct!" if correct else "Incorrect..."}</h3>'
+                f'{q["explanation" + input.quizOptions()]}')
+
