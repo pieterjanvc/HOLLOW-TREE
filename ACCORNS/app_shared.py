@@ -22,8 +22,11 @@ from llama_index.core.extractors import TitleExtractor, KeywordExtractor
 from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
 
-import nest_asyncio
+# -- Shiny
+from shiny.express import ui
 
+# -- Other
+import nest_asyncio
 nest_asyncio.apply()
 
 # --- Global variables
@@ -238,7 +241,7 @@ if addDemo & (not os.path.exists(vectorDB)):
     newFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
     addFileToDB(newFile, vectorDB, appDB)
 
-def backupQuery(cursor, sID, table, rowID, attribute, isBot = None):
+def backupQuery(cursor, sID, table, rowID, attribute, isBot = None, timeStamp = dt()):
     
     #Check if the table exists
     if cursor.execute(f'SELECT * FROM sqlite_master WHERE tbl_name = "{table}"').fetchone() is None:
@@ -253,7 +256,18 @@ def backupQuery(cursor, sID, table, rowID, attribute, isBot = None):
     #Insert into backup
     cursor.execute(
         f"INSERT INTO backup (sID, modified, 'table', 'rowID', created, isBot, 'attribute', tValue) "
-        f"SELECT {sID} as sID, '{dt()}' as 'modified', '{table}' as 'table', {rowID} as 'rowID', "
+        f"SELECT {sID} as sID, '{timeStamp}' as 'modified', '{table}' as 'table', {rowID} as 'rowID', "
         f"modified as 'created', {isBot} as isBot, '{attribute}' as 'attribute', {attribute} as 'tValue' "
         f"FROM {table} WHERE {PK} = {rowID}"
     )
+
+
+def modalMsg(content, title = "Info"):
+    m = ui.modal(
+            content,                      
+            title=title,
+            easy_close=True,
+            size="s",
+            footer=ui.TagList(ui.modal_button("Close")),
+        )
+    ui.modal_show(m)

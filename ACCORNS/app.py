@@ -205,7 +205,9 @@ with ui.navset_pill(id="tab"):
                         f"<li>{input.rqOB()}</li><li>{input.rqOC()}</li>"
                         f"<li>{input.rqOD()}</li></ol><i>Correct answer: {input.rqCorrect()}</i><hr>"
                     )
-
+                # Save updates
+                div(ui.input_action_button("qSaveChanges", "Save Changes"),
+                    ui.input_action_button("qDiscardChanges", "Discard Changes"))
                 # Fields to edit any part of the question
                 ui.input_text_area(
                     "rqQuestion", "Question", width="100%", autoresize=True
@@ -800,14 +802,7 @@ def _():
     elementDisplay("qBtnSet", "s")
     
     if resp["resp"] is None:
-        m = ui.modal(
-            "The generation of a question with the LLM failed, try again later",                      
-            title="Question generation error",
-            easy_close=True,
-            size="l",
-            footer=ui.TagList(ui.modal_button("Close")),
-        )
-        ui.modal_show(m)
+        shared.modalMsg("The generation of a question with the LLM failed, try again later", "Error")       
         return
     
     with reactive.isolate():
@@ -842,7 +837,7 @@ def _():
     ui.update_select("qID", choices=dict(zip(q["qID"], q["question"])))
 
 @reactive.effect
-@reactive.event(input.qID)
+@reactive.event(input.qID, input.qDiscardChanges)
 def _():  
     #Get the question info from the DB
     conn = sqlite3.connect(shared.appDB)
@@ -860,3 +855,32 @@ def _():
     ui.update_text_area("rqODexpl", value=q["explanationD"])
     ui.update_radio_buttons("rqCorrect", selected=q["answer"])
 
+# Save question edits
+@reactive.effect
+@reactive.event(input.qSaveChanges)
+def _():
+    #Get the original question
+    conn = sqlite3.connect(shared.appDB)
+    cursor = conn.cursor()
+    q = pd.read_sql_query("SELECT qID,question,answer,optionA,explanationA,optionB,explanationB,optionC,"
+                          f"explanationC,optionD,explanationD FROM question WHERE qID = {input.qID()}",conn).iloc[0]
+    qID = int(q.iloc[0])
+    fields = ["rqQuestion", "rqCorrect","rqOA","rqOAexpl","rqOB","rqOBexpl","rqOC","rqOCexpl","rqOD","rqODexpl"]
+    now = shared.dt()
+
+    # Backup any changes
+    updates = []
+    for i, v in enumerate(fields):
+        if input[v].get() != q.iloc[i+1]:
+            shared.backupQuery(cursor, sessionID.get(), "question", qID, q.index[i+1], None, now)
+            updates.append(f'{q.index[i+1]} = "{input[v].get()}"')
+    # Update the question
+    if updates != []:
+        updates = ",".join(updates) + f', modified = "{now}"'
+        cursor.execute(f"UPDATE question SET {updates} WHERE qID = {qID}")
+        conn.commit()
+        shared.modalMsg("Your edits were successfully saved", "Update complete")
+    else:
+        shared.modalMsg("No changes were detected")
+    
+    conn.close()
