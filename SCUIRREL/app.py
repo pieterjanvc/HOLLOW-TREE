@@ -400,7 +400,8 @@ def _():
     conn = sqlite3.connect(shared.appDB)
     q = pd.read_sql_query(f"SELECT * FROM question WHERE tID = {tID()} AND archived = 0", conn)
     conn.close()
-    q = q.sample(1).iloc[0]    
+    q = q.sample(1).iloc[0].to_dict()
+    q["start"] =  shared.dt()   
 
     # UI for the quiz question popup (saved as a variable)
     @render.express
@@ -417,9 +418,9 @@ def _():
     m = ui.modal(        
         quizUI,        
         title="Test your knowledge",
-        easy_close=True,
+        easy_close=False,
         size="l",
-        footer=ui.TagList(ui.modal_button("Close")),
+        footer=ui.TagList(ui.input_action_button("qClose", "Return")),
     )
     ui.modal_show(m)
     quizQuestion.set(q)
@@ -433,9 +434,44 @@ def checkAnswer():
     if input.quizOptions() == "X":
         return HTML("<hr><i>Select an option first!</i>")
     
-    # CHeck Answer
+    # Check Answer
     q = quizQuestion.get()
     correct = input.quizOptions() == q["answer"]
+    q["response"] =  input.quizOptions()
+    q["correct"] =  correct + 0 # Convert to integer
+    # Add the response to the database
+
+    # Hide the answer button (don't allow for multiple guessing)
+    if not shared.allowMultiGuess:
+        elementDisplay("checkAnswer", "h")
+    
+    # Add the timestamp the answer was checked
+    q["check"] =  shared.dt()
+    quizQuestion.set(q)
+
     return HTML(f'<hr><h3>{"Correct!" if correct else "Incorrect..."}</h3>'
                 f'{q["explanation" + input.quizOptions()]}')
 
+@reactive.effect
+@reactive.event(input.qClose)
+def _():
+    q = quizQuestion.get()
+    
+    # Handle the case where user returns before checking an answer
+    if "check" not in q:
+        q["check"] = "NULL"  
+        q["response"] = "NULL"
+        q["correct"] = "NULL"
+    else:
+        q["check"] = f'"{q["check"]}"'
+        q["response"] = f'"{q["response"]}"'
+
+    # Add the response to the DB
+    conn = sqlite3.connect(shared.appDB)
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO response (sID, qID, "response", "correct", "start", "check", "end") '
+                   f'VALUES({sessionID()}, {q["qID"]}, {q["response"]}, {q["correct"]},'
+                   f'"{q["start"]}",{q["check"]},"{shared.dt()}")')
+    conn.commit()
+    conn.close()
+    ui.modal_remove()
