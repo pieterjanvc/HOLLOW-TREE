@@ -206,6 +206,11 @@ with ui.navset_pill(id="tab"):
                         f"<li>{input.rqOD()}</li></ol><i>Correct answer: {input.rqCorrect()}</i><hr>"
                     )
 
+                # Save updates
+                div(
+                    ui.input_action_button("qSaveChanges", "Save Changes"),
+                    ui.input_action_button("qDiscardChanges", "Discard Changes"),
+                )
                 # Fields to edit any part of the question
                 ui.input_text_area(
                     "rqQuestion", "Question", width="100%", autoresize=True
@@ -241,7 +246,9 @@ sessionID = reactive.value(0)
 # https://github.com/posit-dev/py-shiny/issues/1271
 conn = sqlite3.connect(shared.appDB)
 topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
-concepts = pd.read_sql_query("SELECT * FROM concept WHERE tID = 0", conn) # get empty df
+concepts = pd.read_sql_query(
+    "SELECT * FROM concept WHERE tID = 0", conn
+)  # get empty df
 files = pd.read_sql_query("SELECT * FROM file", conn)
 
 # Hide the topic and question tab if the vector database is empty and show welcome message
@@ -281,7 +288,9 @@ def _():
     )
     sID = cursor.lastrowid
     sessionID.set(sID)
-    newTopics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+    newTopics = pd.read_sql_query(
+        "SELECT tID, topic FROM topic WHERE archived = 0", conn
+    )
     conn.commit()
     conn.close()
 
@@ -318,11 +327,13 @@ def addTopic_modal():
             )
         ),
         ui.input_text("ntTopic", "New topic:", width="100%"),
-        ui.input_text("ntDescr", "Description (optional):", width="100%"),        
+        ui.input_text("ntDescr", "Description (optional):", width="100%"),
         title="Add a topic",
         easy_close=True,
         size="l",
-        footer=ui.TagList(ui.input_action_button("ntAdd", "Add"),ui.modal_button("Cancel")),
+        footer=ui.TagList(
+            ui.input_action_button("ntAdd", "Add"), ui.modal_button("Cancel")
+        ),
     )
     ui.modal_show(m)
 
@@ -350,14 +361,19 @@ def addNewTopic():
         f'VALUES("{input.ntTopic()}", "{shared.dt()}", "{shared.dt()}", "{input.ntDescr()}")'
     )
     tID = cursor.lastrowid
-    newTopics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+    newTopics = pd.read_sql_query(
+        "SELECT tID, topic FROM topic WHERE archived = 0", conn
+    )
     conn.commit()
     conn.close()
 
     # Update the topics select input
-    ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])), selected=tID)
+    ui.update_select(
+        "tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])), selected=tID
+    )
     topics.set(newTopics)
     ui.modal_remove()
+
 
 # --- Edit an existing topic
 @reactive.effect
@@ -373,11 +389,12 @@ def _():
                 )
             ),
             ui.input_text("etInput", "Updated topic:", width="100%", value=topic),
-            
             title="Edit an existing topic",
             easy_close=True,
             size="l",
-            footer=ui.TagList(ui.input_action_button("etEdit", "Update"),ui.modal_button("Cancel")),
+            footer=ui.TagList(
+                ui.input_action_button("etEdit", "Update"), ui.modal_button("Cancel")
+            ),
         )
         ui.modal_show(m)
 
@@ -397,33 +414,40 @@ def _():
         )
         return
 
-    if topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["topic"] == input.etInput():
+    if (
+        topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["topic"]
+        == input.etInput()
+    ):
         ui.remove_ui("#noGoodTopic")
         ui.insert_ui(
-            HTML(
-                "<div id=noGoodTopic style='color: red'>No change detected</div>"
-            ),
+            HTML("<div id=noGoodTopic style='color: red'>No change detected</div>"),
             "#etInput",
             "afterEnd",
         )
         return
 
-    # Update the DB    
+    # Update the DB
     conn = sqlite3.connect(shared.appDB)
-    cursor = conn.cursor()   
+    cursor = conn.cursor()
     # Backup old value
     shared.backupQuery(cursor, sessionID.get(), "topic", input.tID(), "topic", False)
-    # Update to new 
+    # Update to new
     cursor.execute(
         f'UPDATE topic SET topic = "{input.etInput()}", '
         f'modified = "{shared.dt()}" WHERE tID = {input.tID()}'
     )
-    newTopics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+    newTopics = pd.read_sql_query(
+        "SELECT tID, topic FROM topic WHERE archived = 0", conn
+    )
     conn.commit()
     conn.close()
 
     # Update the topics select input
-    ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])), selected=input.tID())
+    ui.update_select(
+        "tID",
+        choices=dict(zip(newTopics["tID"], newTopics["topic"])),
+        selected=input.tID(),
+    )
     topics.set(newTopics)
     ui.modal_remove()
 
@@ -441,7 +465,9 @@ def _():
         "UPDATE topic SET archived = 1, "
         f'modified = "{shared.dt()}" WHERE tID = {input.tID()}'
     )
-    newTopics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+    newTopics = pd.read_sql_query(
+        "SELECT tID, topic FROM topic WHERE archived = 0", conn
+    )
 
     # Empty the concept table is last topic was removed
     if topics.shape[0] == 0:
@@ -470,11 +496,13 @@ def _():
                 "There is no need to provide context as this will come from the database</i>"
             )
         ),
-        ui.input_text("ncInput", "New concept:", width="100%"),        
+        ui.input_text("ncInput", "New concept:", width="100%"),
         title="Add a new concept to the topic",
         easy_close=True,
         size="l",
-        footer=ui.TagList(ui.input_action_button("ncAdd", "Add"),ui.modal_button("Cancel")),
+        footer=ui.TagList(
+            ui.input_action_button("ncAdd", "Add"), ui.modal_button("Cancel")
+        ),
     )
     ui.modal_show(m)
 
@@ -524,11 +552,13 @@ def _():
                     "Otherwise add or delete instead</i>"
                 )
             ),
-            ui.input_text("ecInput", "New concept:", width="100%", value=concept),            
+            ui.input_text("ecInput", "New concept:", width="100%", value=concept),
             title="Edit and existing topic",
             easy_close=True,
             size="l",
-            footer=ui.TagList(ui.input_action_button("ncEdit", "Update"),ui.modal_button("Cancel")),
+            footer=ui.TagList(
+                ui.input_action_button("ncEdit", "Update"), ui.modal_button("Cancel")
+            ),
         )
         ui.modal_show(m)
 
@@ -547,13 +577,14 @@ def _():
             "afterEnd",
         )
         return
-    
-    if concepts.get().iloc[input.conceptsTable_selected_rows()]["concept"] == input.ecInput():
+
+    if (
+        concepts.get().iloc[input.conceptsTable_selected_rows()]["concept"]
+        == input.ecInput()
+    ):
         ui.remove_ui("#noGoodConcept")
         ui.insert_ui(
-            HTML(
-                "<div id=noGoodConcept style='color: red'>No change detected</div>"
-            ),
+            HTML("<div id=noGoodConcept style='color: red'>No change detected</div>"),
             "#ecInput",
             "afterEnd",
         )
@@ -562,10 +593,10 @@ def _():
     # Update the DB
     cID = concepts.get().iloc[input.conceptsTable_selected_rows()]["cID"]
     conn = sqlite3.connect(shared.appDB)
-    cursor = conn.cursor()   
+    cursor = conn.cursor()
     # Backup old value
     shared.backupQuery(cursor, sessionID.get(), "concept", cID, "concept", False)
-    # Update to new 
+    # Update to new
     cursor.execute(
         f'UPDATE concept SET concept = "{input.ecInput()}", '
         f'modified = "{shared.dt()}" WHERE cID = {cID}'
@@ -669,7 +700,9 @@ def _():
     ui.insert_ui(uiUploadFile, "#processFile", "afterEnd")
     ui.remove_ui("#processFile")
 
+
 # ---- QUIZ QUESTIONS ----
+
 
 # LLM engine for generation
 @reactive.calc
@@ -742,21 +775,30 @@ def _():
     elementDisplay("qBtnSet", "h")
 
     conn = sqlite3.connect(shared.appDB)
-    topic = pd.read_sql_query(f"SELECT topic FROM topic WHERE tID = {input.qtID()}", conn)    
-    conceptList = pd.read_sql_query(f"SELECT cID, max(concept) as concept, count() as n FROM (SELECT cID, concept FROM concept WHERE tID = {input.qtID()} "
-                                    f"UNION ALL SELECT cID, '' as concept FROM question where tID = {input.qtID()}) GROUP BY cID", conn)  
+    topic = pd.read_sql_query(
+        f"SELECT topic FROM topic WHERE tID = {input.qtID()}", conn
+    )
+    conceptList = pd.read_sql_query(
+        f"SELECT cID, max(concept) as concept, count() as n FROM (SELECT cID, concept FROM concept WHERE tID = {input.qtID()} "
+        f"UNION ALL SELECT cID, '' as concept FROM question where tID = {input.qtID()}) GROUP BY cID",
+        conn,
+    )
     cID = int(conceptList[conceptList["n"] == min(conceptList["n"])].sample(1)["cID"])
-    prevQuestions = pd.read_sql_query(f"SELECT question FROM question WHERE cID = {cID} AND archived = 0", conn)
+    prevQuestions = pd.read_sql_query(
+        f"SELECT question FROM question WHERE cID = {cID} AND archived = 0", conn
+    )
     conn.close()
 
     focusConcept = "* ".join(conceptList[conceptList["cID"] == cID]["concept"])
     conceptList = "* " + "\n* ".join(conceptList["concept"])
-    if  prevQuestions.shape[0] == 0:
+    if prevQuestions.shape[0] == 0:
         prevQuestions = ""
-    else:        
-        prevQuestions = ("The following questions have already been generated so try to focus on a different aspect "
-                         "related to the concept if possible:\n"
-                         "* " + "\n* ".join(prevQuestions["question"]))
+    else:
+        prevQuestions = (
+            "The following questions have already been generated so try to focus on a different aspect "
+            "related to the concept if possible:\n"
+            "* " + "\n* ".join(prevQuestions["question"])
+        )
 
     info = f"""Generate a multiple choice question to test a student who just learned about the following topic: 
 {topic.iloc[0]["topic"]}.\n
@@ -765,7 +807,7 @@ The following concepts were covered in this topic:
 The question should center around the following concept:
 {focusConcept}\n
 {prevQuestions}"""
-    
+
     print(info)
 
     botResponse(quizEngine(), info, cID)
@@ -784,7 +826,7 @@ async def botResponse(quizEngine, info, cID):
             valid = True
         except Exception:
             print(("Failed to generate quiz question"))
-            if tries > 1:                
+            if tries > 1:
                 return {"resp": None, "cID": cID}
             tries += 1
 
@@ -798,24 +840,19 @@ def _():
     resp = botResponse.result()
     elementDisplay("qBusyMsg", "h")
     elementDisplay("qBtnSet", "s")
-    
+
     if resp["resp"] is None:
-        m = ui.modal(
-            "The generation of a question with the LLM failed, try again later",                      
-            title="Question generation error",
-            easy_close=True,
-            size="l",
-            footer=ui.TagList(ui.modal_button("Close")),
+        shared.modalMsg(
+            "The generation of a question with the LLM failed, try again later", "Error"
         )
-        ui.modal_show(m)
         return
-    
+
     with reactive.isolate():
         q = resp["resp"].iloc[0]  # For now only processing one
-        #Save the questions in the appAB
+        # Save the questions in the appAB
         conn = sqlite3.connect(shared.appDB)
-        cursor = conn.cursor()   
-        # Insert question 
+        cursor = conn.cursor()
+        # Insert question
         cursor.execute(
             'INSERT INTO question(sID,tID,cID,question,answer,archived,created,modified,'
             'optionA,explanationA,optionB,explanationB,optionC,explanationC,optionD,explanationD)'
@@ -824,31 +861,42 @@ def _():
             f'"{q["explanationC"]}","{q["optionD"]}","{q["explanationD"]}")'
         )
         qID = cursor.lastrowid
-        q = pd.read_sql_query(f"SELECT qID, question FROM question WHERE tID = {input.qtID()} AND archived = 0", conn)
+        q = pd.read_sql_query(
+            f"SELECT qID, question FROM question WHERE tID = {input.qtID()} AND archived = 0",
+            conn,
+        )
         conn.commit()
         conn.close()
-        #Update the UI    
-        ui.update_select("qID", choices=dict(zip(q["qID"], q["question"])), selected=qID)
+        # Update the UI
+        ui.update_select(
+            "qID", choices=dict(zip(q["qID"], q["question"])), selected=qID
+        )
 
 
 @reactive.effect
 @reactive.event(input.qtID)
-def _():  
-    #Get the question info from the DB
+def _():
+    # Get the question info from the DB
     conn = sqlite3.connect(shared.appDB)
-    q = pd.read_sql_query(f"SELECT qID, question FROM question WHERE tID = {input.qtID()} AND archived = 0", conn)
-    conn.close() 
-    #Update the UI
+    q = pd.read_sql_query(
+        f"SELECT qID, question FROM question WHERE tID = {input.qtID()} AND archived = 0",
+        conn,
+    )
+    conn.close()
+    # Update the UI
     ui.update_select("qID", choices=dict(zip(q["qID"], q["question"])))
 
+
 @reactive.effect
-@reactive.event(input.qID)
-def _():  
-    #Get the question info from the DB
+@reactive.event(input.qID, input.qDiscardChanges)
+def _():
+    # Get the question info from the DB
     conn = sqlite3.connect(shared.appDB)
-    q = pd.read_sql_query(f"SELECT * FROM question WHERE qID = {input.qID()}",conn).iloc[0]
-    conn.close() 
-    #Update the UI
+    q = pd.read_sql_query(
+        f"SELECT * FROM question WHERE qID = {input.qID()}", conn
+    ).iloc[0]
+    conn.close()
+    # Update the UI
     ui.update_text_area("rqQuestion", value=q["question"])
     ui.update_text("rqOA", value=q["optionA"])
     ui.update_text_area("rqOAexpl", value=q["explanationA"])
@@ -860,3 +908,49 @@ def _():
     ui.update_text_area("rqODexpl", value=q["explanationD"])
     ui.update_radio_buttons("rqCorrect", selected=q["answer"])
 
+
+# Save question edits
+@reactive.effect
+@reactive.event(input.qSaveChanges)
+def _():
+    # Get the original question
+    conn = sqlite3.connect(shared.appDB)
+    cursor = conn.cursor()
+    q = pd.read_sql_query(
+        "SELECT qID,question,answer,optionA,explanationA,optionB,explanationB,optionC,"
+        f"explanationC,optionD,explanationD FROM question WHERE qID = {input.qID()}",
+        conn,
+    ).iloc[0]
+    qID = int(q.iloc[0])
+    fields = [
+        "rqQuestion",
+        "rqCorrect",
+        "rqOA",
+        "rqOAexpl",
+        "rqOB",
+        "rqOBexpl",
+        "rqOC",
+        "rqOCexpl",
+        "rqOD",
+        "rqODexpl",
+    ]
+    now = shared.dt()
+
+    # Backup any changes
+    updates = []
+    for i, v in enumerate(fields):
+        if input[v].get() != q.iloc[i + 1]:
+            shared.backupQuery(
+                cursor, sessionID.get(), "question", qID, q.index[i + 1], None, now
+            )
+            updates.append(f'{q.index[i+1]} = "{input[v].get()}"')
+    # Update the question
+    if updates != []:
+        updates = ",".join(updates) + f', modified = "{now}"'
+        cursor.execute(f"UPDATE question SET {updates} WHERE qID = {qID}")
+        conn.commit()
+        shared.modalMsg("Your edits were successfully saved", "Update complete")
+    else:
+        shared.modalMsg("No changes were detected")
+
+    conn.close()
