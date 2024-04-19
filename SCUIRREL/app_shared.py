@@ -24,6 +24,7 @@ with open("config.toml", "r") as f:
 
 appDB = config["data"]["appDB"]
 vectorDB = config["data"]["vectorDB"]
+allowMultiGuess = any(config["settings"]["allowMultiGuess"] == x for x in ["True", "true", "T", 1])
 
 # Get the OpenAI API key and organistation
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")

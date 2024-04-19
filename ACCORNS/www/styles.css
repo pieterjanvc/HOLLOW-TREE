@@ -8,6 +8,11 @@ body {
     background: #252525;
 }
 
+.action-button {
+    background-color: #007bc2;
+    color: white;
+}
+
 /* The folowing two fix bugs in DT rendering */
 .table>:not(caption)>*>* {
     background-color: transparent; /* see which row in a table is selected */
