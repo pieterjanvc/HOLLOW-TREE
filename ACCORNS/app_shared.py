@@ -27,6 +27,7 @@ from shiny.express import ui
 
 # -- Other
 import nest_asyncio
+
 nest_asyncio.apply()
 
 # --- Global variables
@@ -93,7 +94,8 @@ def createAppDB(DBpath, addDemo=False):
     # Add a test topic (to be removed later)
     topic = "The central dogma of molecular biology"
     _ = cursor.execute(
-        "INSERT INTO topic(topic, created, modified)" f'VALUES("{topic}", "{dt()}", "{dt()}")'
+        "INSERT INTO topic(topic, created, modified)"
+        f'VALUES("{topic}", "{dt()}", "{dt()}")'
     )
     tID = cursor.lastrowid
 
@@ -119,7 +121,8 @@ def createAppDB(DBpath, addDemo=False):
         ),
     ]
     _ = cursor.executemany(
-        "INSERT INTO concept(tID, concept, created, modified) " f'VALUES({tID}, ?, "{dt()}", "{dt()}")',
+        "INSERT INTO concept(tID, concept, created, modified) "
+        f'VALUES({tID}, ?, "{dt()}", "{dt()}")',
         concepts,
     )
     conn.commit()
@@ -241,19 +244,31 @@ if addDemo & (not os.path.exists(vectorDB)):
     newFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
     addFileToDB(newFile, vectorDB, appDB)
 
-def backupQuery(cursor, sID, table, rowID, attribute, isBot = None, timeStamp = dt()):
-    
-    #Check if the table exists
-    if cursor.execute(f'SELECT * FROM sqlite_master WHERE tbl_name = "{table}"').fetchone() is None:
+
+def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=dt()):
+    # Check if the table exists
+    if (
+        cursor.execute(
+            f'SELECT * FROM sqlite_master WHERE tbl_name = "{table}"'
+        ).fetchone()
+        is None
+    ):
         raise sqlite3.DataError("The table '{table}' does not exist in the database")
-    #Get the Primary Key
-    PK = cursor.execute(f"SELECT name FROM pragma_table_info('{table}') WHERE pk = 1").fetchone()[0]
-    #Check if the attribute exists
-    if cursor.execute(f"SELECT name FROM pragma_table_info('{table}') WHERE name = '{attribute}'").fetchone() is None:
+    # Get the Primary Key
+    PK = cursor.execute(
+        f"SELECT name FROM pragma_table_info('{table}') WHERE pk = 1"
+    ).fetchone()[0]
+    # Check if the attribute exists
+    if (
+        cursor.execute(
+            f"SELECT name FROM pragma_table_info('{table}') WHERE name = '{attribute}'"
+        ).fetchone()
+        is None
+    ):
         raise sqlite3.DataError(f"'{attribute}' is not a column of table '{table}'")
-    #Check isBot and assign 0, 1 or Null when False, True, None
+    # Check isBot and assign 0, 1 or Null when False, True, None
     isBot = isBot + 0 if isBot is not None else "NULL"
-    #Insert into backup
+    # Insert into backup
     cursor.execute(
         f"INSERT INTO backup (sID, modified, 'table', 'rowID', created, isBot, 'attribute', tValue) "
         f"SELECT {sID} as sID, '{timeStamp}' as 'modified', '{table}' as 'table', {rowID} as 'rowID', "
@@ -262,12 +277,12 @@ def backupQuery(cursor, sID, table, rowID, attribute, isBot = None, timeStamp = 
     )
 
 
-def modalMsg(content, title = "Info"):
+def modalMsg(content, title="Info"):
     m = ui.modal(
-            content,                      
-            title=title,
-            easy_close=True,
-            size="s",
-            footer=ui.TagList(ui.modal_button("Close")),
-        )
+        content,
+        title=title,
+        easy_close=True,
+        size="s",
+        footer=ui.TagList(ui.modal_button("Close")),
+    )
     ui.modal_show(m)
