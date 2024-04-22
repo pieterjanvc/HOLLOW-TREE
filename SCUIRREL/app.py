@@ -12,6 +12,7 @@ import app_shared as shared
 import sqlite3
 from html import escape
 import pandas as pd
+import json
 
 # Llamaindex
 from llama_index.core import ChatPromptTemplate
@@ -150,7 +151,7 @@ with ui.navset_pill(id="tab"):
 
 sessionID = reactive.value(0)
 discussionID = reactive.value(0)
-
+conceptIndex = reactive.value(0)
 
 @reactive.calc
 @reactive.event(input.selTopic)
@@ -170,7 +171,7 @@ def tID():
 
 firstWelcome = (
     'Hello, I\'m here to help you get a basic understanding of the following topic: '
-    f'{topics.iloc[0]["topic"]}. Have you heard about this before?'
+    f'{topics.iloc[0]["topic"]}. What do you already know about this?'
 )
 
 
@@ -178,7 +179,7 @@ firstWelcome = (
 def welcome():
     return (
         'Hello, I\'m here to help you get a basic understanding of the following topic: '
-        f'{topics[topics["tID"] == tID()].iloc[0]["topic"]}. Have you heard about this before?'
+        f'{topics[topics["tID"] == tID()].iloc[0]["topic"]}. What do you already know about this?'
     )
 
 
@@ -187,9 +188,9 @@ with reactive.isolate():
     userLog = reactive.value(f"""<div class='botChat talk-bubble tri'>
                             <p>Hello, I'm here to help you get a basic understanding of 
                             the following topic: <b>{topics.iloc[0]["topic"]}</b>. 
-                            Have you heard about this before?</p></div>""")
+                            What do you already know about this?</p></div>""")
     botLog = reactive.value(
-        f"""---- PREVIOUS CONVERSATION ----\n--- YOU:\n{firstWelcome}"""
+        f"""---- PREVIOUS CONVERSATION ----\n--- MENTOR:\n{firstWelcome}"""
     )
 
 
@@ -249,8 +250,7 @@ def concepts():
 
 
 # Adapt the chat engine to the topic
-@reactive.calc
-def chatEngine():
+def chatEngine(topic,concepts,cIndex):
     # TUTORIAL Llamaindex + Prompt engineering
     # https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
     # https://docs.llamaindex.ai/en/stable/examples/customization/prompts/chat_prompts/
@@ -278,28 +278,34 @@ def chatEngine():
         "Original Answer: {existing_answer}"
     )
 
-    topicList = "* " + "\n* ".join(concepts()["concept"])
+    cDone = "" if cIndex == 0 else "These concepts were already covered successfully:\n* " + \
+    "\n* ".join(concepts.head(cIndex)["concept"])
+
+    cToDo = "The following concepts still need to be discussed:\n* " + \
+    "\n* ".join(concepts[cIndex:]["concept"])
 
     # System prompt
     chat_text_qa_msgs = [
         ChatMessage(
             role=MessageRole.SYSTEM,
             content=(
-                f"""
-                Your goal is to check wether the user (a student) has an understanding of the following topic: 
-                {topics[topics["tID"] == tID()].iloc[0]["topic"]}
-                ----
-                These are the sub-concepts that the user should understand:
-                {topicList}
-                ----
-                Remember that you are not lecturing, i.e. giving / asking definitions or giving away all the concepts.
-                Rather, you will ask a series of questions (or generate a multiple choice question if it fits) and look
-                at the answers to refine your next question according to the current understanding of the user.
-                Try to make the user think and reason critically, but do help out if they get stuck. 
-                You will adapt the conversation until you feel all sub-concepts are understood.
-                Do not go beyond what is expected, as this is not your aim. Make sure to always check any user
-                message for mistakes, like the use of incorrect terminology and correct if needed, this is very important!
-                """
+f"""You (MENTOR) will chat with a student (STUDENT) to evaluate their understanding of the following topic: 
+{topic}
+----
+{cDone}\n\n
+{cToDo}
+---- 
+
+The current focus of the conversation should be on the following concept: 
+{concepts.iloc[cIndex]["concept"]} 
+
+Remember that you are not lecturing, i.e. giving / asking definitions or giving away all the concepts.
+Rather, you will ask a series of questions and use the student's answers to refine your next question 
+according to their current understanding.
+Try to make the student think and reason critically, but do help out if they get stuck. 
+You will adapt the conversation until you feel the there are no more mistakes and there is basic understanding of the concept.
+Do not go beyond what is expected, as this is not your aim. Make sure to always check any user
+message for mistakes, like the use of incorrect terminology and correct if needed, this is very important!"""
             ),
         ),
         ChatMessage(role=MessageRole.USER, content=qa_prompt_str),
@@ -311,18 +317,18 @@ def chatEngine():
         ChatMessage(
             role=MessageRole.SYSTEM,
             content=(
-                """
-                If necessary, make edits to ensure the following:
-                - Do not keep repeating the topic title in your answer, focus on what's currently going on
-                - You should stay on topic, and make sure all sub-concepts are evaluated 
-                (but don't give them away accidentally!)
-                - If a user seems confused or does not know something, you should explain some of the theory 
-                in light of their current perceived knowledge
-                - Make sure you make the user think for themselves, but don't make it frustrating
-                - Double check if the latest user query does not contain conceptual or jargon errors and address them if needed
-                - You can add some fun facts based on the provided background if appropriate to keep the conversation
-                interesting 
-                """
+"""
+If necessary, make edits to ensure the following:
+- Do not keep repeating the topic title in your answer, focus on what's currently going on
+- You should stay on topic, and make sure all sub-concepts are evaluated 
+(but don't give them away accidentally!)
+- If a user seems confused or does not know something, you should explain some of the theory 
+in light of their current perceived knowledge
+- Make sure you make the user think for themselves, but don't make it frustrating
+- Double check if the latest user query does not contain conceptual or jargon errors and address them if needed
+- You can add some fun facts based on the provided background if appropriate to keep the conversation
+interesting 
+"""
             ),
         ),
         ChatMessage(role=MessageRole.USER, content=refine_prompt_str),
@@ -335,6 +341,68 @@ def chatEngine():
         llm=shared.llm,
     )
 
+
+# Adapt the chat engine to the topic
+def progressCheckEngine(conversation,topic,concepts,cIndex):   
+
+    cDone = "" if cIndex == 0 else "These concepts were already covered successfully:\n* " + \
+    "\n* ".join(concepts.head(cIndex)["concept"])
+
+    cToDo = "The following concepts still need to be discussed:\n* " + \
+    "\n* ".join(concepts[cIndex:]["concept"])    
+
+    # System prompt
+    chat_text_qa_msgs = [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+f"""You are monitoring a conversation between a tutor (TUTOR) and a student (STUDENT) on following topic:  
+{topic}
+
+{cDone}\n\n
+{cToDo}
+
+The conversation is currently focused on the following concept: 
+{concepts.iloc[cIndex]["concept"]}
+
+{conversation}
+
+----
+
+With this information, you have to decide if the STUDENT demonstrated enough understanding 
+of the current concept to move on to the next one. 
+You do this by outputting a numeric score with the following rubric:
+* 1: No demonstration of understanding yet
+* 2: Some understanding, but still incomplete or with mistakes warranting more discussion 
+* 3: Basics of the concept seem to be understood and we might be able to move on
+* 4: Clear demonstration of understanding
+
+In addition you will add a short comment, based on the conversation and current concept, 
+about what the STUDENT understands but more importantly what they still struggle with (if score < 4).
+
+Please output your score in the following format:"""
+r'{{"score": <int>, "comment": "<>"}}'
+            ),
+        ),
+        ChatMessage(role=MessageRole.USER),
+    ]
+    text_qa_template = ChatPromptTemplate(chat_text_qa_msgs)
+
+    # Refine Prompt
+    chat_refine_msgs = [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(r'Make sure the output is in the following format: {{"score": <int>, "comment": "<>"}}'),
+        ),
+        ChatMessage(role=MessageRole.USER),
+    ]
+    refine_template = ChatPromptTemplate(chat_refine_msgs)
+
+    return shared.index.as_query_engine(
+        text_qa_template=text_qa_template,
+        refine_template=refine_template,
+        llm=shared.llm,
+)
 
 # When the send button is clicked...
 @reactive.effect
@@ -350,35 +418,54 @@ def _():
     msg = messages.get()
     msg.append((False, shared.dt(), newChat))
     messages.set(msg)
-    botIn = botLog.get() + "\n---- NEW RESPONSE FROM USER ----\n" + newChat
+    conversation = botLog.get() + "\n---- NEW RESPONSE FROM STUDENT ----\n" + newChat
     userLog.set(
         userLog.get()
         + "<div class='userChat talk-bubble tri'><p>"
         + escape(newChat)  # prevent HTML injection from user
         + "</p></div>"
     )
-    botLog.set(botLog.get() + f"\n--- USER:\n{newChat}")
-    botResponse(chatEngine(), botIn)
+    botLog.set(botLog.get() + f"\n--- STUDENT:\n{newChat}")
+    topic = topics[topics["tID"] == tID()].iloc[0]["topic"]
+    botResponse(topic,concepts(),conceptIndex.get(), conversation)
 
 
 # Async Shiny task waiting for LLM reply
 @reactive.extended_task
-async def botResponse(chatEngine, botIn):
-    return str(chatEngine.query(botIn))
+async def botResponse(topic,concepts,cIndex, conversation):
+    engine = progressCheckEngine(conversation,topic,concepts,cIndex)
+    eval = json.loads(str(engine.query(conversation)))
+    print(eval)
+    if int(eval["score"]) > 2:
+        cIndex += 1
+    
+    if cIndex > concepts.shape[0]:
+        resp = f"Well done! It seems you have demonstrated understanding of everything we wanted you to know about: {topic}"
+    else:    
+        engine = chatEngine(topic,concepts,cIndex)
+        resp = str(engine.query(conversation))
+    
+    return {"resp": resp, "eval": eval}
 
 
 # Processing LLM response
 @reactive.effect
 def _():
-    resp = botResponse.result()
+    result = botResponse.result()
+    resp = result["resp"]
+    eval = result["eval"]
+
     with reactive.isolate():
+        if int(eval["score"]) > 2:
+            conceptIndex.set(conceptIndex.get()+1)
+
         userLog.set(
             userLog.get()
             + "<div class='botChat talk-bubble tri'><p>"
             + resp
             + "</p></div>"
         )
-        botLog.set(botLog.get() + "\n--- YOU:\n" + resp)
+        botLog.set(botLog.get() + "\n--- MENTOR:\n" + resp)
     # Now the LLM has finished the user can send a new response
     elementDisplay("waitResp", "h")
     elementDisplay("chatIn", "s")
