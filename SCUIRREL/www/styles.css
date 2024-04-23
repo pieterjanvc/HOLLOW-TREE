@@ -4,22 +4,42 @@ html {
     max-width: 1280px;
 }
 
+:root {
+    --background: #252525;
+    --theme1: #AF6B50;
+    --theme2: #65AF50;
+    --theme3: #5094AF;
+    --theme4: #9A50AF;
+
+    --bs-link-color:  var(--theme2);
+    --bs-nav-link-hover-color: var(--theme3);
+}
+.nav-pills {
+    --bs-nav-pills-link-active-bg: var(--theme2);
+}
+
 body {
-    background: #252525;
-    --botCol: #236ba6;
-    --userCol: #A65E23;
+    
+    --botCol: var(--theme3);
+    --userCol: var(--theme1);
+    
+    background: var(--background);
 }
 
 #chatWindow .card-body {
     flex-direction: column-reverse;
 }
 
+.nav-link.active {
+    background-color:  var(--theme2);
+}
+
 .action-button {
-    background-color: #007bc2;
+    background-color: var(--theme2);
     color: white;
 }
 
-/* The folowing two fix bugs in DT rendering */
+/* The following two fix bugs in DT rendering */
 .table>:not(caption)>*>* {
     background-color: transparent; /* see which row in a table is selected */
 }
@@ -75,4 +95,25 @@ https://codepen.io/Founts/pen/AJyVOr
 
 .userChat.tri:after{
     border-color: var(--userCol) var(--userCol) transparent transparent;
+}
+
+/* 
+Progress bar 
+https://gist.github.com/WeiChiaChang/abe92ca2e8da86ef69560b63903e8764
+*/
+.progress-bar {
+    width: 100%;
+    background-color: rgb(255, 255, 255);
+    padding: 3px;
+    border-radius: 3px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, .2);
+}
+
+.progress-bar-fill {
+    display: block;
+    height: 22px;
+    color: var(--theme4);    
+    background-color: #dadada;
+    border-radius: 3px;    
+    transition: width 500ms ease-in-out;
 }
