@@ -82,7 +82,11 @@ with ui.navset_pill(id="tab"):
                 
                 @render.ui
                 def chatLog():
-                    return div(HTML(userLog.get()))
+                    log = userLog.get()
+                    if log:
+                        return div(HTML(log))
+                    else:
+                        return
 
         # User input, send button and wait message
         (
@@ -112,12 +116,48 @@ with ui.navset_pill(id="tab"):
 
 # --- REACTIVE VARIABLES & FUNCTIONS ---
 
-sessionID = reactive.value(0)
-discussionID = reactive.value(0)
-conceptIndex = reactive.value(0)
-messages = reactive.value()
-userLog = reactive.value()
-botLog = reactive.value()
+sessionID = reactive.value(0) # Current Shiny Session
+discussionID = reactive.value(0) # Current conversation
+conceptIndex = reactive.value(0) # Current concept index to discuss
+messages = reactive.value(None) # Raw chat messages
+userLog = reactive.value(None) # Chat shown on the page
+botLog = reactive.value(None) # Chat sent to the LLM
+
+# Stuff to run once when the session has loaded
+if hasattr(session, "_process_ui"):    
+    #Register the session start in the DB
+    conn = sqlite3.connect(shared.appDB)
+    cursor = conn.cursor()
+    # For now we only have anonymous users
+    _ = cursor.execute(
+        "INSERT INTO session (shinyToken, uID, start)"
+        f'VALUES("{session.id}", {uID}, "{shared.dt()}")'
+    )
+    sID = int(cursor.lastrowid)
+    conn.commit()
+    conn.close()
+    sessionID.set(sID)
+    # Set the topics
+    ui.update_select("selTopic", choices=dict(zip(topics["tID"], topics["topic"])))
+        
+
+# Code to run at the END of the session (i.e. when user disconnects)
+_ = session.on_ended(lambda: theEnd())
+def theEnd():
+    # Isolate so we can use the final values of reactive variables
+    with reactive.isolate():
+        dID = discussionID.get()
+        msg = messages.get()    
+        sID = sessionID.get()
+        # AUpdate the database
+        conn = sqlite3.connect(shared.appDB)
+        cursor = conn.cursor()        
+        # Log current discussion
+        shared.endDiscussion(cursor, dID, msg)  
+        # Register the end of the session  
+        _ = cursor.execute(f'UPDATE session SET end = "{shared.dt()}" WHERE sID = {sID}')
+        conn.commit()
+        conn.close()
 
 @reactive.effect
 @reactive.event(input.selTopic)
@@ -125,8 +165,13 @@ def _():
     tID = topics[topics["tID"] == int(input.selTopic())].iloc[0]["tID"]
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
-    #Register the start of the topic discussion
-    cursor.execute(
+    #Save the logs for the previous discussion (if any)
+    if messages.get():
+        shared.endDiscussion(cursor, discussionID.get(), messages.get())
+        elementDisplay("chatIn", "s") # In case hidden if previous finished
+    
+    #Register the start of the  new topic discussion
+    _ = cursor.execute(
         "INSERT INTO discussion (tID, sID, start)"
         f'VALUES({tID}, {sessionID.get()}, "{shared.dt()}")'
     )
@@ -163,64 +208,23 @@ def concepts():
     conn.close()
     return concepts
 
-# Set the topics based on what's in the database (this can only run when the session has loaded)
-if hasattr(session, "_process_ui"):
-    ui.update_select("selTopic", choices=dict(zip(topics["tID"], topics["topic"])))
-
-# Run once the session initialised
-@reactive.effect
-def _():
-    # Set the function to be called when the session ends
-    dID = discussionID.get()
-    msg = messages.get()
-    sID = sessionID.get()   
-
-    # SOmehow this function runs twice, so making sure it only does this stuff one time
-    if sessionID.get() == 0:
-        # Function to fun when session ends
-        _ = session.on_ended(lambda: theEnd(sID, dID, msg))
-        #Register the session start in the DB
-        conn = sqlite3.connect(shared.appDB)
-        cursor = conn.cursor()
-        # For now we only have anonymous users
-        cursor.execute(
-            "INSERT INTO session (shinyToken, uID, start)"
-            f'VALUES("{session.id}", {uID}, "{shared.dt()}")'
-        )
-        sID = int(cursor.lastrowid)
-        conn.commit()
-        conn.close()
-        sessionID.set(sID)  
-
-# Code to run at the end of the session (i.e. when user disconnects)
-def theEnd(sID, dID, msg):
-    # Add logs to the database after user exits
-    print("final write")
-    conn = sqlite3.connect(shared.appDB)
-    cursor = conn.cursor()
-    cursor.execute(f'UPDATE session SET end = "{shared.dt()}" WHERE sID = {sID}')
-    cursor.execute(f'UPDATE discussion SET end = "{shared.dt()}" WHERE dID = {dID}')
-    cursor.executemany(
-        f"INSERT INTO message(dID,isBot,timeStamp,message,cID, progressCode,progressMessage)" 
-        f"VALUES({dID}, ?, ?, ?, ?, ?, ?)",
-        msg,
-    )
-    conn.commit()
-    conn.close()
-
 # When the send button is clicked...
 @reactive.effect
 @reactive.event(input.send)
 def _():
-    newChat = input.newChat()    
+    newChat = input.newChat()
+    # Ignore empty chat    
     if (newChat == "") | (newChat.isspace()):
         return
 
+    # Prevent new chat whilst LLM is working and show waiting message
     elementDisplay("waitResp", "s")
     elementDisplay("chatIn", "h")
+    # Add the user message
     msg = messages.get()
     msg.append((False, shared.dt(), newChat, int(concepts().iloc[conceptIndex.get()]["cID"]), None, None))
     messages.set(msg)
+    # Generate chat logs
     conversation = botLog.get() + "\n---- NEW RESPONSE FROM STUDENT ----\n" + newChat
     userLog.set(
         userLog.get()
@@ -230,20 +234,23 @@ def _():
     )
     botLog.set(botLog.get() + f"\n--- STUDENT:\n{newChat}")
     topic = topics[topics["tID"] == int(input.selTopic())].iloc[0]["topic"]
+    # Send the message to the LLM for processing
     botResponse(topic,concepts(),conceptIndex.get(), conversation)
 
 
 # Async Shiny task waiting for LLM reply
 @reactive.extended_task
 async def botResponse(topic,concepts,cIndex, conversation):
+    # Check the student's progress on the current concept based on the last reply (other engine)
     engine = shared.progressCheckEngine(conversation,topic,concepts,cIndex)
     eval = json.loads(str(engine.query(conversation)))
-    print(eval)
+    # See if the LLM thinks we can move on to the next concept or or not
     if int(eval["score"]) > 2:
         cIndex += 1
-    
+    # Check if all concepts have been covered successfully
     if cIndex > concepts.shape[0]:
         resp = f"Well done! It seems you have demonstrated understanding of everything we wanted you to know about: {topic}"
+        elementDisplay("chatIn", "h")
     else:    
         engine = shared.chatEngine(topic,concepts,cIndex,eval)
         resp = str(engine.query(conversation))
@@ -251,19 +258,19 @@ async def botResponse(topic,concepts,cIndex, conversation):
     return {"resp": resp, "eval": eval}
 
 
-# Processing LLM response
+# Processing LLM responses
 @reactive.effect
 def _():
-    result = botResponse.result()
-    resp = result["resp"]
-    eval = result["eval"]
+    result = botResponse.result()    
+    eval = result["eval"] # Evaluation of last response and progress
+    resp = result["resp"] # New response to student
 
     with reactive.isolate():
+        # Check the topic progress and move on to next concept if current one scored well
         if int(eval["score"]) > 2:
             i = conceptIndex.get()+1
             progressBar("chatProgress", int(100 * i / concepts().shape[0]))
-            conceptIndex.set(i)
-            
+            conceptIndex.set(i)            
 
         userLog.set(
             userLog.get()
@@ -272,14 +279,15 @@ def _():
             + "</p></div>"
         )
         botLog.set(botLog.get() + "\n--- MENTOR:\n" + resp)
-    # Now the LLM has finished the user can send a new response
-    elementDisplay("waitResp", "h")
-    elementDisplay("chatIn", "s")
-    ui.update_text_area("newChat", value="")
-    msg = messages.get()
-    msg[-1] = msg[-1][:-2] + (eval["score"], eval["comment"])
-    msg.append((True, shared.dt(), resp, int(concepts().iloc[conceptIndex.get()]["cID"]), None, None))
-    messages.set(msg)
+        # Add the evaluation of the student's last reply to the log
+        msg = messages.get()
+        msg[-1] = msg[-1][:-2] + (eval["score"], eval["comment"])
+        msg.append((True, shared.dt(), resp, int(concepts().iloc[conceptIndex.get()]["cID"]), None, None))
+        messages.set(msg)
+        # Now the LLM has finished the user can send a new response
+        elementDisplay("waitResp", "h")
+        elementDisplay("chatIn", "s")
+        ui.update_text_area("newChat", value="")
 
 # -- QUIZ
  
@@ -363,7 +371,7 @@ def _():
     # Add the response to the DB
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
-    cursor.execute('INSERT INTO response (sID, qID, "response", "correct", "start", "check", "end") '
+    _ = cursor.execute('INSERT INTO response (sID, qID, "response", "correct", "start", "check", "end") '
                    f'VALUES({sessionID()}, {q["qID"]}, {q["response"]}, {q["correct"]},'
                    f'"{q["start"]}",{q["check"]},"{shared.dt()}")')
     conn.commit()

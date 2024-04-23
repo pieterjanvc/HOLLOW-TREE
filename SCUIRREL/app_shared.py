@@ -229,3 +229,12 @@ r'{{"score": <int>, "comment": "<>"}}'
         refine_template=refine_template,
         llm=llm,
 )
+
+# Function to register the end of a discussion in the DB
+def endDiscussion(cursor, dID, messages, timeStamp = dt()):
+    _ = cursor.execute(f'UPDATE discussion SET end = "{timeStamp}" WHERE dID = {dID}')
+    _ = cursor.executemany(
+        f"INSERT INTO message(dID,isBot,timeStamp,message,cID, progressCode,progressMessage)" 
+        f"VALUES({dID}, ?, ?, ?, ?, ?, ?)",
+        messages,
+)
