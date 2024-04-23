@@ -35,19 +35,17 @@ conn.close()
 # ********************
 
 ui.page_opts(fillable=True)
+ui.head_content(ui.include_css("www/styles.css"), ui.include_js("www/custom.js", method="inline"))
 
-# --- CUSTOM JS FUNCTIONS (move to separate file later) ---
+# --- CUSTOM JS FUNCTIONS (Python side) ---
 
 # This function allows you to hide/show/disable/enable elements by ID or data-value
 # The latter is needed because tabs don't use ID's but data-value
-ui.head_content(ui.include_css("www/styles.css"), ui.include_js("www/custom.js", method="inline"))
-
-
 def elementDisplay(id, effect):
     @reactive.effect
     async def _():
         await session.send_custom_message("hideShow", {"id": id, "effect": effect})
-
+# Update a custom, simple progress bar
 def progressBar(id, percent):
     @reactive.effect
     async def _():
@@ -128,10 +126,10 @@ if hasattr(session, "_process_ui"):
     #Register the session start in the DB
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
-    # For now we only have anonymous users
+    # For now we only have anonymous users (appID 0 -> SCUIRREL)
     _ = cursor.execute(
-        "INSERT INTO session (shinyToken, uID, start)"
-        f'VALUES("{session.id}", {uID}, "{shared.dt()}")'
+        "INSERT INTO session (shinyToken, uID, appID, start)"
+        f'VALUES("{session.id}", {uID}, 0, "{shared.dt()}")'
     )
     sID = int(cursor.lastrowid)
     conn.commit()

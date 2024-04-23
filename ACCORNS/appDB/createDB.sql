@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS "session";
 CREATE TABLE IF NOT EXISTS "session" (
 	"sID" INTEGER PRIMARY KEY AUTOINCREMENT,
   "uID" INTEGER,
+  "appID" INTEGER,
   "start" TEXT,
   "end" TEXT,
   "shinyToken" TEXT,

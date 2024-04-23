@@ -263,7 +263,7 @@ def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=dt()
     # Check isBot and assign 0, 1 or Null when False, True, None
     isBot = isBot + 0 if isBot is not None else "NULL"
     # Insert into backup
-    cursor.execute(
+    _ = cursor.execute(
         f"INSERT INTO backup (sID, modified, 'table', 'rowID', created, isBot, 'attribute', tValue) "
         f"SELECT {sID} as sID, '{timeStamp}' as 'modified', '{table}' as 'table', {rowID} as 'rowID', "
         f"modified as 'created', {isBot} as isBot, '{attribute}' as 'attribute', {attribute} as 'tValue' "

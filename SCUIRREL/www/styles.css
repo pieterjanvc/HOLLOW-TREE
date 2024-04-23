@@ -34,7 +34,7 @@ body {
     background-color:  var(--theme2);
 }
 
-.action-button {
+.btn-default {
     background-color: var(--theme2);
     color: white;
 }
