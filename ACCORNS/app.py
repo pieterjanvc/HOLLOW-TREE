@@ -78,7 +78,7 @@ with ui.navset_pill(id="tab"):
     with ui.nav_panel("Vector Database", value="vTab"):
         with ui.card(id="blankDBMsg", style="display: none;"):
             HTML(
-                "<i>Welcome to ACCORNS, the Admin Control Center Overseeing RAG Needed for SCUIRREL!"
+                "<i>Welcome to ACCORNS, the Admin Control Center Overseeing RAG Needed for SCUIRREL!<br>"
                 "In order to get started, please add at least one file to the vector database</i>"
             )
         # Tables of the files that are in the DB
