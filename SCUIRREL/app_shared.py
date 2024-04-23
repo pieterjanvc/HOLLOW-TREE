@@ -73,7 +73,7 @@ def dt():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # Adapt the chat engine to the topic
-def chatEngine(topic,concepts,cIndex):
+def chatEngine(topic,concepts,cIndex,eval):
     # TUTORIAL Llamaindex + Prompt engineering
     # https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
     # https://docs.llamaindex.ai/en/stable/examples/customization/prompts/chat_prompts/
@@ -107,21 +107,24 @@ def chatEngine(topic,concepts,cIndex):
     cToDo = "The following concepts still need to be discussed:\n* " + \
     "\n* ".join(concepts[cIndex:]["concept"])
 
+    progress = "\nBased on the conversation it seems you need to explore the current topic " + \
+             f'a bit more as you noted the following: {eval["comment"]}\n' if int(eval["score"]) < 3 else ""
+
     # System prompt
     chat_text_qa_msgs = [
         ChatMessage(
             role=MessageRole.SYSTEM,
             content=(
-f"""You (MENTOR) will chat with a student (STUDENT) to evaluate their understanding of the following topic: 
+f"""You (MENTOR) are chatting with a student (STUDENT) to evaluate their understanding of the following topic: 
 {topic}
 ----
 {cDone}\n\n
 {cToDo}
 ---- 
 
-The current focus of the conversation should be on the following concept: 
-{concepts.iloc[cIndex]["concept"]} 
-
+The current focus of the conversation is on the following concept: 
+{concepts.iloc[cIndex]["concept"]}
+{progress}
 Remember that you are not lecturing, i.e. giving / asking definitions or giving away all the concepts.
 Rather, you will ask a series of questions and use the student's answers to refine your next question 
 according to their current understanding.

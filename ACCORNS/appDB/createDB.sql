@@ -59,10 +59,15 @@ DROP TABLE IF EXISTS "message";
 CREATE TABLE IF NOT EXISTS "message" (
 	"mID" INTEGER PRIMARY KEY AUTOINCREMENT,
 	"dID" INTEGER,
+  "cID" INTEGER,
   "isBot" INTEGER,
   "timestamp" TEXT,
   "message" TEXT,
+  "progressCode" INTEGER,
+  "progressMessage" TEXT,
   FOREIGN KEY("dID") REFERENCES "discussion"("dID") 
+	  ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("cID") REFERENCES "concept"("cID") 
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
 

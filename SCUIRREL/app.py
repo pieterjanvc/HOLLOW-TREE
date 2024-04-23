@@ -148,10 +148,13 @@ with ui.navset_pill(id="tab"):
 sessionID = reactive.value(0)
 discussionID = reactive.value(0)
 conceptIndex = reactive.value(0)
+messages = reactive.value()
+userLog = reactive.value("")
+botLog = reactive.value()
 
-@reactive.calc
+@reactive.effect
 @reactive.event(input.selTopic)
-def tID():
+def _():
     tID = topics[topics["tID"] == int(input.selTopic())].iloc[0]["tID"]
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
@@ -159,36 +162,36 @@ def tID():
         "INSERT INTO discussion (tID, sID, start)"
         f'VALUES({tID}, {sessionID.get()}, "{shared.dt()}")'
     )
-    discussionID.set(cursor.lastrowid)
+    discussionID.set(int(cursor.lastrowid))
     conn.commit()
     conn.close()
-    return tID
-
-
-firstWelcome = (
+    print("firstMsg")
+    firstWelcome = (
     'Hello, I\'m here to help you get a basic understanding of the following topic: '
     f'{topics.iloc[0]["topic"]}. What do you already know about this?'
-)
-
-
-@reactive.calc
-def welcome():
-    return (
-        'Hello, I\'m here to help you get a basic understanding of the following topic: '
-        f'{topics[topics["tID"] == tID()].iloc[0]["topic"]}. What do you already know about this?'
     )
 
-
-with reactive.isolate():
-    messages = reactive.value([(1, shared.dt(), firstWelcome)])
-    userLog = reactive.value(f"""<div class='botChat talk-bubble tri'>
+    messages.set([(1, shared.dt(), firstWelcome, int(concepts().iloc[conceptIndex.get()]["cID"]), None, None)])
+    userLog.set(f"""<div class='botChat talk-bubble tri'>
                             <p>Hello, I'm here to help you get a basic understanding of 
                             the following topic: <b>{topics.iloc[0]["topic"]}</b>. 
                             What do you already know about this?</p></div>""")
-    botLog = reactive.value(
-        f"""---- PREVIOUS CONVERSATION ----\n--- MENTOR:\n{firstWelcome}"""
-    )
+    botLog.set(f"---- PREVIOUS CONVERSATION ----\n--- MENTOR:\n{firstWelcome}")
+    return tID
 
+# Get the concepts related to the topic
+@reactive.calc
+def concepts():
+    conn = sqlite3.connect(shared.appDB)
+    concepts = pd.read_sql_query(
+        f"SELECT * FROM concept WHERE tID = {int(input.selTopic())} AND archived = 0", conn
+    )
+    conn.close()
+    return concepts
+
+# Set the topics based on what's in the database (this can only run when the session has loaded)
+if hasattr(session, "_process_ui"):
+    ui.update_select("selTopic", choices=dict(zip(topics["tID"], topics["topic"])))
 
 # Run once the session initialised
 @reactive.effect
@@ -196,53 +199,40 @@ def _():
     # Set the function to be called when the session ends
     dID = discussionID.get()
     msg = messages.get()
-    sID = sessionID.get()
-    _ = session.on_ended(lambda: theEnd(sID, dID, msg))
+    sID = sessionID.get()   
 
-    if sessionID.get() != 0:
-        return
-
-    # Register the session in the DB
-    conn = sqlite3.connect(shared.appDB)
-    cursor = conn.cursor()
-    # For now we only have anonymous users
-    cursor.execute(
-        "INSERT INTO session (shinyToken, uID, start)"
-        f'VALUES("{session.id}", {uID}, "{shared.dt()}")'
-    )
-    sID = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    sessionID.set(sID)
-
-    # Set the topics based on what's in the database
-    ui.update_select("selTopic", choices=dict(zip(topics["tID"], topics["topic"])))
-
+    # SOmehow this function runs twice, so making sure it only does this stuff one time
+    if sessionID.get() == 0:
+        # Function to fun when session ends
+        _ = session.on_ended(lambda: theEnd(sID, dID, msg))
+        #Register the session start in the DB
+        conn = sqlite3.connect(shared.appDB)
+        cursor = conn.cursor()
+        # For now we only have anonymous users
+        cursor.execute(
+            "INSERT INTO session (shinyToken, uID, start)"
+            f'VALUES("{session.id}", {uID}, "{shared.dt()}")'
+        )
+        sID = int(cursor.lastrowid)
+        conn.commit()
+        conn.close()
+        sessionID.set(sID)  
 
 # Code to run at the end of the session (i.e. when user disconnects)
 def theEnd(sID, dID, msg):
     # Add logs to the database after user exits
+    print("final write")
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
     cursor.execute(f'UPDATE session SET end = "{shared.dt()}" WHERE sID = {sID}')
     cursor.execute(f'UPDATE discussion SET end = "{shared.dt()}" WHERE dID = {dID}')
     cursor.executemany(
-        f"INSERT INTO message(dID,isBot,timeStamp,message)" f"VALUES({dID}, ?, ?, ?)",
+        f"INSERT INTO message(dID,isBot,timeStamp,message,cID, progressCode,progressMessage)" 
+        f"VALUES({dID}, ?, ?, ?, ?, ?, ?)",
         msg,
     )
     conn.commit()
     conn.close()
-
-
-# Get the concepts related to the topic
-@reactive.calc
-def concepts():
-    conn = sqlite3.connect(shared.appDB)
-    concepts = pd.read_sql_query(
-        f"SELECT * FROM concept WHERE tID = {tID()} AND archived = 0", conn
-    )
-    conn.close()
-    return concepts
 
 # When the send button is clicked...
 @reactive.effect
@@ -256,7 +246,7 @@ def _():
     elementDisplay("waitResp", "s")
     elementDisplay("chatIn", "h")
     msg = messages.get()
-    msg.append((False, shared.dt(), newChat))
+    msg.append((False, shared.dt(), newChat, int(concepts().iloc[conceptIndex.get()]["cID"]), None, None))
     messages.set(msg)
     conversation = botLog.get() + "\n---- NEW RESPONSE FROM STUDENT ----\n" + newChat
     userLog.set(
@@ -266,7 +256,7 @@ def _():
         + "</p></div>"
     )
     botLog.set(botLog.get() + f"\n--- STUDENT:\n{newChat}")
-    topic = topics[topics["tID"] == tID()].iloc[0]["topic"]
+    topic = topics[topics["tID"] == int(input.selTopic())].iloc[0]["topic"]
     botResponse(topic,concepts(),conceptIndex.get(), conversation)
 
 
@@ -282,7 +272,7 @@ async def botResponse(topic,concepts,cIndex, conversation):
     if cIndex > concepts.shape[0]:
         resp = f"Well done! It seems you have demonstrated understanding of everything we wanted you to know about: {topic}"
     else:    
-        engine = shared.chatEngine(topic,concepts,cIndex)
+        engine = shared.chatEngine(topic,concepts,cIndex,eval)
         resp = str(engine.query(conversation))
     
     return {"resp": resp, "eval": eval}
@@ -311,7 +301,8 @@ def _():
     elementDisplay("chatIn", "s")
     ui.update_text_area("newChat", value="")
     msg = messages.get()
-    msg.append((True, shared.dt(), resp))
+    msg[-1] = msg[-1][:-2] + (eval["score"], eval["comment"])
+    msg.append((True, shared.dt(), resp, int(concepts().iloc[conceptIndex.get()]["cID"]), None, None))
     messages.set(msg)
 
 # -- QUIZ
@@ -325,7 +316,7 @@ def _():
 
     # Get a random question on the topic from the DB
     conn = sqlite3.connect(shared.appDB)
-    q = pd.read_sql_query(f"SELECT * FROM question WHERE tID = {tID()} AND archived = 0", conn)
+    q = pd.read_sql_query(f"SELECT * FROM question WHERE tID = {int(input.selTopic())} AND archived = 0", conn)
     conn.close()
     q = q.sample(1).iloc[0].to_dict()
     q["start"] =  shared.dt()   
