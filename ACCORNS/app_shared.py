@@ -101,24 +101,18 @@ def createAppDB(DBpath, addDemo=False):
 
     # Add topic concepts (to be removed later)
     concepts = [
-        ("DNA is made up of 4 bases that encode all information needed for life",),
-        ("A protein is encoded in the DNA as a sequence of bases",),
-        ("To create a protein, you first have to transcribe the DNA into RNA",),
-        (
-            "RNA is similar to DNA but instead of ACTG it has ACUG and is single stranded",
-        ),
-        ("RNA is processed by removing introns, keeping only exons",),
-        (
-            "RNA is translated into protein. 3 RNA bases form a codon, and each codon"
-            "represents an amino acid, or the start / stop of the sequence",
-        ),
-        (
-            "Based on RNA codons, amino acids are chained together into a single protein strand",
-        ),
-        (
-            "The protein will fold into a 3D shape to become functional,"
-            "with optional post-translational processing",
-        ),
+        ("Central dogma of molecular biology: DNA → RNA → Protein",),
+        ("DNA: Composed of adenine (A), cytosine (C), guanine (G), and thymine (T); Blueprint of life",),
+        ("Genes: Hold code for specific proteins",),
+        ("RNA: Composed of nucleotides (including uracil, U); Single-stranded",),
+        ("Transcription: RNA polymerase unwinds DNA double helix; Synthesizes complementary RNA strand",),
+        ("Messenger RNA (mRNA): Carries genetic code from nucleus to cytoplasm",),
+        ("RNA splicing: Removes introns; Retains exons",),
+        ("Translation: Occurs in ribosomes; Deciphers mRNA to assemble protein", ),
+        ("Codons: Three-nucleotide sequences; Specify amino acids or signal start/termination of translation", ),
+        ("Amino acids: Building blocks of proteins; Linked by peptide bonds", ),
+        ("Protein folding: Adopts specific three-dimensional structure", ),
+        ("Post-translational modifications: Addition of chemical groups; Cleavage of specific segments", ),
     ]
     _ = cursor.executemany(
         "INSERT INTO concept(tID, concept, created, modified) "
@@ -269,7 +263,7 @@ def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=dt()
     # Check isBot and assign 0, 1 or Null when False, True, None
     isBot = isBot + 0 if isBot is not None else "NULL"
     # Insert into backup
-    cursor.execute(
+    _ = cursor.execute(
         f"INSERT INTO backup (sID, modified, 'table', 'rowID', created, isBot, 'attribute', tValue) "
         f"SELECT {sID} as sID, '{timeStamp}' as 'modified', '{table}' as 'table', {rowID} as 'rowID', "
         f"modified as 'created', {isBot} as isBot, '{attribute}' as 'attribute', {attribute} as 'tValue' "

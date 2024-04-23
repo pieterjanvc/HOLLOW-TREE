@@ -59,45 +59,12 @@ uiUploadFile = div(
 # ********************
 
 ui.page_opts(fillable=True)
-ui.include_css("www/styles.css")
+ui.head_content(ui.include_css("www/styles.css"), ui.include_js("www/custom.js", method="inline"))
 
-# --- CUSTOM JS FUNCTIONS (move to separate file later) ---
+# --- CUSTOM JS FUNCTIONS (Python side) ---
 
 # This function allows you to hide/show/disable/enable elements by ID or data-value
 # The latter is needed because tabs don't use ID's but data-value
-ui.tags.script(
-    """
-    Shiny.addCustomMessageHandler("hideShow", function(x) {
-
-        if (document.getElementById(x.id)) {
-            var element = document.getElementById(x.id);
-        } else if (document.querySelector('[data-value="' + x.id + '"]')) {
-            var element = document.querySelector('[data-value="' + x.id + '"]');
-        } else {
-            alert("No element found with an ID or data-value of:" + x.id);
-            return;
-        }
-
-        switch(x.effect) {
-            case "d":
-                element.setAttribute("disabled", true);
-                break;
-            case "e":
-                element.setAttribute("disabled", false);
-                break;
-            case "h":
-                element.style.display = "none";
-                break;
-            case "s":
-                element.style.display = "";
-                break;
-        }
-        
-    });
-    """
-)
-
-
 def elementDisplay(id, effect):
     @reactive.effect
     async def _():
@@ -111,7 +78,7 @@ with ui.navset_pill(id="tab"):
     with ui.nav_panel("Vector Database", value="vTab"):
         with ui.card(id="blankDBMsg", style="display: none;"):
             HTML(
-                "<i>Welcome to ACCORNS, the Admin Control Center Overseeing RAG Needed for SCUIRREL!"
+                "<i>Welcome to ACCORNS, the Admin Control Center Overseeing RAG Needed for SCUIRREL!<br>"
                 "In order to get started, please add at least one file to the vector database</i>"
             )
         # Tables of the files that are in the DB
@@ -164,10 +131,10 @@ with ui.navset_pill(id="tab"):
                     style="display:inline",
                 )
                 HTML(
-                    "<i>Concepts are facts or pieces of information you want SCUIRREL to check with your students. "
+                    "<i>Concepts are specific facts or pieces of information you want SCUIRREL to check with your students. "
                     "You can be very brief, as all context will be retrieved from the database of documents. "
-                    "Don't be too broad, as this might cause confusion (you'll have to test it). "
-                    "Try to limit the number of concepts to 4 - 8 as the AI might preform worse with a large number</i>"
+                    "Don't be too broad, split into multiple topics if needed. "
+                    "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"
                 )
     # TAB 3 - QUIZ QUESTIONS
     with ui.nav_panel("Quiz Questions", value="qTab"):
@@ -242,14 +209,9 @@ with ui.navset_pill(id="tab"):
 
 sessionID = reactive.value(0)
 
-# Workaround until issue with reactive.calls is resolved
-# https://github.com/posit-dev/py-shiny/issues/1271
 conn = sqlite3.connect(shared.appDB)
-topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
-concepts = pd.read_sql_query(
-    "SELECT * FROM concept WHERE tID = 0", conn
-)  # get empty df
 files = pd.read_sql_query("SELECT * FROM file", conn)
+conn.close()
 
 # Hide the topic and question tab if the vector database is empty and show welcome message
 if files.shape[0] == 0:
@@ -257,62 +219,60 @@ if files.shape[0] == 0:
     elementDisplay("qTab", "h")
     elementDisplay("blankDBMsg", "s")
 
-conn.close()
-
 if files.shape[0] == 0:
     index = None
 else:
     index = VectorStoreIndex.from_vector_store(
         DuckDBVectorStore.from_local(shared.vectorDB)
     )
-
+    
+# Some of these could become reactive calls in future but for now we use
+# reactive var until issue with reactive.calls is resolved
+# https://github.com/posit-dev/py-shiny/issues/1271
 index = reactive.value(index)
-topics = reactive.value(topics)
-concepts = reactive.value(concepts)
+topics = reactive.value(None)
+concepts = reactive.value(None)
 files = reactive.value(files)
 
 
 # --- REACTIVE FUNCTIONS ---
 
-
-# Code to run at the start of the session (i.e. user connects)
-@reactive.effect
-def _():
-    # Register the session in the DB at start
+# Stuff to run once when the session has loaded
+if hasattr(session, "_process_ui"):    
+    #Register the session start in the DB
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
-    # For now we only have anonymous users
-    cursor.execute(
-        "INSERT INTO session (shinyToken, uID, start)"
-        f'VALUES("{session.id}", {uID}, "{shared.dt()}")'
+    # For now we only have anonymous users (appID 1 -> ACCORNS)
+    _ = cursor.execute(
+        "INSERT INTO session (shinyToken, uID, appID, start)"
+        f'VALUES("{session.id}", {uID}, 1, "{shared.dt()}")'
     )
-    sID = cursor.lastrowid
-    sessionID.set(sID)
+    sID = int(cursor.lastrowid)
+    # Get all active topics
     newTopics = pd.read_sql_query(
         "SELECT tID, topic FROM topic WHERE archived = 0", conn
     )
     conn.commit()
     conn.close()
-
-    # Update the topics select input
-    ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])))
+    sessionID.set(sID)
+    # Set the topics
+    ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])))    
     topics.set(newTopics)
-    # Set the function to be called when the session ends
-    _ = session.on_ended(lambda: theEnd(sID))
 
-
-# Code to run at the end of the session (i.e. user disconnects)
-def theEnd(sID):
-    # Add logs to the database after user exits
-    conn = sqlite3.connect(shared.appDB)
-    cursor = conn.cursor()
-    cursor.execute(f'UPDATE session SET end = "{shared.dt()}" WHERE sID = {sID}')
-    conn.commit()
-    conn.close()
-
+# Code to run at the END of the session (i.e. when user disconnects)
+_ = session.on_ended(lambda: theEnd())
+def theEnd():
+    # Isolate so we can use the final values of reactive variables
+    with reactive.isolate():
+        # Add logs to the database after user exits
+        sID = sessionID.get()
+        conn = sqlite3.connect(shared.appDB)
+        cursor = conn.cursor()
+        _ = cursor.execute(f'UPDATE session SET end = "{shared.dt()}" WHERE sID = {sID}')
+        conn.commit()
+        conn.close()
 
 # ---- TOPICS ----
-
 
 # --- Add a new topic
 @reactive.effect
@@ -356,7 +316,7 @@ def addNewTopic():
     # Add new topic to DB
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
-    cursor.execute(
+    _ = cursor.execute(
         "INSERT INTO topic(topic, created, modified, description)"
         f'VALUES("{input.ntTopic()}", "{shared.dt()}", "{shared.dt()}", "{input.ntDescr()}")'
     )
@@ -432,7 +392,7 @@ def _():
     # Backup old value
     shared.backupQuery(cursor, sessionID.get(), "topic", input.tID(), "topic", False)
     # Update to new
-    cursor.execute(
+    _ = cursor.execute(
         f'UPDATE topic SET topic = "{input.etInput()}", '
         f'modified = "{shared.dt()}" WHERE tID = {input.tID()}'
     )
@@ -461,7 +421,7 @@ def _():
 
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
-    cursor.execute(
+    _ = cursor.execute(
         "UPDATE topic SET archived = 1, "
         f'modified = "{shared.dt()}" WHERE tID = {input.tID()}'
     )
@@ -525,7 +485,7 @@ def _():
     # Add new topic to DB
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
-    cursor.execute(
+    _ = cursor.execute(
         "INSERT INTO concept(tID, concept, created, modified)"
         f'VALUES({input.tID()}, "{input.ncInput()}", "{shared.dt()}", "{shared.dt()}")'
     )
@@ -597,7 +557,7 @@ def _():
     # Backup old value
     shared.backupQuery(cursor, sessionID.get(), "concept", cID, "concept", False)
     # Update to new
-    cursor.execute(
+    _ = cursor.execute(
         f'UPDATE concept SET concept = "{input.ecInput()}", '
         f'modified = "{shared.dt()}" WHERE cID = {cID}'
     )
@@ -621,7 +581,7 @@ def _():
     cID = concepts.get().iloc[input.conceptsTable_selected_rows()]["cID"]
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
-    cursor.execute(
+    _ = cursor.execute(
         "UPDATE concept SET archived = 1, "
         f'modified = "{shared.dt()}" WHERE cID = {cID}'
     )
@@ -853,7 +813,7 @@ def _():
         conn = sqlite3.connect(shared.appDB)
         cursor = conn.cursor()
         # Insert question
-        cursor.execute(
+        _ = cursor.execute(
             'INSERT INTO question(sID,tID,cID,question,answer,archived,created,modified,'
             'optionA,explanationA,optionB,explanationB,optionC,explanationC,optionD,explanationD)'
             f'VALUES({sessionID.get()},{input.tID()},{resp["cID"]},"{q["question"]}","{q["answer"]}",0,"{shared.dt()}","{shared.dt()}",'
@@ -947,7 +907,7 @@ def _():
     # Update the question
     if updates != []:
         updates = ",".join(updates) + f', modified = "{now}"'
-        cursor.execute(f"UPDATE question SET {updates} WHERE qID = {qID}")
+        _ = cursor.execute(f"UPDATE question SET {updates} WHERE qID = {qID}")
         conn.commit()
         shared.modalMsg("Your edits were successfully saved", "Update complete")
     else:

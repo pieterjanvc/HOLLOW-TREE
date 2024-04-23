@@ -4,12 +4,27 @@ html {
     max-width: 1280px;
 }
 
-body {
-    background: #252525;
+:root {
+    --background: #252525;
+    --theme1: #AF6B50;
+    --theme2: #65AF50;
+    --theme3: #5094AF;
+    --theme4: #9A50AF;
+
+    --bs-link-color:  var(--theme2);
+    --bs-nav-link-hover-color: var(--theme3);
+    --bs-btn-bg: var(--theme2)
+}
+.nav-pills {
+    --bs-nav-pills-link-active-bg: var(--theme2);
 }
 
-.action-button {
-    background-color: #007bc2;
+body {
+    background: var(--background);
+}
+
+.btn-default {
+    background-color: var(--theme2);
     color: white;
 }
 
