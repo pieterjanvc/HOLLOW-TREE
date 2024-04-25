@@ -97,6 +97,10 @@ https://codepen.io/Founts/pen/AJyVOr
     border-color: var(--userCol) var(--userCol) transparent transparent;
 }
 
+.isSel{
+    background-color: var(--theme4);
+}
+
 /* 
 Progress bar 
 https://gist.github.com/WeiChiaChang/abe92ca2e8da86ef69560b63903e8764

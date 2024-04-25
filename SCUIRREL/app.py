@@ -188,7 +188,9 @@ def _():
     f'{topics.iloc[0]["topic"]}. What do you already know about this?'
     )
 
-    messages.set([(1, shared.dt(), firstWelcome, int(concepts().iloc[conceptIndex.get()]["cID"]), None, None)])
+    msg = shared.Conversation()
+    msg.add_message(isBot = 1, cID = int(concepts().iloc[conceptIndex.get()]["cID"]), content = firstWelcome)
+    messages.set(msg)
     userLog.set(f"""<div class='botChat talk-bubble tri'>
                             <p>Hello, I'm here to help you get a basic understanding of 
                             the following topic: <b>{topics.iloc[0]["topic"]}</b>. 
@@ -220,7 +222,7 @@ def _():
     elementDisplay("chatIn", "h")
     # Add the user message
     msg = messages.get()
-    msg.append((False, shared.dt(), newChat, int(concepts().iloc[conceptIndex.get()]["cID"]), None, None))
+    msg.add_message(isBot = 0, cID = int(concepts().iloc[conceptIndex.get()]["cID"]), content = newChat)
     messages.set(msg)
     # Generate chat logs
     conversation = botLog.get() + "\n---- NEW RESPONSE FROM STUDENT ----\n" + newChat
@@ -279,8 +281,8 @@ def _():
         botLog.set(botLog.get() + "\n--- MENTOR:\n" + resp)
         # Add the evaluation of the student's last reply to the log
         msg = messages.get()
-        msg[-1] = msg[-1][:-2] + (eval["score"], eval["comment"])
-        msg.append((True, shared.dt(), resp, int(concepts().iloc[conceptIndex.get()]["cID"]), None, None))
+        msg.addEval(eval["score"], eval["comment"])
+        msg.add_message(isBot = 1, cID = int(concepts().iloc[conceptIndex.get()]["cID"]), content = resp)
         messages.set(msg)
         # Now the LLM has finished the user can send a new response
         elementDisplay("waitResp", "h")

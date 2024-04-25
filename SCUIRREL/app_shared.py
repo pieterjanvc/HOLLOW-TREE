@@ -11,6 +11,7 @@ import sqlite3
 from datetime import datetime
 import pandas as pd
 import toml
+from dataclasses import dataclass, astuple
 
 # Llamaindex
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate
@@ -236,5 +237,44 @@ def endDiscussion(cursor, dID, messages, timeStamp = dt()):
     _ = cursor.executemany(
         f"INSERT INTO message(dID,isBot,timeStamp,message,cID, progressCode,progressMessage)" 
         f"VALUES({dID}, ?, ?, ?, ?, ?, ?)",
-        messages,
+        messages.astuple(),
 )
+
+# --- CLASSES
+
+# Messages and conversation
+@dataclass
+class Message:
+    id: int
+    cID: int
+    isBot: int    
+    content: str
+    pCode: int = None
+    pMessage: int = None
+    timeStamp: str = dt()
+
+class Conversation:
+    def __init__(self, id = 0, messages = []):
+        self.id = id
+        self.messages = messages
+
+    def add_message(self, cID: int, isBot: int, content: str, pCode: int = None, pMessage: str = None, timeStamp: str = dt()):
+        message = Message(self.id, cID, isBot, content, pCode, pMessage, timeStamp)
+        self.id += 1
+        self.messages.append(message)
+
+    def filterIds(self, ids):
+        ids = [ids] if isinstance(ids, int) else ids
+        return Conversation(id = max(ids) + 1, messages = [x for x in self.messages if x.id in ids])
+    
+    def addEval(self, score, comment):
+        self.messages[-1].pCode = score
+        self.messages[-1].pMessage = comment
+
+    def astuple(self, shiftId = None):
+        if self.messages == []:
+            return []
+        out = [astuple(x) for x in self.messages]
+        if shiftId:
+            out = [(t[0] + shiftId,) + tuple(t[1:]) for t in out]
+        return  out

@@ -44,3 +44,12 @@ Shiny.addCustomMessageHandler("progressBar", function(x) {
     elem.style.width = x.percent + '%';
     
 });
+
+// document.getElementById("myElement").addEventListener("click", function() {
+//     var element = document.getElementById("myElement");
+//     if (element.classList.contains("myClass")) {
+//         element.classList.remove("myClass");
+//     } else {
+//         element.classList.add("myClass");
+//     }
+// });
