@@ -11,7 +11,6 @@ import sqlite3
 from datetime import datetime
 import pandas as pd
 import toml
-from dataclasses import dataclass, astuple
 
 # Llamaindex
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate
@@ -235,46 +234,36 @@ r'{{"score": <int>, "comment": "<>"}}'
 def endDiscussion(cursor, dID, messages, timeStamp = dt()):
     _ = cursor.execute(f'UPDATE discussion SET end = "{timeStamp}" WHERE dID = {dID}')
     _ = cursor.executemany(
-        f"INSERT INTO message(dID,isBot,timeStamp,message,cID, progressCode,progressMessage)" 
+        f"INSERT INTO message(dID,cID,isBot,timestamp,message,progressCode,progressMessage)" 
         f"VALUES({dID}, ?, ?, ?, ?, ?, ?)",
-        messages.astuple(),
+        messages.astuple(['cID','isBot', 'timeStamp','content','pCode','pMessage']),
 )
 
 # --- CLASSES
 
 # Messages and conversation
-@dataclass
-class Message:
-    id: int
-    cID: int
-    isBot: int    
-    content: str
-    pCode: int = None
-    pMessage: int = None
-    timeStamp: str = dt()
-
 class Conversation:
-    def __init__(self, id = 0, messages = []):
-        self.id = id
-        self.messages = messages
+    def __init__(self):
+        self.id = 0
+        columns = {"id": int,"cID": int, "isBot": int, "timeStamp": str, "content": str, "pCode": str, "pMessage": str}
+        self.messages = pd.DataFrame(columns=columns.keys()).astype(columns)
 
-    def add_message(self, cID: int, isBot: int, content: str, pCode: int = None, pMessage: str = None, timeStamp: str = dt()):
-        message = Message(self.id, cID, isBot, content, pCode, pMessage, timeStamp)
+    def add_message(self, cID: int, isBot: int, content: str, pCode: int = None, pMessage: str = None, timeStamp: str = None):
+        timeStamp = timeStamp if timeStamp else dt()
+        self.messages = pd.concat([self.messages, 
+                                pd.DataFrame.from_dict({"id": [self.id], "cID": [cID], "timeStamp": [timeStamp], 
+                                                        "isBot": [isBot], "content": [content], "pCode": [pCode], "pMessage": [pMessage]})],
+                                                        ignore_index=True)
         self.id += 1
-        self.messages.append(message)
 
-    def filterIds(self, ids):
-        ids = [ids] if isinstance(ids, int) else ids
-        return Conversation(id = max(ids) + 1, messages = [x for x in self.messages if x.id in ids])
-    
     def addEval(self, score, comment):
-        self.messages[-1].pCode = score
-        self.messages[-1].pMessage = comment
+        self.messages.at[self.messages.index[-1], "pCode"] = score
+        self.messages.at[self.messages.index[-1], "pMessage"] = comment
 
-    def astuple(self, shiftId = None):
-        if self.messages == []:
-            return []
-        out = [astuple(x) for x in self.messages]
-        if shiftId:
-            out = [(t[0] + shiftId,) + tuple(t[1:]) for t in out]
-        return  out
+    def astuple(self, order = None):
+        if order is not None and (set(['cID','isBot', 'timeStamp','content','pCode','pMessage']) != set(order)):
+            raise ValueError("messages order not correct")
+        out = self.messages.drop(columns=["id"])
+        if order:
+            out = out[order]
+        return [tuple(x) for x in out.to_numpy()]
