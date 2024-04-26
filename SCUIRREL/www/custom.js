@@ -27,7 +27,7 @@ Shiny.addCustomMessageHandler("hideShow", function(x) {
         case "s":
             element.style.display = "";
             break;
-    }
+    }    
     
 });
 
@@ -38,18 +38,24 @@ $(document).keyup(function(event) {
     }
 });
 
-Shiny.addCustomMessageHandler("progressBar", function(x) {
-
-    var elem = document.getElementById(x.id);
-    elem.style.width = x.percent + '%';
-    
+$(document).on('shiny:connected', function(event) {
+    let flaggedMsg = [];
+    Shiny.setInputValue("selectedMsg", JSON.stringify(flaggedMsg)); 
+    document.getElementById("report").addEventListener("click", function() {    
+        var messages = document.querySelectorAll('.talk-bubble');    
+        // Loop through each element and attach a click event listener
+        messages.forEach(function(message) {
+            message.addEventListener('click', function() {
+            // Change its properties
+            if (message.classList.contains('selectedMsg')){
+                message.classList.remove('selectedMsg');
+                flaggedMsg.splice(flaggedMsg.indexOf(message.getAttribute('msg')), 1);
+            } else {
+                message.classList.add('selectedMsg');
+                flaggedMsg.push(message.getAttribute('msg'))
+            }
+            Shiny.setInputValue("selectedMsg", JSON.stringify(flaggedMsg));            
+            });
+        })
+    });
 });
-
-// document.getElementById("myElement").addEventListener("click", function() {
-//     var element = document.getElementById("myElement");
-//     if (element.classList.contains("myClass")) {
-//         element.classList.remove("myClass");
-//     } else {
-//         element.classList.add("myClass");
-//     }
-// });

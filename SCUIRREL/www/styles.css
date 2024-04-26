@@ -65,7 +65,7 @@ https://codepen.io/Founts/pen/AJyVOr
 	height: auto;	
 }
 
-.tri:after{
+/* .tri:after{
 	content: ' ';
 	position: absolute;
 	width: 0;
@@ -74,7 +74,7 @@ https://codepen.io/Founts/pen/AJyVOr
 	right: 38px;
 	bottom: -20px;
 	border: 12px solid;	
-}
+} */
 
 .botChat{
     color: white;    
@@ -82,9 +82,9 @@ https://codepen.io/Founts/pen/AJyVOr
     border-color: var(--botCol);
 }
 
-.botChat.tri:after{
+/* .botChat.tri:after{
     border-color: var(--botCol) var(--botCol) transparent transparent;
-}
+} */
 
 .userChat{
     color: white;
@@ -93,9 +93,9 @@ https://codepen.io/Founts/pen/AJyVOr
     border-color: var(--userCol);
 }
 
-.userChat.tri:after{
+/* .userChat.tri:after{
     border-color: var(--userCol) var(--userCol) transparent transparent;
-}
+} */
 
 .isSel{
     background-color: var(--theme4);
@@ -120,4 +120,8 @@ https://gist.github.com/WeiChiaChang/abe92ca2e8da86ef69560b63903e8764
     background-color: #dadada;
     border-radius: 3px;    
     transition: width 500ms ease-in-out;
+}
+
+.selectedMsg {
+    background-color: var(--theme4);
 }

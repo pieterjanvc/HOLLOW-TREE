@@ -92,7 +92,7 @@ with ui.navset_pill(id="tab"):
                 ui.input_text_area(
                     "newChat", "", value="", width="100%", spellcheck=True, resize=False
                 ),
-                ui.input_action_button("send", "Send"),
+                ui.input_action_button("send", "Send"), ui.input_action_button("report", "Report issue"),
                 id="chatIn",
             ),
         )
@@ -191,7 +191,7 @@ def _():
     msg = shared.Conversation()
     msg.add_message(isBot = 1, cID = int(concepts().iloc[conceptIndex.get()]["cID"]), content = firstWelcome)
     messages.set(msg)
-    userLog.set(f"""<div class='botChat talk-bubble tri'>
+    userLog.set(f"""<div id='welcome' class='botChat talk-bubble' msg='{msg.id - 1}'>
                             <p>Hello, I'm here to help you get a basic understanding of 
                             the following topic: <b>{topics.iloc[0]["topic"]}</b>. 
                             What do you already know about this?</p></div>""")
@@ -228,7 +228,7 @@ def _():
     conversation = botLog.get() + "\n---- NEW RESPONSE FROM STUDENT ----\n" + newChat
     userLog.set(
         userLog.get()
-        + "<div class='userChat talk-bubble tri'><p>"
+        + f"<div class='userChat talk-bubble' msg='{msg.id - 1}'><p>"
         + escape(newChat)  # prevent HTML injection from user
         + "</p></div>"
     )
@@ -271,19 +271,20 @@ def _():
             i = conceptIndex.get()+1
             progressBar("chatProgress", int(100 * i / concepts().shape[0]))
             conceptIndex.set(i)            
-
-        userLog.set(
-            userLog.get()
-            + "<div class='botChat talk-bubble tri'><p>"
-            + resp
-            + "</p></div>"
-        )
-        botLog.set(botLog.get() + "\n--- MENTOR:\n" + resp)
         # Add the evaluation of the student's last reply to the log
         msg = messages.get()
         msg.addEval(eval["score"], eval["comment"])
         msg.add_message(isBot = 1, cID = int(concepts().iloc[conceptIndex.get()]["cID"]), content = resp)
         messages.set(msg)
+
+        userLog.set(
+            userLog.get()
+            + f"<div class='botChat talk-bubble' msg='{msg.id - 1}'><p>"
+            + resp
+            + "</p></div>"
+        )
+        botLog.set(botLog.get() + "\n--- MENTOR:\n" + resp)
+       
         # Now the LLM has finished the user can send a new response
         elementDisplay("waitResp", "h")
         elementDisplay("chatIn", "s")
@@ -377,3 +378,12 @@ def _():
     conn.commit()
     conn.close()
     ui.modal_remove()
+
+@reactive.effect
+@reactive.event(input.report)
+def _():
+    sel = json.loads(input.selectedMsg())
+    if sel == []:
+        ui.notification_show("Please select all chat messages relevant to the issue you like to report")
+    else:
+        print(sel)
