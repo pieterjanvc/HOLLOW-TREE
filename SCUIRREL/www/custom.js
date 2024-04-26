@@ -38,24 +38,26 @@ $(document).keyup(function(event) {
     }
 });
 
-$(document).on('shiny:connected', function(event) {
-    let flaggedMsg = [];
+// Selecting messages for reporting issues
+let flaggedMsg = []; // keep list of selected messages
+
+// This function is added to each message and executed when clicked
+function chatSelection(message, x){
+
+    // Toggle the background color to indicate selection
+    if (message.classList.contains('selectedMsg')){
+        message.classList.remove('selectedMsg');
+        flaggedMsg.splice(flaggedMsg.indexOf(x), 1);
+    } else {
+        message.classList.add('selectedMsg');
+        flaggedMsg.push(x)
+    }
+    // Keep track of selected messages in Shiny with custom input
+    Shiny.setInputValue("selectedMsg", JSON.stringify(flaggedMsg));            
+
+}
+
+// Make sure the custom Shiny input gets initialised
+$(document).on('shiny:connected', function() {    
     Shiny.setInputValue("selectedMsg", JSON.stringify(flaggedMsg)); 
-    document.getElementById("report").addEventListener("click", function() {    
-        var messages = document.querySelectorAll('.talk-bubble');    
-        // Loop through each element and attach a click event listener
-        messages.forEach(function(message) {
-            message.addEventListener('click', function() {
-            // Change its properties
-            if (message.classList.contains('selectedMsg')){
-                message.classList.remove('selectedMsg');
-                flaggedMsg.splice(flaggedMsg.indexOf(message.getAttribute('msg')), 1);
-            } else {
-                message.classList.add('selectedMsg');
-                flaggedMsg.push(message.getAttribute('msg'))
-            }
-            Shiny.setInputValue("selectedMsg", JSON.stringify(flaggedMsg));            
-            });
-        })
-    });
 });

@@ -78,13 +78,7 @@ with ui.navset_pill(id="tab"):
                 ui.card_header(HTML('<div class="progress-bar"><span id="chatProgress"'
                                     'class="progress-bar-fill" style="width: 0%;">Topic Progress</span></div>'))
                 
-                @render.ui
-                def chatLog():
-                    log = userLog.get()
-                    if log:
-                        return div(HTML(log))
-                    else:
-                        return
+                div(id="conversation")
 
         # User input, send button and wait message
         (
@@ -118,7 +112,6 @@ sessionID = reactive.value(0) # Current Shiny Session
 discussionID = reactive.value(0) # Current conversation
 conceptIndex = reactive.value(0) # Current concept index to discuss
 messages = reactive.value(None) # Raw chat messages
-userLog = reactive.value(None) # Chat shown on the page
 botLog = reactive.value(None) # Chat sent to the LLM
 
 # Stuff to run once when the session has loaded
@@ -191,10 +184,11 @@ def _():
     msg = shared.Conversation()
     msg.add_message(isBot = 1, cID = int(concepts().iloc[conceptIndex.get()]["cID"]), content = firstWelcome)
     messages.set(msg)
-    userLog.set(f"""<div id='welcome' class='botChat talk-bubble' msg='{msg.id - 1}'>
+    ui.insert_ui(
+        HTML(f"""<div id='welcome' class='botChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'>
                             <p>Hello, I'm here to help you get a basic understanding of 
                             the following topic: <b>{topics.iloc[0]["topic"]}</b>. 
-                            What do you already know about this?</p></div>""")
+                            What do you already know about this?</p></div>"""), "#conversation")
     botLog.set(f"---- PREVIOUS CONVERSATION ----\n--- MENTOR:\n{firstWelcome}")
     return tID
 
@@ -226,12 +220,8 @@ def _():
     messages.set(msg)
     # Generate chat logs
     conversation = botLog.get() + "\n---- NEW RESPONSE FROM STUDENT ----\n" + newChat
-    userLog.set(
-        userLog.get()
-        + f"<div class='userChat talk-bubble' msg='{msg.id - 1}'><p>"
-        + escape(newChat)  # prevent HTML injection from user
-        + "</p></div>"
-    )
+    ui.insert_ui(HTML(f"<div class='userChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'><p>{escape(newChat)}</p></div>"),
+                 "#conversation")    
     botLog.set(botLog.get() + f"\n--- STUDENT:\n{newChat}")
     topic = topics[topics["tID"] == int(input.selTopic())].iloc[0]["topic"]
     # Send the message to the LLM for processing
@@ -276,13 +266,8 @@ def _():
         msg.addEval(eval["score"], eval["comment"])
         msg.add_message(isBot = 1, cID = int(concepts().iloc[conceptIndex.get()]["cID"]), content = resp)
         messages.set(msg)
-
-        userLog.set(
-            userLog.get()
-            + f"<div class='botChat talk-bubble' msg='{msg.id - 1}'><p>"
-            + resp
-            + "</p></div>"
-        )
+        ui.insert_ui(HTML(f"<div class='botChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'><p>{escape(resp)}</p></div>"), 
+                     "#conversation")       
         botLog.set(botLog.get() + "\n--- MENTOR:\n" + resp)
        
         # Now the LLM has finished the user can send a new response
@@ -379,11 +364,45 @@ def _():
     conn.close()
     ui.modal_remove()
 
+# When the chat reporting button is clicked
 @reactive.effect
 @reactive.event(input.report)
 def _():
-    sel = json.loads(input.selectedMsg())
+    sel = json.loads(input.selectedMsg()) # Custom JS input selectedMsg
     if sel == []:
+        # With no messages selected
         ui.notification_show("Please select all chat messages relevant to the issue you like to report")
     else:
-        print(sel)
+        # Ask for more details
+        m = ui.modal(            
+            ui.input_radio_buttons("issueChatCode", " Pick a category", 
+                choices= {1: "Incorrect", 2: "Inappropriate", 3: "Not helpful", 
+                          4:"Not able to proceed", 5:"Other"}, inline=True),
+            ui.input_text_area("issueChatDetails", "Please provide more details", width="100%"),
+            title="Please provide some more information",
+            size="l",
+            footer=[ui.input_action_button("issueChatSubmit", "Submit"), ui.modal_button("Cancel")]
+        )
+        ui.modal_show(m)
+
+# Insert the issue into the DB
+@reactive.effect
+@reactive.event(input.issueChatSubmit)
+def _():
+    # Because multiple issues can be submitted for a single conversation, we have to commit to the
+    # DB immediately or it would become harder to keep track of TODO
+    # This means we add a temp mID which will be updated in the end
+    conn = sqlite3.connect(shared.appDB)
+    cursor = conn.cursor()
+    _ = cursor.execute('INSERT INTO issue_chat(dID,code,created,details) VALUES(?,?,?,?)',
+                       (discussionID.get(),int(input.issueChatCode()),shared.dt(),input.issueChatDetails()))
+    icID = cursor.lastrowid
+    tempID = json.loads(input.selectedMsg())
+    tempID.sort()
+    _ = cursor.executemany(f'INSERT INTO issue_chat_msg(icID,mID) VALUES({icID},?)', [(x,) for x in tempID])
+    conn.commit()
+    conn.close()
+    #Remove modal and show confirmation
+    ui.modal_remove()
+    ui.notification_show("Report successfully submitted!", duration=3)
+

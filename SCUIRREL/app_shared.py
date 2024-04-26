@@ -233,11 +233,20 @@ r'{{"score": <int>, "comment": "<>"}}'
 # Function to register the end of a discussion in the DB
 def endDiscussion(cursor, dID, messages, timeStamp = dt()):
     _ = cursor.execute(f'UPDATE discussion SET end = "{timeStamp}" WHERE dID = {dID}')
-    _ = cursor.executemany(
-        f"INSERT INTO message(dID,cID,isBot,timestamp,message,progressCode,progressMessage)" 
-        f"VALUES({dID}, ?, ?, ?, ?, ?, ?)",
-        messages.astuple(['cID','isBot', 'timeStamp','content','pCode','pMessage']),
-)
+    # Executemany is optimised in such a way that it can't return the lastrowid. 
+    # Therefor we insert the last message separately as we need to know the ID  
+    msg = messages.astuple(['cID','isBot', 'timeStamp','content','pCode','pMessage'])
+    if len(msg) > 1:
+        _ = cursor.executemany(f"INSERT INTO message(dID,cID,isBot,timestamp,message,progressCode,progressMessage)VALUES({dID}, ?, ?, ?, ?, ?, ?)",
+                           msg[:-1])
+    _ = cursor.execute(f"INSERT INTO message(dID,cID,isBot,timestamp,message,progressCode,progressMessage)VALUES({dID}, ?, ?, ?, ?, ?, ?)",
+                       msg[-1])
+    # If a chat issue was submitted, update the temp IDs to the real ones
+    idShift = cursor.lastrowid - messages.id + 1
+    if cursor.execute(f'SELECT icID FROM issue_chat WHERE dID = {dID}').fetchone():        
+        _ = cursor.execute(f'UPDATE issue_chat_msg SET mID = mID + {idShift} WHERE icID IN '
+                           f'(SELECT icID FROM issue_chat WHERE dID = {dID})')
+
 
 # --- CLASSES
 
