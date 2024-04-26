@@ -149,3 +149,25 @@ CREATE TABLE IF NOT EXISTS "backup" (
   FOREIGN KEY("sID") REFERENCES "session"("sID") 
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
+
+DROP TABLE IF EXISTS "issue_chat";
+CREATE TABLE IF NOT EXISTS "issue_chat" (
+	"icID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "dID" INTEGER NOT NULL,
+  "code" INTEGER NOT NULL,
+  "created" TEXT NOT NULL,  
+  "details" TEXT,
+  FOREIGN KEY("dID") REFERENCES "discussion"("dID") 
+	  ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+DROP TABLE IF EXISTS "issue_chat_msg";
+CREATE TABLE IF NOT EXISTS "issue_chat_msg" (
+	"icmID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "icID" INTEGER NOT NULL,
+  "mID" INTEGER NOT NULL, 
+  FOREIGN KEY("icID") REFERENCES "issue_chat"("icID") 
+	  ON DELETE CASCADE ON UPDATE CASCADE
+  -- We can't add a mID foreign key because the first time 
+  -- the value is inserted it's a placeholder which gets updated 
+);
