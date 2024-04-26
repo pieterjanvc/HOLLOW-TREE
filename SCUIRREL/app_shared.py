@@ -25,7 +25,9 @@ with open("config.toml", "r") as f:
 
 appDB = config["data"]["appDB"]
 vectorDB = config["data"]["vectorDB"]
-allowMultiGuess = any(config["settings"]["allowMultiGuess"] == x for x in ["True", "true", "T", 1])
+allowMultiGuess = any(
+    config["settings"]["allowMultiGuess"] == x for x in ["True", "true", "T", 1]
+)
 
 # Get the OpenAI API key and organistation
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
@@ -72,8 +74,9 @@ index = VectorStoreIndex.from_vector_store(vector_store)
 def dt():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+
 # Adapt the chat engine to the topic
-def chatEngine(topic,concepts,cIndex,eval):
+def chatEngine(topic, concepts, cIndex, eval):
     # TUTORIAL Llamaindex + Prompt engineering
     # https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
     # https://docs.llamaindex.ai/en/stable/examples/customization/prompts/chat_prompts/
@@ -101,21 +104,30 @@ def chatEngine(topic,concepts,cIndex,eval):
         "Original Answer: {existing_answer}"
     )
 
-    cDone = "" if cIndex == 0 else "These concepts were already covered successfully:\n* " + \
-    "\n* ".join(concepts.head(cIndex)["concept"])
+    cDone = (
+        ""
+        if cIndex == 0
+        else "These concepts were already covered successfully:\n* "
+        + "\n* ".join(concepts.head(cIndex)["concept"])
+    )
 
-    cToDo = "The following concepts still need to be discussed:\n* " + \
-    "\n* ".join(concepts[cIndex:]["concept"])
+    cToDo = "The following concepts still need to be discussed:\n* " + "\n* ".join(
+        concepts[cIndex:]["concept"]
+    )
 
-    progress = "\nBased on the conversation it seems you need to explore the current topic " + \
-             f'a bit more as you noted the following: {eval["comment"]}\n' if int(eval["score"]) < 3 else ""
+    progress = (
+        "\nBased on the conversation it seems you need to explore the current topic "
+        + f'a bit more as you noted the following: {eval["comment"]}\n'
+        if int(eval["score"]) < 3
+        else ""
+    )
 
     # System prompt
     chat_text_qa_msgs = [
         ChatMessage(
             role=MessageRole.SYSTEM,
             content=(
-f"""You (MENTOR) are chatting with a student (STUDENT) to evaluate their understanding of the following topic: 
+                f"""You (MENTOR) are chatting with a student (STUDENT) to evaluate their understanding of the following topic: 
 {topic}
 ----
 {cDone}\n\n
@@ -143,7 +155,7 @@ message for mistakes, like the use of incorrect terminology and correct if neede
         ChatMessage(
             role=MessageRole.SYSTEM,
             content=(
-"""
+                """
 If necessary, make edits to ensure the following:
 - Do not keep repeating the topic title in your answer, focus on what's currently going on
 - You should stay on topic, and make sure all sub-concepts are evaluated 
@@ -169,20 +181,24 @@ interesting
 
 
 # Adapt the chat engine to the topic
-def progressCheckEngine(conversation,topic,concepts,cIndex):   
+def progressCheckEngine(conversation, topic, concepts, cIndex):
+    cDone = (
+        ""
+        if cIndex == 0
+        else "These concepts were already covered successfully:\n* "
+        + "\n* ".join(concepts.head(cIndex)["concept"])
+    )
 
-    cDone = "" if cIndex == 0 else "These concepts were already covered successfully:\n* " + \
-    "\n* ".join(concepts.head(cIndex)["concept"])
-
-    cToDo = "The following concepts still need to be discussed:\n* " + \
-    "\n* ".join(concepts[cIndex:]["concept"])    
+    cToDo = "The following concepts still need to be discussed:\n* " + "\n* ".join(
+        concepts[cIndex:]["concept"]
+    )
 
     # System prompt
     chat_text_qa_msgs = [
         ChatMessage(
             role=MessageRole.SYSTEM,
             content=(
-f"""You are monitoring a conversation between a tutor (TUTOR) and a student (STUDENT) on following topic:  
+                f"""You are monitoring a conversation between a tutor (TUTOR) and a student (STUDENT) on following topic:  
 {topic}
 
 {cDone}\n\n
@@ -207,7 +223,7 @@ In addition you will add a short comment, based on the conversation and current 
 about what the STUDENT understands but more importantly what they still struggle with (if score < 4).
 
 Please output your score in the following format:"""
-r'{{"score": <int>, "comment": "<>"}}'
+                r'{{"score": <int>, "comment": "<>"}}'
             ),
         ),
         ChatMessage(role=MessageRole.USER),
@@ -218,7 +234,9 @@ r'{{"score": <int>, "comment": "<>"}}'
     chat_refine_msgs = [
         ChatMessage(
             role=MessageRole.SYSTEM,
-            content=(r'Make sure the output is in the following format: {{"score": <int>, "comment": "<>"}}'),
+            content=(
+                r'Make sure the output is in the following format: {{"score": <int>, "comment": "<>"}}'
+            ),
         ),
         ChatMessage(role=MessageRole.USER),
     ]
@@ -228,49 +246,91 @@ r'{{"score": <int>, "comment": "<>"}}'
         text_qa_template=text_qa_template,
         refine_template=refine_template,
         llm=llm,
-)
+    )
+
 
 # Function to register the end of a discussion in the DB
-def endDiscussion(cursor, dID, messages, timeStamp = dt()):
+def endDiscussion(cursor, dID, messages, timeStamp=dt()):
     _ = cursor.execute(f'UPDATE discussion SET end = "{timeStamp}" WHERE dID = {dID}')
-    # Executemany is optimised in such a way that it can't return the lastrowid. 
-    # Therefor we insert the last message separately as we need to know the ID  
-    msg = messages.astuple(['cID','isBot', 'timeStamp','content','pCode','pMessage'])
+    # Executemany is optimised in such a way that it can't return the lastrowid.
+    # Therefor we insert the last message separately as we need to know the ID
+    msg = messages.astuple(
+        ["cID", "isBot", "timeStamp", "content", "pCode", "pMessage"]
+    )
     if len(msg) > 1:
-        _ = cursor.executemany(f"INSERT INTO message(dID,cID,isBot,timestamp,message,progressCode,progressMessage)VALUES({dID}, ?, ?, ?, ?, ?, ?)",
-                           msg[:-1])
-    _ = cursor.execute(f"INSERT INTO message(dID,cID,isBot,timestamp,message,progressCode,progressMessage)VALUES({dID}, ?, ?, ?, ?, ?, ?)",
-                       msg[-1])
+        _ = cursor.executemany(
+            f"INSERT INTO message(dID,cID,isBot,timestamp,message,progressCode,progressMessage)VALUES({dID}, ?, ?, ?, ?, ?, ?)",
+            msg[:-1],
+        )
+    _ = cursor.execute(
+        f"INSERT INTO message(dID,cID,isBot,timestamp,message,progressCode,progressMessage)VALUES({dID}, ?, ?, ?, ?, ?, ?)",
+        msg[-1],
+    )
     # If a chat issue was submitted, update the temp IDs to the real ones
     idShift = cursor.lastrowid - messages.id + 1
-    if cursor.execute(f'SELECT icID FROM issue_chat WHERE dID = {dID}').fetchone():        
-        _ = cursor.execute(f'UPDATE issue_chat_msg SET mID = mID + {idShift} WHERE icID IN '
-                           f'(SELECT icID FROM issue_chat WHERE dID = {dID})')
+    if cursor.execute(f"SELECT icID FROM issue_chat WHERE dID = {dID}").fetchone():
+        _ = cursor.execute(
+            f"UPDATE issue_chat_msg SET mID = mID + {idShift} WHERE icID IN "
+            f"(SELECT icID FROM issue_chat WHERE dID = {dID})"
+        )
 
 
 # --- CLASSES
+
 
 # Messages and conversation
 class Conversation:
     def __init__(self):
         self.id = 0
-        columns = {"id": int,"cID": int, "isBot": int, "timeStamp": str, "content": str, "pCode": str, "pMessage": str}
+        columns = {
+            "id": int,
+            "cID": int,
+            "isBot": int,
+            "timeStamp": str,
+            "content": str,
+            "pCode": str,
+            "pMessage": str,
+        }
         self.messages = pd.DataFrame(columns=columns.keys()).astype(columns)
 
-    def add_message(self, cID: int, isBot: int, content: str, pCode: int = None, pMessage: str = None, timeStamp: str = None):
+    def add_message(
+        self,
+        cID: int,
+        isBot: int,
+        content: str,
+        pCode: int = None,
+        pMessage: str = None,
+        timeStamp: str = None,
+    ):
         timeStamp = timeStamp if timeStamp else dt()
-        self.messages = pd.concat([self.messages, 
-                                pd.DataFrame.from_dict({"id": [self.id], "cID": [cID], "timeStamp": [timeStamp], 
-                                                        "isBot": [isBot], "content": [content], "pCode": [pCode], "pMessage": [pMessage]})],
-                                                        ignore_index=True)
+        self.messages = pd.concat(
+            [
+                self.messages,
+                pd.DataFrame.from_dict(
+                    {
+                        "id": [self.id],
+                        "cID": [cID],
+                        "timeStamp": [timeStamp],
+                        "isBot": [isBot],
+                        "content": [content],
+                        "pCode": [pCode],
+                        "pMessage": [pMessage],
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )
         self.id += 1
 
     def addEval(self, score, comment):
         self.messages.at[self.messages.index[-1], "pCode"] = score
         self.messages.at[self.messages.index[-1], "pMessage"] = comment
 
-    def astuple(self, order = None):
-        if order is not None and (set(['cID','isBot', 'timeStamp','content','pCode','pMessage']) != set(order)):
+    def astuple(self, order=None):
+        if order is not None and (
+            set(["cID", "isBot", "timeStamp", "content", "pCode", "pMessage"])
+            != set(order)
+        ):
             raise ValueError("messages order not correct")
         out = self.messages.drop(columns=["id"])
         if order:

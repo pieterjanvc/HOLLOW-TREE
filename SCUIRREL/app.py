@@ -35,9 +35,12 @@ conn.close()
 # ********************
 
 ui.page_opts(fillable=True)
-ui.head_content(ui.include_css("www/styles.css"), ui.include_js("www/custom.js", method="inline"))
+ui.head_content(
+    ui.include_css("www/styles.css"), ui.include_js("www/custom.js", method="inline")
+)
 
 # --- CUSTOM JS FUNCTIONS (Python side) ---
+
 
 # This function allows you to hide/show/disable/enable elements by ID or data-value
 # The latter is needed because tabs don't use ID's but data-value
@@ -45,6 +48,8 @@ def elementDisplay(id, effect):
     @reactive.effect
     async def _():
         await session.send_custom_message("hideShow", {"id": id, "effect": effect})
+
+
 # Update a custom, simple progress bar
 def progressBar(id, percent):
     @reactive.effect
@@ -71,13 +76,22 @@ with ui.navset_pill(id="tab"):
                      research purposes so don't share any personal information and keep to the topic at hand.</i></p>""")
             with ui.card(id="topicSelection"):
                 ui.card_header("Pick a topic")
-                ui.input_select("selTopic", None, choices=[], width="600px"), 
-                ui.input_action_button("quiz", "Give me a quiz question", width="250px", style="display:none;")
+                (ui.input_select("selTopic", None, choices=[], width="600px"),)
+                ui.input_action_button(
+                    "quiz",
+                    "Give me a quiz question",
+                    width="250px",
+                    style="display:none;",
+                )
 
             with ui.card(id="chatWindow", height="45vh"):
-                ui.card_header(HTML('<div class="progress-bar"><span id="chatProgress"'
-                                    'class="progress-bar-fill" style="width: 0%;">Topic Progress</span></div>'))
-                
+                ui.card_header(
+                    HTML(
+                        '<div class="progress-bar"><span id="chatProgress"'
+                        'class="progress-bar-fill" style="width: 0%;">Topic Progress</span></div>'
+                    )
+                )
+
                 div(id="conversation")
 
         # User input, send button and wait message
@@ -86,7 +100,8 @@ with ui.navset_pill(id="tab"):
                 ui.input_text_area(
                     "newChat", "", value="", width="100%", spellcheck=True, resize=False
                 ),
-                ui.input_action_button("send", "Send"), ui.input_action_button("report", "Report issue"),
+                ui.input_action_button("send", "Send"),
+                ui.input_action_button("report", "Report issue"),
                 id="chatIn",
             ),
         )
@@ -108,15 +123,15 @@ with ui.navset_pill(id="tab"):
 
 # --- REACTIVE VARIABLES & FUNCTIONS ---
 
-sessionID = reactive.value(0) # Current Shiny Session
-discussionID = reactive.value(0) # Current conversation
-conceptIndex = reactive.value(0) # Current concept index to discuss
-messages = reactive.value(None) # Raw chat messages
-botLog = reactive.value(None) # Chat sent to the LLM
+sessionID = reactive.value(0)  # Current Shiny Session
+discussionID = reactive.value(0)  # Current conversation
+conceptIndex = reactive.value(0)  # Current concept index to discuss
+messages = reactive.value(None)  # Raw chat messages
+botLog = reactive.value(None)  # Chat sent to the LLM
 
 # Stuff to run once when the session has loaded
-if hasattr(session, "_process_ui"):    
-    #Register the session start in the DB
+if hasattr(session, "_process_ui"):
+    # Register the session start in the DB
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
     # For now we only have anonymous users (appID 0 -> SCUIRREL)
@@ -130,25 +145,30 @@ if hasattr(session, "_process_ui"):
     sessionID.set(sID)
     # Set the topics
     ui.update_select("selTopic", choices=dict(zip(topics["tID"], topics["topic"])))
-        
+
 
 # Code to run at the END of the session (i.e. when user disconnects)
 _ = session.on_ended(lambda: theEnd())
+
+
 def theEnd():
     # Isolate so we can use the final values of reactive variables
     with reactive.isolate():
         dID = discussionID.get()
-        msg = messages.get()    
+        msg = messages.get()
         sID = sessionID.get()
         # AUpdate the database
         conn = sqlite3.connect(shared.appDB)
-        cursor = conn.cursor()        
+        cursor = conn.cursor()
         # Log current discussion
-        shared.endDiscussion(cursor, dID, msg)  
-        # Register the end of the session  
-        _ = cursor.execute(f'UPDATE session SET end = "{shared.dt()}" WHERE sID = {sID}')
+        shared.endDiscussion(cursor, dID, msg)
+        # Register the end of the session
+        _ = cursor.execute(
+            f'UPDATE session SET end = "{shared.dt()}" WHERE sID = {sID}'
+        )
         conn.commit()
         conn.close()
+
 
 @reactive.effect
 @reactive.event(input.selTopic)
@@ -156,58 +176,69 @@ def _():
     tID = topics[topics["tID"] == int(input.selTopic())].iloc[0]["tID"]
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
-    #Save the logs for the previous discussion (if any)
+    # Save the logs for the previous discussion (if any)
     if messages.get():
         shared.endDiscussion(cursor, discussionID.get(), messages.get())
-        elementDisplay("chatIn", "s") # In case hidden if previous finished
-    
-    #Register the start of the  new topic discussion
+        elementDisplay("chatIn", "s")  # In case hidden if previous finished
+
+    # Register the start of the  new topic discussion
     _ = cursor.execute(
         "INSERT INTO discussion (tID, sID, start)"
         f'VALUES({tID}, {sessionID.get()}, "{shared.dt()}")'
     )
     discussionID.set(int(cursor.lastrowid))
-    #Only show the quiz button if there are any questions
-    if cursor.execute(f"SELECT qID FROM question where tID = {tID} AND archived = 0").fetchone():
+    # Only show the quiz button if there are any questions
+    if cursor.execute(
+        f"SELECT qID FROM question where tID = {tID} AND archived = 0"
+    ).fetchone():
         elementDisplay("quiz", "s")
     else:
         elementDisplay("quiz", "h")
-    
+
     conn.commit()
     conn.close()
     # The first message is not generated by the bot
     firstWelcome = (
-    'Hello, I\'m here to help you get a basic understanding of the following topic: '
-    f'{topics.iloc[0]["topic"]}. What do you already know about this?'
+        'Hello, I\'m here to help you get a basic understanding of the following topic: '
+        f'{topics.iloc[0]["topic"]}. What do you already know about this?'
     )
 
     msg = shared.Conversation()
-    msg.add_message(isBot = 1, cID = int(concepts().iloc[conceptIndex.get()]["cID"]), content = firstWelcome)
+    msg.add_message(
+        isBot=1,
+        cID=int(concepts().iloc[conceptIndex.get()]["cID"]),
+        content=firstWelcome,
+    )
     messages.set(msg)
     ui.insert_ui(
         HTML(f"""<div id='welcome' class='botChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'>
                             <p>Hello, I'm here to help you get a basic understanding of 
                             the following topic: <b>{topics.iloc[0]["topic"]}</b>. 
-                            What do you already know about this?</p></div>"""), "#conversation")
+                            What do you already know about this?</p></div>"""),
+        "#conversation",
+    )
     botLog.set(f"---- PREVIOUS CONVERSATION ----\n--- MENTOR:\n{firstWelcome}")
     return tID
+
 
 # Get the concepts related to the topic
 @reactive.calc
 def concepts():
     conn = sqlite3.connect(shared.appDB)
     concepts = pd.read_sql_query(
-        f"SELECT * FROM concept WHERE tID = {int(input.selTopic())} AND archived = 0", conn
+        f"SELECT * FROM concept WHERE tID = {int(input.selTopic())} AND archived = 0",
+        conn,
     )
     conn.close()
     return concepts
+
 
 # When the send button is clicked...
 @reactive.effect
 @reactive.event(input.send)
 def _():
     newChat = input.newChat()
-    # Ignore empty chat    
+    # Ignore empty chat
     if (newChat == "") | (newChat.isspace()):
         return
 
@@ -216,23 +247,29 @@ def _():
     elementDisplay("chatIn", "h")
     # Add the user message
     msg = messages.get()
-    msg.add_message(isBot = 0, cID = int(concepts().iloc[conceptIndex.get()]["cID"]), content = newChat)
+    msg.add_message(
+        isBot=0, cID=int(concepts().iloc[conceptIndex.get()]["cID"]), content=newChat
+    )
     messages.set(msg)
     # Generate chat logs
     conversation = botLog.get() + "\n---- NEW RESPONSE FROM STUDENT ----\n" + newChat
-    ui.insert_ui(HTML(f"<div class='userChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'><p>{escape(newChat)}</p></div>"),
-                 "#conversation")    
+    ui.insert_ui(
+        HTML(
+            f"<div class='userChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'><p>{escape(newChat)}</p></div>"
+        ),
+        "#conversation",
+    )
     botLog.set(botLog.get() + f"\n--- STUDENT:\n{newChat}")
     topic = topics[topics["tID"] == int(input.selTopic())].iloc[0]["topic"]
     # Send the message to the LLM for processing
-    botResponse(topic,concepts(),conceptIndex.get(), conversation)
+    botResponse(topic, concepts(), conceptIndex.get(), conversation)
 
 
 # Async Shiny task waiting for LLM reply
 @reactive.extended_task
-async def botResponse(topic,concepts,cIndex, conversation):
+async def botResponse(topic, concepts, cIndex, conversation):
     # Check the student's progress on the current concept based on the last reply (other engine)
-    engine = shared.progressCheckEngine(conversation,topic,concepts,cIndex)
+    engine = shared.progressCheckEngine(conversation, topic, concepts, cIndex)
     eval = json.loads(str(engine.query(conversation)))
     # See if the LLM thinks we can move on to the next concept or or not
     if int(eval["score"]) > 2:
@@ -241,70 +278,91 @@ async def botResponse(topic,concepts,cIndex, conversation):
     if cIndex > concepts.shape[0]:
         resp = f"Well done! It seems you have demonstrated understanding of everything we wanted you to know about: {topic}"
         elementDisplay("chatIn", "h")
-    else:    
-        engine = shared.chatEngine(topic,concepts,cIndex,eval)
+    else:
+        engine = shared.chatEngine(topic, concepts, cIndex, eval)
         resp = str(engine.query(conversation))
-    
+
     return {"resp": resp, "eval": eval}
 
 
 # Processing LLM responses
 @reactive.effect
 def _():
-    result = botResponse.result()    
-    eval = result["eval"] # Evaluation of last response and progress
-    resp = result["resp"] # New response to student
+    result = botResponse.result()
+    eval = result["eval"]  # Evaluation of last response and progress
+    resp = result["resp"]  # New response to student
 
     with reactive.isolate():
         # Check the topic progress and move on to next concept if current one scored well
         if int(eval["score"]) > 2:
-            i = conceptIndex.get()+1
+            i = conceptIndex.get() + 1
             progressBar("chatProgress", int(100 * i / concepts().shape[0]))
-            conceptIndex.set(i)            
+            conceptIndex.set(i)
         # Add the evaluation of the student's last reply to the log
         msg = messages.get()
         msg.addEval(eval["score"], eval["comment"])
-        msg.add_message(isBot = 1, cID = int(concepts().iloc[conceptIndex.get()]["cID"]), content = resp)
+        msg.add_message(
+            isBot=1, cID=int(concepts().iloc[conceptIndex.get()]["cID"]), content=resp
+        )
         messages.set(msg)
-        ui.insert_ui(HTML(f"<div class='botChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'><p>{escape(resp)}</p></div>"), 
-                     "#conversation")       
+        ui.insert_ui(
+            HTML(
+                f"<div class='botChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'><p>{escape(resp)}</p></div>"
+            ),
+            "#conversation",
+        )
         botLog.set(botLog.get() + "\n--- MENTOR:\n" + resp)
-       
+
         # Now the LLM has finished the user can send a new response
         elementDisplay("waitResp", "h")
         elementDisplay("chatIn", "s")
         ui.update_text_area("newChat", value="")
 
+
 # -- QUIZ
- 
+
 quizQuestion = reactive.value()
+
 
 # Clicking the quiz button shows a modal
 @reactive.effect
 @reactive.event(input.quiz)
 def _():
-
     # Get a random question on the topic from the DB
     conn = sqlite3.connect(shared.appDB)
-    q = pd.read_sql_query(f"SELECT * FROM question WHERE tID = {int(input.selTopic())} AND archived = 0", conn)
+    q = pd.read_sql_query(
+        f"SELECT * FROM question WHERE tID = {int(input.selTopic())} AND archived = 0",
+        conn,
+    )
     conn.close()
     q = q.sample(1).iloc[0].to_dict()
-    q["start"] =  shared.dt()   
+    q["start"] = shared.dt()
 
     # UI for the quiz question popup (saved as a variable)
     @render.express
-    def quizUI(): 
+    def quizUI():
         HTML(f'<b>{q["question"]}</b><br><br>')
-        ui.input_radio_buttons("quizOptions", None, width="100%", 
-                                choices={"X":HTML("<i>Select an option below:</i>"),"A": q["optionA"],"B": q["optionB"],
-                                        "C": q["optionC"],"D": q["optionD"]})
-        ui.input_action_button("checkAnswer", "Check answer")    
+        ui.input_radio_buttons(
+            "quizOptions",
+            None,
+            width="100%",
+            choices={
+                "X": HTML("<i>Select an option below:</i>"),
+                "A": q["optionA"],
+                "B": q["optionB"],
+                "C": q["optionC"],
+                "D": q["optionD"],
+            },
+        )
+        ui.input_action_button("checkAnswer", "Check answer")
+
         @render.ui
         def _():
             return checkAnswer()
+
     # The modal
-    m = ui.modal(        
-        quizUI,        
+    m = ui.modal(
+        quizUI,
         title="Test your knowledge",
         easy_close=False,
         size="l",
@@ -312,7 +370,7 @@ def _():
     )
     ui.modal_show(m)
     quizQuestion.set(q)
-    
+
 
 # Clicking the check answer button will show result + explanation
 @reactive.calc
@@ -321,33 +379,36 @@ def checkAnswer():
     # User must select a valid option
     if input.quizOptions() == "X":
         return HTML("<hr><i>Select an option first!</i>")
-    
+
     # Check Answer
     q = quizQuestion.get()
     correct = input.quizOptions() == q["answer"]
-    q["response"] =  input.quizOptions()
-    q["correct"] =  correct + 0 # Convert to integer
+    q["response"] = input.quizOptions()
+    q["correct"] = correct + 0  # Convert to integer
     # Add the response to the database
 
     # Hide the answer button (don't allow for multiple guessing)
     if not shared.allowMultiGuess:
         elementDisplay("checkAnswer", "h")
-    
+
     # Add the timestamp the answer was checked
-    q["check"] =  shared.dt()
+    q["check"] = shared.dt()
     quizQuestion.set(q)
 
-    return HTML(f'<hr><h3>{"Correct!" if correct else "Incorrect..."}</h3>'
-                f'{q["explanation" + input.quizOptions()]}')
+    return HTML(
+        f'<hr><h3>{"Correct!" if correct else "Incorrect..."}</h3>'
+        f'{q["explanation" + input.quizOptions()]}'
+    )
+
 
 @reactive.effect
 @reactive.event(input.qClose)
 def _():
     q = quizQuestion.get()
-    
+
     # Handle the case where user returns before checking an answer
     if "check" not in q:
-        q["check"] = "NULL"  
+        q["check"] = "NULL"
         q["response"] = "NULL"
         q["correct"] = "NULL"
     else:
@@ -357,33 +418,53 @@ def _():
     # Add the response to the DB
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
-    _ = cursor.execute('INSERT INTO response (sID, qID, "response", "correct", "start", "check", "end") '
-                   f'VALUES({sessionID()}, {q["qID"]}, {q["response"]}, {q["correct"]},'
-                   f'"{q["start"]}",{q["check"]},"{shared.dt()}")')
+    _ = cursor.execute(
+        'INSERT INTO response (sID, qID, "response", "correct", "start", "check", "end") '
+        f'VALUES({sessionID()}, {q["qID"]}, {q["response"]}, {q["correct"]},'
+        f'"{q["start"]}",{q["check"]},"{shared.dt()}")'
+    )
     conn.commit()
     conn.close()
     ui.modal_remove()
+
 
 # When the chat reporting button is clicked
 @reactive.effect
 @reactive.event(input.report)
 def _():
-    sel = json.loads(input.selectedMsg()) # Custom JS input selectedMsg
+    sel = json.loads(input.selectedMsg())  # Custom JS input selectedMsg
     if sel == []:
         # With no messages selected
-        ui.notification_show("Please select all chat messages relevant to the issue you like to report")
+        ui.notification_show(
+            "Please select all chat messages relevant to the issue you like to report"
+        )
     else:
         # Ask for more details
-        m = ui.modal(            
-            ui.input_radio_buttons("issueChatCode", " Pick a category", 
-                choices= {1: "Incorrect", 2: "Inappropriate", 3: "Not helpful", 
-                          4:"Not able to proceed", 5:"Other"}, inline=True),
-            ui.input_text_area("issueChatDetails", "Please provide more details", width="100%"),
+        m = ui.modal(
+            ui.input_radio_buttons(
+                "issueChatCode",
+                " Pick a category",
+                choices={
+                    1: "Incorrect",
+                    2: "Inappropriate",
+                    3: "Not helpful",
+                    4: "Not able to proceed",
+                    5: "Other",
+                },
+                inline=True,
+            ),
+            ui.input_text_area(
+                "issueChatDetails", "Please provide more details", width="100%"
+            ),
             title="Please provide some more information",
             size="l",
-            footer=[ui.input_action_button("issueChatSubmit", "Submit"), ui.modal_button("Cancel")]
+            footer=[
+                ui.input_action_button("issueChatSubmit", "Submit"),
+                ui.modal_button("Cancel"),
+            ],
         )
         ui.modal_show(m)
+
 
 # Insert the issue into the DB
 @reactive.effect
@@ -394,15 +475,23 @@ def _():
     # This means we add a temp mID which will be updated in the end
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
-    _ = cursor.execute('INSERT INTO issue_chat(dID,code,created,details) VALUES(?,?,?,?)',
-                       (discussionID.get(),int(input.issueChatCode()),shared.dt(),input.issueChatDetails()))
+    _ = cursor.execute(
+        "INSERT INTO issue_chat(dID,code,created,details) VALUES(?,?,?,?)",
+        (
+            discussionID.get(),
+            int(input.issueChatCode()),
+            shared.dt(),
+            input.issueChatDetails(),
+        ),
+    )
     icID = cursor.lastrowid
     tempID = json.loads(input.selectedMsg())
     tempID.sort()
-    _ = cursor.executemany(f'INSERT INTO issue_chat_msg(icID,mID) VALUES({icID},?)', [(x,) for x in tempID])
+    _ = cursor.executemany(
+        f"INSERT INTO issue_chat_msg(icID,mID) VALUES({icID},?)", [(x,) for x in tempID]
+    )
     conn.commit()
     conn.close()
-    #Remove modal and show confirmation
+    # Remove modal and show confirmation
     ui.modal_remove()
     ui.notification_show("Report successfully submitted!", duration=3)
-
