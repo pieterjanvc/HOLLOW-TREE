@@ -10,8 +10,10 @@ import app_shared as shared
 
 # -- General
 import sqlite3
+import duckdb
 import pandas as pd
 import json
+import warnings
 
 # -- Llamaindex
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate
@@ -88,7 +90,7 @@ with ui.navset_pill(id="tab"):
             @render.data_frame
             def filesTable():
                 return render.DataTable(
-                    files.get(), width="100%", row_selection_mode="single"
+                    files.get(), width="100%", selection_mode="row"
                 )
 
         # Option to add bew files
@@ -119,7 +121,7 @@ with ui.navset_pill(id="tab"):
                     return render.DataTable(
                         concepts.get()[["concept"]],
                         width="100%",
-                        row_selection_mode="single",
+                        selection_mode="row",
                     )
 
                 div(
@@ -209,8 +211,10 @@ with ui.navset_pill(id="tab"):
 
 sessionID = reactive.value(0)
 
-conn = sqlite3.connect(shared.appDB)
-files = pd.read_sql_query("SELECT * FROM file", conn)
+conn = duckdb.connect(shared.vectorDB)
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    files = pd.read_sql_query("SELECT * FROM file", conn)
 conn.close()
 
 # Hide the topic and question tab if the vector database is empty and show welcome message
@@ -616,7 +620,6 @@ def _():
     updateVectorDB(
         input.newFile()[0]["datapath"],
         shared.vectorDB,
-        shared.appDB,
         shared.storageFolder,
         input.newFile()[0]["name"],
     )
@@ -631,9 +634,9 @@ def _():
 
 
 @reactive.extended_task
-async def updateVectorDB(newFile, vectorDB, appDB, storageFolder, newFileName):
+async def updateVectorDB(newFile, vectorDB, storageFolder, newFileName):
     print("Start adding file...")
-    return shared.addFileToDB(newFile, vectorDB, appDB, storageFolder, newFileName)
+    return shared.addFileToDB(newFile, vectorDB, storageFolder, newFileName)
 
 
 @reactive.effect

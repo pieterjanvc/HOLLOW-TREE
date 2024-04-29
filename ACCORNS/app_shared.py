@@ -71,7 +71,7 @@ def createAppDB(DBpath, addDemo=False):
         return (1, "Database already exists. Skipping")
 
     # Create a new database from the SQL file
-    with open("appDB/createDB.sql", "r") as file:
+    with open("appDB/createAppDB.sql", "r") as file:
         query = file.read().replace("\n", " ").replace("\t", "").split(";")
 
     conn = sqlite3.connect(DBpath)
@@ -130,9 +130,7 @@ print(createAppDB(appDB, addDemo=addDemo))
 
 
 # Create DuckDB vector database and add files
-def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
-    if not os.path.exists(appDB):
-        raise ConnectionError("The appDB was not found")
+def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
 
     # In case the file is a URL download it first
     isURL = False
@@ -167,7 +165,7 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
     if (storageFolder is None) & isURL:
         os.remove(newFile)
 
-    # Build the vector store https://docs.llamaindex.ai/en/stable/examples/vector_stores/DuckDBDemo/?h=duckdb
+    # Add file to vector store https://docs.llamaindex.ai/en/stable/examples/vector_stores/DuckDBDemo/?h=duckdb
     if os.path.exists(vectorDB):
         vector_store = DuckDBVectorStore.from_local(vectorDB)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
@@ -186,6 +184,19 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
             storage_context=storage_context,
             transformations=[TitleExtractor(), KeywordExtractor()],
         )
+
+        # Add the a custom file info and keywords table
+        with open("appDB/expandVectorDB.sql", "r") as file:
+            query = file.read().replace("\n", " ").replace("\t", "").split(";")
+
+        conn = duckdb.connect("../appData/vectordb.duckdb")
+        cursor = conn.cursor()
+
+        for x in query:
+            _ = cursor.execute(x)
+
+        cursor.commit()
+        conn.close()
 
     # Get the metadata out of the DB excerpt_keywords document_title
     fileName = newData[0].metadata["file_name"]
@@ -213,17 +224,17 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
     )
     docSum = json.loads(str(index.as_query_engine().query(docSum)))
 
-    conn = sqlite3.connect(appDB)
+    conn = duckdb.connect(vectorDB)
     cursor = conn.cursor()
     _ = cursor.execute(
         (
-            'INSERT INTO file(fileName, title, subtitle, created) '
-            f'VALUES("{fileName}", "{docSum["title"]}", "{docSum["subtitle"]}", "{dt()}")'
+            'INSERT INTO file(fID, fileName, title, subtitle, created) '
+            f"VALUES(nextval('seq_fID'), '{fileName}', '{docSum['title']}', '{docSum['subtitle']}', '{dt()}')"
         )
     )
-    fID = cursor.lastrowid
+    fID = cursor.execute("SELECT currval('seq_fID')").fetchall()[0][0]
     _ = cursor.executemany(
-        "INSERT INTO keyword(fID, keyword) " f'VALUES("{fID}", ?)',
+        "INSERT INTO keyword(kID, fID, keyword) " f"VALUES(nextval('seq_kID'),'{fID}', ?)",
         [(item,) for item in docSum["keywords"]],
     )
     conn.commit()
@@ -236,7 +247,7 @@ def addFileToDB(newFile, vectorDB, appDB, storageFolder=None, newFileName=None):
 # TODO Replace URL once public!
 if addDemo & (not os.path.exists(vectorDB)):
     newFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
-    addFileToDB(newFile, vectorDB, appDB)
+    addFileToDB(newFile, vectorDB)
 
 
 def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=dt()):

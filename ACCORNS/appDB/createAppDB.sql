@@ -72,25 +72,6 @@ CREATE TABLE IF NOT EXISTS "message" (
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-DROP TABLE IF EXISTS "file";
-CREATE TABLE IF NOT EXISTS "file" (
-	"fID" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "fileName" TEXT,
-  "title" TEXT,
-  "subtitle" TEXT,
-	"created" TEXT,
-  "modified" TEXT
-);
-
-DROP TABLE IF EXISTS "keyword";
-CREATE TABLE IF NOT EXISTS "keyword" (
-  "kID" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "fID" INTEGER,
-  "keyword" TEXT,
-  FOREIGN KEY("fID") REFERENCES "file"("fID") 
-	  ON DELETE CASCADE ON UPDATE CASCADE
-);
-
 DROP TABLE IF EXISTS "question";
 CREATE TABLE IF NOT EXISTS "question" (
 	"qID" INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,6 +142,8 @@ CREATE TABLE IF NOT EXISTS "issue_chat" (
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- We can't add a mID foreign key because the first time 
+-- the value is inserted it's a placeholder which gets updated 
 DROP TABLE IF EXISTS "issue_chat_msg";
 CREATE TABLE IF NOT EXISTS "issue_chat_msg" (
 	"icmID" INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,6 +151,4 @@ CREATE TABLE IF NOT EXISTS "issue_chat_msg" (
   "mID" INTEGER NOT NULL, 
   FOREIGN KEY("icID") REFERENCES "issue_chat"("icID") 
 	  ON DELETE CASCADE ON UPDATE CASCADE
-  -- We can't add a mID foreign key because the first time 
-  -- the value is inserted it's a placeholder which gets updated 
 );
