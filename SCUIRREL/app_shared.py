@@ -37,12 +37,12 @@ llm = OpenAI(model=gptModel)
 
 if not os.path.exists(appDB):
     raise ConnectionError(
-        "The app database was not found. Please run the admin app first"
+        "The app database was not found. Please run ACCORNS first"
     )
 
 if not os.path.exists(vectorDB):
     raise ConnectionError(
-        "The vector database was not found. Please run the admin app first"
+        "The vector database was not found. Please run ACCORNS first"
     )
 
 if os.environ["OPENAI_API_KEY"] is None:

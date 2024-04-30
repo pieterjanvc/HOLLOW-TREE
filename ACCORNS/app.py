@@ -10,8 +10,10 @@ import app_shared as shared
 
 # -- General
 import sqlite3
+import duckdb
 import pandas as pd
 import json
+import warnings
 
 # -- Llamaindex
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate
@@ -20,7 +22,7 @@ from llama_index.vector_stores.duckdb import DuckDBVectorStore
 
 # -- Shiny
 from shiny import reactive
-from shiny.express import input, render, ui, session
+from shiny.express import input, render, ui, session, output
 from htmltools import HTML, div
 
 # The following is needed to prevent async issues when inserting new data in vector DB
@@ -88,8 +90,15 @@ with ui.navset_pill(id="tab"):
             @render.data_frame
             def filesTable():
                 return render.DataTable(
-                    files.get(), width="100%", row_selection_mode="single"
+                    files.get()[["title", "fileName"]], width="100%", selection_mode="row"
                 )
+        with ui.card(id="fileInfoCard"):
+            ui.card_header("File info")
+
+            @render.ui
+            def fileDetailsUI():
+                return fileInfo()
+
 
         # Option to add bew files
         with ui.card():
@@ -119,7 +128,7 @@ with ui.navset_pill(id="tab"):
                     return render.DataTable(
                         concepts.get()[["concept"]],
                         width="100%",
-                        row_selection_mode="single",
+                        selection_mode="row",
                     )
 
                 div(
@@ -209,8 +218,10 @@ with ui.navset_pill(id="tab"):
 
 sessionID = reactive.value(0)
 
-conn = sqlite3.connect(shared.appDB)
-files = pd.read_sql_query("SELECT * FROM file", conn)
+conn = duckdb.connect(shared.vectorDB)
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    files = pd.read_sql_query("SELECT * FROM file", conn)
 conn.close()
 
 # Hide the topic and question tab if the vector database is empty and show welcome message
@@ -503,8 +514,8 @@ def _():
 @reactive.effect
 @reactive.event(input.cEdit)
 def _():
-    if input.conceptsTable_selected_rows() != ():
-        concept = concepts.get().iloc[input.conceptsTable_selected_rows()]["concept"]
+    if not conceptsTable.data_view(selected=True).empty:    
+        concept = conceptsTable.data_view(selected=True).iloc[0]["concept"]
         m = ui.modal(
             ui.tags.p(
                 HTML(
@@ -512,7 +523,7 @@ def _():
                     "Otherwise add or delete instead</i>"
                 )
             ),
-            ui.input_text("ecInput", "New concept:", width="100%", value=concept),
+            ui.input_text("ecInput", "Edit concept:", width="100%", value=concept),
             title="Edit and existing topic",
             easy_close=True,
             size="l",
@@ -537,11 +548,8 @@ def _():
             "afterEnd",
         )
         return
-
-    if (
-        concepts.get().iloc[input.conceptsTable_selected_rows()]["concept"]
-        == input.ecInput()
-    ):
+    concept = conceptsTable.data_view(selected=True).iloc[0]["concept"]
+    if ( concept == input.ecInput()):
         ui.remove_ui("#noGoodConcept")
         ui.insert_ui(
             HTML("<div id=noGoodConcept style='color: red'>No change detected</div>"),
@@ -551,7 +559,7 @@ def _():
         return
 
     # Update the DB
-    cID = concepts.get().iloc[input.conceptsTable_selected_rows()]["cID"]
+    cID = concepts.get().iloc[conceptsTable.data_view(selected=True).index[0]]["cID"]
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
     # Backup old value
@@ -575,10 +583,10 @@ def _():
 @reactive.effect
 @reactive.event(input.cArchive)
 def _():
-    if input.conceptsTable_selected_rows() == ():
+    if conceptsTable.data_view(selected=True).empty:
         return
 
-    cID = concepts.get().iloc[input.conceptsTable_selected_rows()]["cID"]
+    cID = concepts.get().iloc[conceptsTable.data_view(selected=True).index[0]]["cID"]
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
     _ = cursor.execute(
@@ -592,7 +600,6 @@ def _():
     conn.close()
 
     concepts.set(conceptList)
-
 
 @reactive.effect
 @reactive.event(input.tID)
@@ -608,7 +615,6 @@ def _():
 
 # ---- VECTOR DATABASE ----
 
-
 @reactive.effect
 @reactive.event(input.newFile, ignore_init=True)
 def _():
@@ -616,7 +622,6 @@ def _():
     updateVectorDB(
         input.newFile()[0]["datapath"],
         shared.vectorDB,
-        shared.appDB,
         shared.storageFolder,
         input.newFile()[0]["name"],
     )
@@ -631,9 +636,9 @@ def _():
 
 
 @reactive.extended_task
-async def updateVectorDB(newFile, vectorDB, appDB, storageFolder, newFileName):
+async def updateVectorDB(newFile, vectorDB, storageFolder, newFileName):
     print("Start adding file...")
-    return shared.addFileToDB(newFile, vectorDB, appDB, storageFolder, newFileName)
+    return shared.addFileToDB(newFile, vectorDB, storageFolder, newFileName)
 
 
 @reactive.effect
@@ -660,6 +665,29 @@ def _():
     ui.insert_ui(uiUploadFile, "#processFile", "afterEnd")
     ui.remove_ui("#processFile")
 
+# Get file details
+@reactive.calc
+def fileInfo():
+    if filesTable.data_view(selected=True).empty:
+        # elementDisplay("fileInfoCard", "h")
+        return
+    
+    info = files().iloc[filesTable.data_view(selected=True).index[0]]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        conn = duckdb.connect(shared.vectorDB)
+        keywords = pd.read_sql_query(f"SELECT keyword FROM keyword WHERE fID = {info.fID}", conn)
+        conn.close()    
+    keywords = "; ".join(keywords["keyword"])
+    # elementDisplay("fileInfoCard", "s")
+
+    return HTML(f"<h4>{info.fileName}</h4><ul>"
+                f"<li><b>Summary title</b> <i>(AI generated)</i>: {info.title}</li>"
+                f"<li><b>Summary subtitle</b> <i>(AI generated)</i>: {info.subtitle}</li>"
+                f"<li><b>Uploaded</b>: {info.created}</li></ul>"
+                "<p><b>Top-10 keywords extracted from document</b> <i>(AI generated)</i></p>"
+                f"{keywords}")
+    
 
 # ---- QUIZ QUESTIONS ----
 
