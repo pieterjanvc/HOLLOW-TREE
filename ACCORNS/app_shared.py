@@ -102,17 +102,25 @@ def createAppDB(DBpath, addDemo=False):
     # Add topic concepts (to be removed later)
     concepts = [
         ("Central dogma of molecular biology: DNA → RNA → Protein",),
-        ("DNA: Composed of adenine (A), cytosine (C), guanine (G), and thymine (T); Blueprint of life",),
+        (
+            "DNA: Composed of adenine (A), cytosine (C), guanine (G), and thymine (T); Blueprint of life",
+        ),
         ("Genes: Hold code for specific proteins",),
         ("RNA: Composed of nucleotides (including uracil, U); Single-stranded",),
-        ("Transcription: RNA polymerase unwinds DNA double helix; Synthesizes complementary RNA strand",),
+        (
+            "Transcription: RNA polymerase unwinds DNA double helix; Synthesizes complementary RNA strand",
+        ),
         ("Messenger RNA (mRNA): Carries genetic code from nucleus to cytoplasm",),
         ("RNA splicing: Removes introns; Retains exons",),
-        ("Translation: Occurs in ribosomes; Deciphers mRNA to assemble protein", ),
-        ("Codons: Three-nucleotide sequences; Specify amino acids or signal start/termination of translation", ),
-        ("Amino acids: Building blocks of proteins; Linked by peptide bonds", ),
-        ("Protein folding: Adopts specific three-dimensional structure", ),
-        ("Post-translational modifications: Addition of chemical groups; Cleavage of specific segments", ),
+        ("Translation: Occurs in ribosomes; Deciphers mRNA to assemble protein",),
+        (
+            "Codons: Three-nucleotide sequences; Specify amino acids or signal start/termination of translation",
+        ),
+        ("Amino acids: Building blocks of proteins; Linked by peptide bonds",),
+        ("Protein folding: Adopts specific three-dimensional structure",),
+        (
+            "Post-translational modifications: Addition of chemical groups; Cleavage of specific segments",
+        ),
     ]
     _ = cursor.executemany(
         "INSERT INTO concept(tID, concept, created, modified) "
@@ -131,7 +139,6 @@ print(createAppDB(appDB, addDemo=addDemo))
 
 # Create DuckDB vector database and add files
 def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
-
     # In case the file is a URL download it first
     isURL = False
     if newFile.startswith("http://") or newFile.startswith("https://"):
@@ -234,7 +241,8 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
     )
     fID = cursor.execute("SELECT currval('seq_fID')").fetchall()[0][0]
     _ = cursor.executemany(
-        "INSERT INTO keyword(kID, fID, keyword) " f"VALUES(nextval('seq_kID'),'{fID}', ?)",
+        "INSERT INTO keyword(kID, fID, keyword) "
+        f"VALUES(nextval('seq_kID'),'{fID}', ?)",
         [(item,) for item in docSum["keywords"]],
     )
     conn.commit()

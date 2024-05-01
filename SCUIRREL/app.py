@@ -85,13 +85,13 @@ with ui.navset_pill(id="tab"):
                 )
 
             with ui.card(id="chatWindow", height="45vh"):
-                ui.card_header(
-                    HTML(
-                        '<div class="progress-bar"><span id="chatProgress"'
-                        'class="progress-bar-fill" style="width: 0%;">Topic Progress</span></div>'
+                x = (
+                    '<div class="progress-bar"><span id="chatProgress" class="progress-bar-fill" style="width: 0%;">Topic Progress</span></div>'
+                    + str(
+                        ui.input_action_button("chatFeedback", "Provide chat feedback")
                     )
                 )
-
+                ui.card_header(HTML(x), id="chatHeader")
                 div(id="conversation")
 
         # User input, send button and wait message
@@ -101,7 +101,6 @@ with ui.navset_pill(id="tab"):
                     "newChat", "", value="", width="100%", spellcheck=True, resize=False
                 ),
                 ui.input_action_button("send", "Send"),
-                ui.input_action_button("report", "Report issue"),
                 id="chatIn",
             ),
         )
@@ -120,6 +119,8 @@ with ui.navset_pill(id="tab"):
                 ui.card_header("User Progress")
                 "TODO"
 
+# Customised feedback button (floating at right side of screen)
+ui.input_action_button("feedback", "General Feedback")
 
 # --- REACTIVE VARIABLES & FUNCTIONS ---
 
@@ -428,21 +429,21 @@ def _():
     ui.modal_remove()
 
 
-# When the chat reporting button is clicked
+# When the chat feedback button is clicked
 @reactive.effect
-@reactive.event(input.report)
+@reactive.event(input.chatFeedback)
 def _():
     sel = json.loads(input.selectedMsg())  # Custom JS input selectedMsg
     if sel == []:
         # With no messages selected
         ui.notification_show(
-            "Please select all chat messages relevant to the issue you like to report"
+            "Please select all chat messages relevant to your feedback report"
         )
     else:
         # Ask for more details
         m = ui.modal(
             ui.input_radio_buttons(
-                "issueChatCode",
+                "feedbackChatCode",
                 " Pick a category",
                 choices={
                     1: "Incorrect",
@@ -454,12 +455,12 @@ def _():
                 inline=True,
             ),
             ui.input_text_area(
-                "issueChatDetails", "Please provide more details", width="100%"
+                "feedbackChatDetails", "Please provide more details", width="100%"
             ),
             title="Please provide some more information",
             size="l",
             footer=[
-                ui.input_action_button("issueChatSubmit", "Submit"),
+                ui.input_action_button("feedbackChatSubmit", "Submit"),
                 ui.modal_button("Cancel"),
             ],
         )
@@ -468,7 +469,7 @@ def _():
 
 # Insert the issue into the DB
 @reactive.effect
-@reactive.event(input.issueChatSubmit)
+@reactive.event(input.feedbackChatSubmit)
 def _():
     # Because multiple issues can be submitted for a single conversation, we have to commit to the
     # DB immediately or it would become harder to keep track of TODO
@@ -476,22 +477,89 @@ def _():
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
     _ = cursor.execute(
-        "INSERT INTO issue_chat(dID,code,created,details) VALUES(?,?,?,?)",
+        "INSERT INTO feedback_chat(dID,code,created,details) VALUES(?,?,?,?)",
         (
             discussionID.get(),
-            int(input.issueChatCode()),
+            int(input.feedbackChatCode()),
             shared.dt(),
-            input.issueChatDetails(),
+            input.feedbackChatDetails(),
         ),
     )
-    icID = cursor.lastrowid
+    fcID = cursor.lastrowid
     tempID = json.loads(input.selectedMsg())
     tempID.sort()
     _ = cursor.executemany(
-        f"INSERT INTO issue_chat_msg(icID,mID) VALUES({icID},?)", [(x,) for x in tempID]
+        f"INSERT INTO feedback_chat_msg(fcID,mID) VALUES({fcID},?)",
+        [(x,) for x in tempID],
     )
     conn.commit()
     conn.close()
     # Remove modal and show confirmation
     ui.modal_remove()
-    ui.notification_show("Report successfully submitted!", duration=3)
+    ui.notification_show("Feedback successfully submitted!", duration=3)
+
+
+# General feedback button click
+@reactive.effect
+@reactive.event(input.feedback)
+def _():
+    # Show a modal asking for more details
+    m = ui.modal(
+        ui.input_radio_buttons(
+            "feedbackCode",
+            "Pick a feedback category",
+            choices={
+                1: "User experience (overall functionality, intuitiveness)",
+                2: "Content (descriptions, labels, messages, ...)",
+                3: "Design (layout, accessibility)",
+                4: "Performance (speed, crashes, unexpected behavior)",
+                5: "Suggestion for improvement / new feature",
+                6: "Other",
+            },
+            inline=False,
+            width="100%",
+        ),
+        ui.tags.p(
+            "Please note that if you have chat specific feedback to use the dedicated button instead!",
+            style="color:red;",
+        ),
+        ui.input_text_area(
+            "feedbackDetails", "Please provide more details", width="100%"
+        ),
+        ui.input_text(
+            "feedbackContact", "(optional) Contact email address", width="100%"
+        ),
+        ui.tags.i(
+            "Please note that providing your email address will link all session details "
+            "to this feedback report (no longer anonymous)"
+        ),
+        title="Please provide some more information",
+        size="l",
+        footer=[
+            ui.input_action_button("feedbackSubmit", "Submit"),
+            ui.modal_button("Cancel"),
+        ],
+    )
+    ui.modal_show(m)
+
+
+# Register feedback in the appDB
+@reactive.effect
+@reactive.event(input.feedbackSubmit)
+def _():
+    conn = sqlite3.connect(shared.appDB)
+    cursor = conn.cursor()
+    _ = cursor.execute(
+        "INSERT INTO feedback_general(sID,code,created,email,details) VALUES(?,?,?,?,?)",
+        (
+            sessionID(),
+            input.feedbackCode(),
+            shared.dt(),
+            input.feedbackContact(),
+            input.feedbackDetails(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    ui.modal_remove()
+    ui.notification_show("Thank you for sharing feedback", duration=3)

@@ -131,9 +131,22 @@ CREATE TABLE IF NOT EXISTS "backup" (
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-DROP TABLE IF EXISTS "issue_chat";
-CREATE TABLE IF NOT EXISTS "issue_chat" (
-	"icID" INTEGER PRIMARY KEY AUTOINCREMENT,
+DROP TABLE IF EXISTS "feedback_general";
+CREATE TABLE IF NOT EXISTS "feedback_general" (
+	"fgID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "sID" INTEGER NOT NULL,
+  "code" INTEGER NOT NULL,
+  "status" INTEGER DEFAULT 0,
+  "created" TEXT NOT NULL,
+  "email" TEXT NOT NULL,  
+  "details" TEXT,
+  FOREIGN KEY("sID") REFERENCES "session"("sID") 
+	  ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+DROP TABLE IF EXISTS "feedback_chat";
+CREATE TABLE IF NOT EXISTS "feedback_chat" (
+	"fcID" INTEGER PRIMARY KEY AUTOINCREMENT,
   "dID" INTEGER NOT NULL,
   "code" INTEGER NOT NULL,
   "created" TEXT NOT NULL,  
@@ -144,11 +157,11 @@ CREATE TABLE IF NOT EXISTS "issue_chat" (
 
 -- We can't add a mID foreign key because the first time 
 -- the value is inserted it's a placeholder which gets updated 
-DROP TABLE IF EXISTS "issue_chat_msg";
-CREATE TABLE IF NOT EXISTS "issue_chat_msg" (
-	"icmID" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "icID" INTEGER NOT NULL,
+DROP TABLE IF EXISTS "feedback_chat_msg";
+CREATE TABLE IF NOT EXISTS "feedback_chat_msg" (
+	"fcmID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "fcID" INTEGER NOT NULL,
   "mID" INTEGER NOT NULL, 
-  FOREIGN KEY("icID") REFERENCES "issue_chat"("icID") 
+  FOREIGN KEY("fcID") REFERENCES "feedback_chat"("fcID") 
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );

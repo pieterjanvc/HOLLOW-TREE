@@ -1,15 +1,16 @@
-/* Overall settings */
+/* Max page width */
 html {
     margin:    0 auto;
     max-width: 1280px;
 }
 
+/* Custom variables and overwriting existing ones */
 :root {
     --background: #252525;
-    --theme1: #AF6B50;
-    --theme2: #65AF50;
-    --theme3: #5094AF;
-    --theme4: #9A50AF;
+    --theme1: #AF6B50; /* Accent colour 1 */
+    --theme2: #65AF50; /* Main clickable elements */
+    --theme3: #5094AF; /* Accent colour 2 */
+    --theme4: #9A50AF; /* Messaging or feedback */
 
     --bs-link-color:  var(--theme2);
     --bs-nav-link-hover-color: var(--theme3);
@@ -17,6 +18,7 @@ html {
 }
 .nav-pills {
     --bs-nav-pills-link-active-bg: var(--theme2);
+    --bs-link-hover-color: white;
 }
 
 body {
@@ -27,12 +29,45 @@ body {
     background-color: var(--theme2);
     color: white;
 }
-
-/* The folowing two fix bugs in DT rendering */
-.table>:not(caption)>*>* {
-    background-color: transparent; /* see which row in a table is selected */
+.btn-default:hover {
+    background-color: var(--theme3);
+    color: white;
 }
 
+/* Show data table divider lines */
 thead, tbody, tfoot, tr, td, th {
     border-bottom: 1px solid #dadada; /* row dividers */
+}
+
+/* Feedback button */
+@media (max-width: 1280px) {
+    #feedback {
+        right: 5px;
+    }
+}
+@media (min-width: 1281px) {
+    #feedback {
+        right: calc(((100% - 1275px) / 2));
+    }
+}
+#feedback {
+    position:  fixed;
+    top: 50%; /* Adjust top position as needed */    
+    padding: 10px;
+    z-index: 9999;
+    border: transparent;
+    writing-mode: vertical-rl;
+    background-color: var(--theme4);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 5px 5px 7px rgba(33,33,33,.7);
+}
+
+#feedback:hover {
+    transform: scale(1.1);
+}
+
+.shiny-notification {
+    background-color: var(--theme4);
+    color: white;
 }

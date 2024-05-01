@@ -36,14 +36,10 @@ gptModel = config["LLM"]["gptModel"]
 llm = OpenAI(model=gptModel)
 
 if not os.path.exists(appDB):
-    raise ConnectionError(
-        "The app database was not found. Please run ACCORNS first"
-    )
+    raise ConnectionError("The app database was not found. Please run ACCORNS first")
 
 if not os.path.exists(vectorDB):
-    raise ConnectionError(
-        "The vector database was not found. Please run ACCORNS first"
-    )
+    raise ConnectionError("The vector database was not found. Please run ACCORNS first")
 
 if os.environ["OPENAI_API_KEY"] is None:
     raise ValueError(
@@ -268,10 +264,10 @@ def endDiscussion(cursor, dID, messages, timeStamp=dt()):
     )
     # If a chat issue was submitted, update the temp IDs to the real ones
     idShift = cursor.lastrowid - messages.id + 1
-    if cursor.execute(f"SELECT icID FROM issue_chat WHERE dID = {dID}").fetchone():
+    if cursor.execute(f"SELECT fcID FROM issue_chat WHERE dID = {dID}").fetchone():
         _ = cursor.execute(
-            f"UPDATE issue_chat_msg SET mID = mID + {idShift} WHERE icID IN "
-            f"(SELECT icID FROM issue_chat WHERE dID = {dID})"
+            f"UPDATE issue_chat_msg SET mID = mID + {idShift} WHERE fcID IN "
+            f"(SELECT fcID FROM issue_chat WHERE dID = {dID})"
         )
 
 

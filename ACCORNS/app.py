@@ -60,10 +60,13 @@ uiUploadFile = div(
 # --- RENDERING UI ---
 # ********************
 
-ui.page_opts(fillable=True)
-ui.head_content(ui.include_css("www/styles.css"), ui.include_js("www/custom.js", method="inline"))
+ui.page_opts(fillable=True, window_title="ACCORNS")
+ui.head_content(
+    ui.include_css("www/styles.css"), ui.include_js("www/custom.js", method="inline")
+)
 
 # --- CUSTOM JS FUNCTIONS (Python side) ---
+
 
 # This function allows you to hide/show/disable/enable elements by ID or data-value
 # The latter is needed because tabs don't use ID's but data-value
@@ -90,15 +93,17 @@ with ui.navset_pill(id="tab"):
             @render.data_frame
             def filesTable():
                 return render.DataTable(
-                    files.get()[["title", "fileName"]], width="100%", selection_mode="row"
+                    files.get()[["title", "fileName"]],
+                    width="100%",
+                    selection_mode="row",
                 )
+
         with ui.card(id="fileInfoCard"):
             ui.card_header("File info")
 
             @render.ui
             def fileDetailsUI():
                 return fileInfo()
-
 
         # Option to add bew files
         with ui.card():
@@ -214,6 +219,9 @@ with ui.navset_pill(id="tab"):
                     "rqODexpl", "Explanation D", width="100%", autoresize=True
                 )
 
+# Customised feedback button (floating at right side of screen)
+ui.input_action_button("feedback", "Provide Feedback")
+
 # --- REACTIVE VARIABLES ---
 
 sessionID = reactive.value(0)
@@ -236,7 +244,7 @@ else:
     index = VectorStoreIndex.from_vector_store(
         DuckDBVectorStore.from_local(shared.vectorDB)
     )
-    
+
 # Some of these could become reactive calls in future but for now we use
 # reactive var until issue with reactive.calls is resolved
 # https://github.com/posit-dev/py-shiny/issues/1271
@@ -249,8 +257,8 @@ files = reactive.value(files)
 # --- REACTIVE FUNCTIONS ---
 
 # Stuff to run once when the session has loaded
-if hasattr(session, "_process_ui"):    
-    #Register the session start in the DB
+if hasattr(session, "_process_ui"):
+    # Register the session start in the DB
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
     # For now we only have anonymous users (appID 1 -> ACCORNS)
@@ -267,11 +275,13 @@ if hasattr(session, "_process_ui"):
     conn.close()
     sessionID.set(sID)
     # Set the topics
-    ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])))    
+    ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])))
     topics.set(newTopics)
 
 # Code to run at the END of the session (i.e. when user disconnects)
 _ = session.on_ended(lambda: theEnd())
+
+
 def theEnd():
     # Isolate so we can use the final values of reactive variables
     with reactive.isolate():
@@ -279,11 +289,15 @@ def theEnd():
         sID = sessionID.get()
         conn = sqlite3.connect(shared.appDB)
         cursor = conn.cursor()
-        _ = cursor.execute(f'UPDATE session SET end = "{shared.dt()}" WHERE sID = {sID}')
+        _ = cursor.execute(
+            f'UPDATE session SET end = "{shared.dt()}" WHERE sID = {sID}'
+        )
         conn.commit()
         conn.close()
 
+
 # ---- TOPICS ----
+
 
 # --- Add a new topic
 @reactive.effect
@@ -514,7 +528,7 @@ def _():
 @reactive.effect
 @reactive.event(input.cEdit)
 def _():
-    if not conceptsTable.data_view(selected=True).empty:    
+    if not conceptsTable.data_view(selected=True).empty:
         concept = conceptsTable.data_view(selected=True).iloc[0]["concept"]
         m = ui.modal(
             ui.tags.p(
@@ -549,7 +563,7 @@ def _():
         )
         return
     concept = conceptsTable.data_view(selected=True).iloc[0]["concept"]
-    if ( concept == input.ecInput()):
+    if concept == input.ecInput():
         ui.remove_ui("#noGoodConcept")
         ui.insert_ui(
             HTML("<div id=noGoodConcept style='color: red'>No change detected</div>"),
@@ -601,6 +615,7 @@ def _():
 
     concepts.set(conceptList)
 
+
 @reactive.effect
 @reactive.event(input.tID)
 def _():
@@ -614,6 +629,7 @@ def _():
 
 
 # ---- VECTOR DATABASE ----
+
 
 @reactive.effect
 @reactive.event(input.newFile, ignore_init=True)
@@ -665,29 +681,34 @@ def _():
     ui.insert_ui(uiUploadFile, "#processFile", "afterEnd")
     ui.remove_ui("#processFile")
 
+
 # Get file details
 @reactive.calc
 def fileInfo():
     if filesTable.data_view(selected=True).empty:
         # elementDisplay("fileInfoCard", "h")
         return
-    
+
     info = files().iloc[filesTable.data_view(selected=True).index[0]]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         conn = duckdb.connect(shared.vectorDB)
-        keywords = pd.read_sql_query(f"SELECT keyword FROM keyword WHERE fID = {info.fID}", conn)
-        conn.close()    
+        keywords = pd.read_sql_query(
+            f"SELECT keyword FROM keyword WHERE fID = {info.fID}", conn
+        )
+        conn.close()
     keywords = "; ".join(keywords["keyword"])
     # elementDisplay("fileInfoCard", "s")
 
-    return HTML(f"<h4>{info.fileName}</h4><ul>"
-                f"<li><b>Summary title</b> <i>(AI generated)</i>: {info.title}</li>"
-                f"<li><b>Summary subtitle</b> <i>(AI generated)</i>: {info.subtitle}</li>"
-                f"<li><b>Uploaded</b>: {info.created}</li></ul>"
-                "<p><b>Top-10 keywords extracted from document</b> <i>(AI generated)</i></p>"
-                f"{keywords}")
-    
+    return HTML(
+        f"<h4>{info.fileName}</h4><ul>"
+        f"<li><b>Summary title</b> <i>(AI generated)</i>: {info.title}</li>"
+        f"<li><b>Summary subtitle</b> <i>(AI generated)</i>: {info.subtitle}</li>"
+        f"<li><b>Uploaded</b>: {info.created}</li></ul>"
+        "<p><b>Top-10 keywords extracted from document</b> <i>(AI generated)</i></p>"
+        f"{keywords}"
+    )
+
 
 # ---- QUIZ QUESTIONS ----
 
@@ -942,3 +963,65 @@ def _():
         shared.modalMsg("No changes were detected")
 
     conn.close()
+
+
+# General feedback button click
+@reactive.effect
+@reactive.event(input.feedback)
+def _():
+    # Show a modal asking for more details
+    m = ui.modal(
+        ui.input_radio_buttons(
+            "feedbackCode",
+            "Pick a feedback category",
+            choices={
+                1: "User experience (overall functionality, intuitiveness)",
+                2: "Content (descriptions, labels, messages, ...)",
+                3: "Design (layout, accessibility)",
+                4: "Performance (speed, crashes, unexpected behavior)",
+                5: "Suggestion for improvement / new feature",
+                6: "Other",
+            },
+            inline=False,
+            width="100%",
+        ),
+        ui.input_text_area(
+            "feedbackDetails", "Please provide more details", width="100%"
+        ),
+        ui.input_text(
+            "feedbackContact", "(optional) Contact email address", width="100%"
+        ),
+        ui.tags.i(
+            "Please note that providing your email address will link all session details "
+            "to this feedback report (no longer anonymous)"
+        ),
+        title="Please provide some more information",
+        size="l",
+        footer=[
+            ui.input_action_button("feedbackSubmit", "Submit"),
+            ui.modal_button("Cancel"),
+        ],
+    )
+    ui.modal_show(m)
+
+
+# Register feedback in the appDB
+@reactive.effect
+@reactive.event(input.feedbackSubmit)
+def _():
+    conn = sqlite3.connect(shared.appDB)
+    cursor = conn.cursor()
+    _ = cursor.execute(
+        "INSERT INTO feedback_general(sID,code,created,email,details) VALUES(?,?,?,?,?)",
+        (
+            sessionID(),
+            input.feedbackCode(),
+            shared.dt(),
+            input.feedbackContact(),
+            input.feedbackDetails(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    ui.modal_remove()
+    ui.notification_show("Thank you for sharing feedback", duration=3)
