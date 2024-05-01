@@ -6,16 +6,19 @@ html {
 
 :root {
     --background: #252525;
-    --theme1: #AF6B50;
-    --theme2: #65AF50;
-    --theme3: #5094AF;
-    --theme4: #9A50AF;
+    --theme1: #AF6B50; /* Accent colour 1 */
+    --theme2: #65AF50; /* Main clickable elements */
+    --theme3: #5094AF; /* Accent colour 2 */
+    --theme4: #9A50AF; /* Messaging or feedback */
 
     --bs-link-color:  var(--theme2);
     --bs-nav-link-hover-color: var(--theme3);
+    --bs-btn-bg: var(--theme2)
 }
+
 .nav-pills {
     --bs-nav-pills-link-active-bg: var(--theme2);
+    --bs-link-hover-color: white;
 }
 
 body {
@@ -124,4 +127,55 @@ https://gist.github.com/WeiChiaChang/abe92ca2e8da86ef69560b63903e8764
 
 .selectedMsg {
     background-color: var(--theme4);
+}
+
+/* Feedback button */
+@media (max-width: 1280px) {
+    #feedback {
+        right: 5px;
+    }
+}
+@media (min-width: 1281px) {
+    #feedback {
+        right: calc(((100% - 1275px) / 2));
+    }
+}
+
+#feedback {    
+    z-index: 9999;
+    border: transparent;
+    background-color: var(--theme4);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position:  fixed;
+    top: 50%; /* Adjust top position as needed */    
+    padding: 10px;
+    box-shadow: 5px 5px 7px rgba(33,33,33,.7);
+    writing-mode: vertical-rl;
+}
+
+#feedback:hover {
+    transform: scale(1.1);
+}
+
+#chatFeedback {    
+    border: transparent;
+    background-color: var(--theme4);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 2px 2px 6px rgba(33,33,33,.7);
+    padding: 0px 20px;
+    position:  absolute;
+    left: 50%; /* Adjust top position as needed */
+    transform: translateX(-50%);
+    /* writing-mode: vertical-lr; */
+}
+
+#chatFeedback:hover {
+    transform: translateX(-50%) scale(1.1);
+}
+
+.shiny-notification {
+    background-color: var(--theme4);
+    color: white;
 }

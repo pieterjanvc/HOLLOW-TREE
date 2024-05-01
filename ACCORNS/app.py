@@ -60,7 +60,7 @@ uiUploadFile = div(
 # --- RENDERING UI ---
 # ********************
 
-ui.page_opts(fillable=True)
+ui.page_opts(fillable=True, window_title="ACCORNS")
 ui.head_content(ui.include_css("www/styles.css"), ui.include_js("www/custom.js", method="inline"))
 
 # --- CUSTOM JS FUNCTIONS (Python side) ---
@@ -213,6 +213,9 @@ with ui.navset_pill(id="tab"):
                 ui.input_text_area(
                     "rqODexpl", "Explanation D", width="100%", autoresize=True
                 )
+
+# Customised feedback button (floating at right side of screen)
+ui.input_action_button("feedback", "Provide Feedback")
 
 # --- REACTIVE VARIABLES ---
 
@@ -942,3 +945,52 @@ def _():
         shared.modalMsg("No changes were detected")
 
     conn.close()
+
+# General feedback button click
+@reactive.effect
+@reactive.event(input.feedback)
+def _():
+    # Show a modal asking for more details
+    m = ui.modal(
+            ui.input_radio_buttons(
+                "feedbackCode",
+                "Pick a feedback category",
+                choices={
+                    1: "User experience (overall functionality, intuitiveness)",
+                    2: "Content (descriptions, labels, messages, ...)",
+                    3: "Design (layout, accessibility)",
+                    4: "Performance (speed, crashes, unexpected behavior)",
+                    5: "Suggestion for improvement / new feature",
+                    6: "Other",
+                },
+                inline=False, width="100%"
+            ),
+            ui.input_text_area(
+                "feedbackDetails", "Please provide more details", width="100%"
+            ),
+            ui.input_text(
+                "feedbackContact", "(optional) Contact email address", width="100%"
+            ),
+            ui.tags.i("Please note that providing your email address will link all session details "
+                      "to this feedback report (no longer anonymous)"),
+            title="Please provide some more information",
+            size="l",
+            footer=[
+                ui.input_action_button("feedbackSubmit", "Submit"),
+                ui.modal_button("Cancel"),
+            ],
+        )
+    ui.modal_show(m)
+
+# Register feedback in the appDB
+@reactive.effect
+@reactive.event(input.feedbackSubmit)
+def _():
+    conn = sqlite3.connect(shared.appDB)
+    cursor = conn.cursor()
+    _ = cursor.execute("INSERT INTO feedback_general(sID,code,created,email,details) VALUES(?,?,?,?,?)", 
+                       (sessionID(),input.feedbackCode(), shared.dt(),input.feedbackContact(), input.feedbackDetails()))
+    conn.commit()
+    conn.close()
+    ui.modal_remove()
+    ui.notification_show("Thank you for sharing feedback", duration=3)
