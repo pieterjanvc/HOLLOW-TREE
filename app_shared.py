@@ -20,7 +20,12 @@ import toml
 from urllib.request import urlretrieve
 
 # Llamaindex
-from llama_index.core import VectorStoreIndex, ChatPromptTemplate, SimpleDirectoryReader, StorageContext
+from llama_index.core import (
+    VectorStoreIndex,
+    ChatPromptTemplate,
+    SimpleDirectoryReader,
+    StorageContext,
+)
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core.extractors import TitleExtractor, KeywordExtractor
 from llama_index.llms.openai import OpenAI
@@ -31,6 +36,7 @@ from shiny.express import ui
 
 # -- Other
 import nest_asyncio
+
 nest_asyncio.apply()
 
 # --- VARIABLES ---
@@ -73,6 +79,7 @@ if os.environ["OPENAI_API_KEY"] is None:
 #     )
 # conn.close()
 
+
 ### --- APP WIDE FUNCTIONS ---
 def dt():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -84,7 +91,9 @@ def inputCheck(input):
     else:
         False
 
+
 ### --- ACCORN FUNCTIONS ---
+
 
 # Database to store app data (this is not the vector database!)
 def createAppDB(DBpath, addDemo=False):
@@ -123,9 +132,7 @@ def createAppDB(DBpath, addDemo=False):
     # Add topic concepts (to be removed later)
     concepts = [
         ("Central dogma of molecular biology: DNA → RNA → Protein",),
-        (
-            "DNA: Composed of adenine (A), cytosine (C), guanine (G), and thymine (T)",
-        ),
+        ("DNA: Composed of adenine (A), cytosine (C), guanine (G), and thymine (T)",),
         ("Genes: Hold code for specific proteins",),
         ("RNA: Composed of nucleotides (including uracil, U); Single-stranded",),
         (
@@ -320,6 +327,7 @@ def modalMsg(content, title="Info"):
         footer=ui.TagList(ui.modal_button("Close")),
     )
     ui.modal_show(m)
+
 
 ### --- SCUIRREL FUNCTIONS ---
 
@@ -529,6 +537,7 @@ def endDiscussion(cursor, dID, messages, timeStamp=dt()):
 
 
 # --- CLASSES
+
 
 # Messages and conversation
 class Conversation:

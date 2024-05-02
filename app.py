@@ -32,6 +32,7 @@ from htmltools import HTML, div
 # The following is needed to prevent async issues when inserting new data in vector DB
 # https://github.com/run-llama/llama_index/issues/9978
 import nest_asyncio
+
 nest_asyncio.apply()
 
 # ----------- SHINY APP -----------
@@ -100,7 +101,7 @@ with ui.navset_pill(id="tab"):
     with ui.nav_panel("WELCOME"):
         # Render the chat window
         with ui.layout_columns(col_widths=12):
-           with ui.card(id="about"):
+            with ui.card(id="about"):
                 HTML("""<p>Hello, I'm Scuirrel (Science Concept Understanding with Interactive Research RAG Educational LLM). 
                      I'm here to help you test your knowledge on specific concepts
                      related to topics relevant to your coursework. I will guide you though these concepts by asking you
@@ -113,7 +114,6 @@ with ui.navset_pill(id="tab"):
     with ui.nav_panel("SCUIRREL"):
         # Render the chat window
         with ui.layout_columns(col_widths=12):
-            
             with ui.card(id="topicSelection"):
                 ui.card_header("Pick a topic")
                 (ui.input_select("selTopic", None, choices=[], width="600px"),)
@@ -353,7 +353,9 @@ if hasattr(session, "_process_ui"):
     conn.close()
     sessionID.set(sID)
     # Set the topics in SCUIRREL
-    ui.update_select("selTopic", choices=dict(zip(newTopics["tID"], newTopics["topic"])))
+    ui.update_select(
+        "selTopic", choices=dict(zip(newTopics["tID"], newTopics["topic"]))
+    )
     # Set the topics in ACCORNS
     ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])))
     topics.set(newTopics)
@@ -381,8 +383,10 @@ def theEnd():
         conn.commit()
         conn.close()
 
+
 ### ---- SCUIRREL APP LOGIC ----
-### ---------------------------- 
+### ----------------------------
+
 
 @reactive.effect
 @reactive.event(input.selTopic)
@@ -511,18 +515,16 @@ def _():
         finished = False
         if int(eval["score"]) > 2:
             if i < (concepts().shape[0] - 1):
-                i = i + 1 
+                i = i + 1
             else:
                 finished = True
-            
+
             progressBar("chatProgress", int(100 * i / concepts().shape[0]))
-                
+
         # Add the evaluation of the student's last reply to the log
         msg = messages.get()
         msg.addEval(eval["score"], eval["comment"])
-        msg.add_message(
-            isBot=1, cID=int(concepts().iloc[i]["cID"]), content=resp
-        )
+        msg.add_message(isBot=1, cID=int(concepts().iloc[i]["cID"]), content=resp)
         messages.set(msg)
         conceptIndex.set(i)
         ui.insert_ui(
@@ -539,8 +541,9 @@ def _():
         # If conversation is over don't show new message box
         if not finished:
             elementDisplay("chatIn", "s")
-        else :
-            ui.insert_ui(HTML("<hr>"),"#conversation")
+        else:
+            ui.insert_ui(HTML("<hr>"), "#conversation")
+
 
 # -- QUIZ
 
@@ -622,6 +625,7 @@ def checkAnswer():
         f'<hr><h3>{"Correct!" if correct else "Incorrect..."}</h3>'
         f'{q["explanation" + input.quizOptions()]}'
     )
+
 
 @reactive.effect
 @reactive.event(input.qClose)
@@ -787,9 +791,10 @@ def _():
 
 
 ### ---- ACCORNS APP LOGIC ----
-### ---------------------------- 
+### ----------------------------
 
 # ---- TOPICS ----
+
 
 # --- Add a new topic
 @reactive.effect
@@ -1065,7 +1070,9 @@ def _():
         return
 
     # Update the DB
-    cID = conceptsList.get().iloc[conceptsTable.data_view(selected=True).index[0]]["cID"]
+    cID = conceptsList.get().iloc[conceptsTable.data_view(selected=True).index[0]][
+        "cID"
+    ]
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
     # Backup old value
@@ -1092,7 +1099,9 @@ def _():
     if conceptsTable.data_view(selected=True).empty:
         return
 
-    cID = conceptsList.get().iloc[conceptsTable.data_view(selected=True).index[0]]["cID"]
+    cID = conceptsList.get().iloc[conceptsTable.data_view(selected=True).index[0]][
+        "cID"
+    ]
     conn = sqlite3.connect(shared.appDB)
     cursor = conn.cursor()
     _ = cursor.execute(
