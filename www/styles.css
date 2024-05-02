@@ -1,0 +1,166 @@
+/* Max page width */
+html {
+    margin:    0 auto;
+    max-width: 1280px;
+}
+
+/* OVERRIDING DEFAULTS */
+:root {
+    --background: #252525;
+    --theme1: #AF6B50; /* Accent colour 1 */
+    --theme2: #65AF50; /* Main clickable elements */
+    --theme3: #5094AF; /* Accent colour 2 */
+    --theme4: #9A50AF; /* Messaging or feedback */
+
+    --bs-link-color:  var(--theme2);
+    --bs-nav-link-hover-color: var(--theme3);
+    --bs-btn-bg: var(--theme2)
+}
+.nav-pills {
+    --bs-nav-pills-link-active-bg: var(--theme2);
+    --bs-link-hover-color: white;
+}
+
+body {
+    background: var(--background);
+    --botCol: var(--theme3);
+    --userCol: var(--theme1);
+}
+
+.btn-default {
+    background-color: var(--theme2);
+    color: white;
+}
+.btn-default:hover {
+    background-color: var(--theme3);
+    color: white;
+}
+
+.nav-link.active {
+    background-color:  var(--theme2);
+}
+
+.shiny-notification {
+    background-color: var(--theme4);
+    color: white;
+}
+
+/* Show data table divider lines */
+thead, tbody, tfoot, tr, td, th {
+    border-bottom: 1px solid #dadada; /* row dividers */
+}
+
+/* CUSTOM ACCORNS CSS STYLING */
+
+/* Feedback button */
+@media (max-width: 1280px) {
+    #feedback {
+        right: 5px;
+    }
+}
+@media (min-width: 1281px) {
+    #feedback {
+        right: calc(((100% - 1275px) / 2));
+    }
+}
+#feedback {
+    position:  fixed;
+    top: 50%; /* Adjust top position as needed */    
+    padding: 10px;
+    z-index: 9999;
+    border: transparent;
+    writing-mode: vertical-rl;
+    background-color: var(--theme4);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 5px 5px 7px rgba(33,33,33,.7);
+}
+
+#feedback:hover {
+    transform: scale(1.1);
+}
+
+/* CUSTOM SCUIRREL CSS STYLING */
+
+/* 
+TALK BUBBLES
+https://codepen.io/Founts/pen/AJyVOr 
+*/
+.talk-bubble {
+	margin: 10px 40px 15px 40px;
+    padding: 5px;
+    display: inline-block;
+    position: relative;
+	width: auto;
+    min-width: 30%;
+    max-width: 70%;
+    min-height: 40px;
+    border-radius: 5px;
+	height: auto;	
+}
+
+.botChat{
+    color: white;    
+    background-color: var(--botCol);
+    border-color: var(--botCol);
+}
+
+.userChat{
+    color: white;
+    float: right;
+    background-color: var(--userCol);
+    border-color: var(--userCol);
+}
+
+.isSel{
+    background-color: var(--theme4);
+}
+
+.selectedMsg {
+    background-color: var(--theme4);
+}
+
+#chatWindow .card-body {
+    flex-direction: column-reverse;
+    z-index: 1;
+}
+
+/* 
+Progress bar 
+https://gist.github.com/WeiChiaChang/abe92ca2e8da86ef69560b63903e8764
+*/
+.progress-bar {
+    width: 100%;
+    background-color: rgb(255, 255, 255);
+    padding: 3px;
+    border-radius: 3px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, .2);
+}
+
+.progress-bar-fill {
+    display: block;
+    height: 22px;
+    color: var(--theme4);    
+    background-color: #dadada;
+    border-radius: 3px;    
+    transition: width 500ms ease-in-out;
+}
+
+/* Chat feedback button */
+#chatFeedback {
+    z-index: 2;    
+    border: transparent;
+    background-color: var(--theme4);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 2px 2px 6px rgba(33,33,33,.7);
+    padding: 0px 20px;
+    position:  absolute;
+    left: 50%; /* Adjust top position as needed */
+    transform: translateX(-50%);
+    /* writing-mode: vertical-lr; */
+}
+
+#chatFeedback:hover {
+    transform: translateX(-50%) scale(1.1);
+}

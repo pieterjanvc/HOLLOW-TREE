@@ -27,7 +27,7 @@ Shiny.addCustomMessageHandler("hideShow", function(x) {
         case "s":
             element.style.display = "";
             break;
-    }    
+    }
     
 });
 

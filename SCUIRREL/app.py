@@ -276,9 +276,8 @@ async def botResponse(topic, concepts, cIndex, conversation):
     if int(eval["score"]) > 2:
         cIndex += 1
     # Check if all concepts have been covered successfully
-    if cIndex > concepts.shape[0]:
+    if cIndex >= concepts.shape[0]:
         resp = f"Well done! It seems you have demonstrated understanding of everything we wanted you to know about: {topic}"
-        elementDisplay("chatIn", "h")
     else:
         engine = shared.chatEngine(topic, concepts, cIndex, eval)
         resp = str(engine.query(conversation))
@@ -295,17 +294,24 @@ def _():
 
     with reactive.isolate():
         # Check the topic progress and move on to next concept if current one scored well
+        i = conceptIndex.get()
+        finished = False
         if int(eval["score"]) > 2:
-            i = conceptIndex.get() + 1
+            if i < (concepts().shape[0] - 1):
+                i = i + 1 
+            else:
+                finished = True
+            
             progressBar("chatProgress", int(100 * i / concepts().shape[0]))
-            conceptIndex.set(i)
+                
         # Add the evaluation of the student's last reply to the log
         msg = messages.get()
         msg.addEval(eval["score"], eval["comment"])
         msg.add_message(
-            isBot=1, cID=int(concepts().iloc[conceptIndex.get()]["cID"]), content=resp
+            isBot=1, cID=int(concepts().iloc[i]["cID"]), content=resp
         )
         messages.set(msg)
+        conceptIndex.set(i)
         ui.insert_ui(
             HTML(
                 f"<div class='botChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'><p>{escape(resp)}</p></div>"
@@ -316,8 +322,12 @@ def _():
 
         # Now the LLM has finished the user can send a new response
         elementDisplay("waitResp", "h")
-        elementDisplay("chatIn", "s")
         ui.update_text_area("newChat", value="")
+        # If conversation is over don't show new message box
+        if not finished:
+            elementDisplay("chatIn", "s")
+        else :
+            ui.insert_ui(HTML("<hr>"),"#conversation")
 
 
 # -- QUIZ
