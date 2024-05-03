@@ -101,11 +101,11 @@ def createAppDB(DBpath, addDemo=False):
 
     # Add topic concepts (to be removed later)
     concepts = [
-        ("Central dogma of molecular biology: DNA → RNA → Protein",),
+        ("Central dogma of molecular biology: DNA makes RNA makes Protein",),
         (
             "DNA: Composed of adenine (A), cytosine (C), guanine (G), and thymine (T); Blueprint of life",
         ),
-        ("Genes: Hold code for specific proteins",),
+        ("Genes: Hold code for specific functional molecular products (RNA and Protein)",),
         ("RNA: Composed of nucleotides (including uracil, U); Single-stranded",),
         (
             "Transcription: RNA polymerase unwinds DNA double helix; Synthesizes complementary RNA strand",

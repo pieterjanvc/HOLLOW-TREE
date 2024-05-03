@@ -72,8 +72,8 @@ def appDBConn(remoteAppDB = remoteAppDB):
 # Check if there are topics to discuss before proceeding
 conn = appDBConn()
 topics = pd.read_sql_query(
-    "SELECT * FROM topic WHERE archived = 0 AND tID IN"
-    "(SELECT DISTINCT tID from concept WHERE archived = 0)",
+    'SELECT * FROM "topic" WHERE "archived" = 0 AND "tID" IN'
+    '(SELECT DISTINCT "tID" from "concept" WHERE "archived" = 0)',
     conn,
 )
 
@@ -260,7 +260,7 @@ Please output your score in the following format:"""
 
 # Function to register the end of a discussion in the DB
 def endDiscussion(cursor, dID, messages, timeStamp=dt()):
-    _ = cursor.execute(f'UPDATE discussion SET end = "{timeStamp}" WHERE dID = {dID}')
+    _ = cursor.execute('UPDATE "discussion" SET "end" = %s WHERE "dID" = %s', (timeStamp,dID))
     # Executemany is optimised in such a way that it can't return the lastrowid.
     # Therefor we insert the last message separately as we need to know the ID
     msg = messages.astuple(
@@ -268,19 +268,23 @@ def endDiscussion(cursor, dID, messages, timeStamp=dt()):
     )
     if len(msg) > 1:
         _ = cursor.executemany(
-            f"INSERT INTO message(dID,cID,isBot,timestamp,message,progressCode,progressMessage)VALUES({dID}, ?, ?, ?, ?, ?, ?)",
+            'INSERT INTO "message"("dID","cID","isBot","timestamp","message","progressCode","progressMessage") '
+            f'VALUES({dID}, %s, %s, %s, %s, %s, %s)',
             msg[:-1],
         )
     _ = cursor.execute(
-        f"INSERT INTO message(dID,cID,isBot,timestamp,message,progressCode,progressMessage)VALUES({dID}, ?, ?, ?, ?, ?, ?)",
+        'INSERT INTO "message"("dID","cID","isBot","timestamp","message","progressCode","progressMessage") ' 
+        f'VALUES({dID}, %s, %s, %s, %s, %s, %s) RETURNING "mID"',
         msg[-1],
     )
     # If a chat issue was submitted, update the temp IDs to the real ones
-    idShift = cursor.lastrowid - messages.id + 1
-    if cursor.execute(f"SELECT fcID FROM feedback_chat WHERE dID = {dID}").fetchone():
+    idShift = cursor.fetchone()[0] - messages.id + 1
+    # idShift = cursor.lastrowid - messages.id + 1
+    _ = cursor.execute('SELECT "fcID" FROM "feedback_chat" WHERE "dID" = %s',(dID,))
+    if cursor.fetchone():
         _ = cursor.execute(
-            f"UPDATE feedback_chat_msg SET mID = mID + {idShift} WHERE fcID IN "
-            f"(SELECT fcID FROM feedback_chat WHERE dID = {dID})"
+            'UPDATE "feedback_chat_msg" SET "mID" = "mID" + %s WHERE "fcID" IN '
+            '(SELECT "fcID" FROM "feedback_chat" WHERE "dID" = %s)', (idShift,dID)
         )
 
 

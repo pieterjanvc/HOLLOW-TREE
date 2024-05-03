@@ -24,7 +24,7 @@ DROP TABLE IF EXISTS "topic";
 CREATE TABLE IF NOT EXISTS "topic" (
 	"tID" INTEGER PRIMARY KEY AUTOINCREMENT,
 	"topic" TEXT,
-  "archived" TEXT DEFAULT 0,
+  "archived" INTEGER DEFAULT 0,
   "created" TEXT,
   "modified" TEXT,
   "description" TEXT
@@ -33,9 +33,9 @@ CREATE TABLE IF NOT EXISTS "topic" (
 DROP TABLE IF EXISTS "concept";
 CREATE TABLE IF NOT EXISTS "concept" (
 	"cID" INTEGER PRIMARY KEY AUTOINCREMENT,
-	"tID" TEXT,
+	"tID" INTEGER,
   "concept" TEXT,
-  "archived" TEXT DEFAULT 0,
+  "archived" INTEGER DEFAULT 0,
   "created" TEXT,
   "modified" TEXT,
   "description" TEXT,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS "discussion" (
   "start" TEXT,
   "end" TEXT,
   FOREIGN KEY("tID") REFERENCES "topic"("tID") 
-	  ON DELETE CASCADE ON UPDATE CASCADE
+	  ON DELETE CASCADE ON UPDATE CASCADE,
   FOREIGN KEY("sID") REFERENCES "session"("sID") 
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS "question" (
   "cID" INTEGER,
   "question" TEXT,
   "answer" TEXT,
-  "archived" TEXT,
+  "archived" INTEGER,
 	"created" TEXT,
   "modified" TEXT,
   "optionA" TEXT,

@@ -1,6 +1,6 @@
 [general]
 allowMultiGuess = "False"
-remoteAppDB = "False" # If True use postgres otherwise localStorage
+remoteAppDB = "True" # If True use postgres otherwise localStorage
 
 [localStorage]
 appDB = "../appData/appDB.db"

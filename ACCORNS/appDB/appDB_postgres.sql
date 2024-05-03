@@ -24,7 +24,7 @@ DROP TABLE IF EXISTS "topic";
 CREATE TABLE IF NOT EXISTS "topic" (
 	"tID" SERIAL PRIMARY KEY,
 	"topic" TEXT,
-  "archived" TEXT DEFAULT 0,
+  "archived" INTEGER DEFAULT 0,
   "created" TEXT,
   "modified" TEXT,
   "description" TEXT
@@ -33,9 +33,9 @@ CREATE TABLE IF NOT EXISTS "topic" (
 DROP TABLE IF EXISTS "concept";
 CREATE TABLE IF NOT EXISTS "concept" (
 	"cID" SERIAL PRIMARY KEY,
-	"tID" TEXT,
+	"tID" INTEGER,
   "concept" TEXT,
-  "archived" TEXT DEFAULT 0,
+  "archived" INTEGER DEFAULT 0,
   "created" TEXT,
   "modified" TEXT,
   "description" TEXT,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS "discussion" (
   "start" TEXT,
   "end" TEXT,
   FOREIGN KEY("tID") REFERENCES "topic"("tID") 
-	  ON DELETE CASCADE ON UPDATE CASCADE
+	  ON DELETE CASCADE ON UPDATE CASCADE,
   FOREIGN KEY("sID") REFERENCES "session"("sID") 
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS "question" (
   "cID" INTEGER,
   "question" TEXT,
   "answer" TEXT,
-  "archived" TEXT,
+  "archived" INTEGER,
 	"created" TEXT,
   "modified" TEXT,
   "optionA" TEXT,
@@ -170,3 +170,29 @@ CREATE TABLE IF NOT EXISTS "feedback_chat_msg" (
 INSERT INTO "user" ("username", "isAdmin", "created", "modified") 
 VALUES ('anonymous', 0, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS')), 
 ('admin', 1, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
+
+-- INSERT DEMO DATA (OPTIONAL)
+INSERT INTO topic("topic", "created", "modified")
+VALUES('The central dogma of molecular biology', to_char(now(), 
+  'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
+
+INSERT INTO "concept" ("tID", "concept", "created", "modified")
+ VALUES (1,'Central dogma of molecular biology: DNA makes RNA makes Protein',
+  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
+  (1,'Genes: Hold code for specific functional molecular products (RNA and Protein)',
+  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
+  (1,'RNA: Composed of nucleotides (including uracil, U); Single-stranded',
+  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
+  (1,'Transcription: RNA polymerase unwinds DNA double helix; Synthesizes complementary RNA strand',
+  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
+  (1,'Messenger RNA (mRNA): Carries genetic code from nucleus to cytoplasm',
+  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
+  (1,'RNA splicing: Removes introns; Retains exons',
+  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
+  (1,'Translation: Occurs in ribosomes; Deciphers mRNA to assemble protein',
+  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
+  (1,'Amino acids: Building blocks of proteins; Linked by peptide bonds',
+  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
+  (1,'Protein folding: Adopts specific three-dimensional structure',
+  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
+  

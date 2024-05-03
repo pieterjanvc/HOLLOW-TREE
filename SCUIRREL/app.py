@@ -27,7 +27,7 @@ from htmltools import HTML, div
 uID = 1  # if registered users update later
 
 conn = shared.appDBConn()
-topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+topics = pd.read_sql_query('SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0', conn)
 conn.close()
 
 
@@ -137,10 +137,11 @@ if hasattr(session, "_process_ui"):
     cursor = conn.cursor()
     # For now we only have anonymous users (appID 0 -> SCUIRREL)
     _ = cursor.execute(
-        "INSERT INTO session (shinyToken, uID, appID, start)"
-        f'VALUES("{session.id}", {uID}, 0, "{shared.dt()}")'
+        'INSERT INTO "session" ("shinyToken", "uID", "appID", "start")'
+        'VALUES(%s, %s, 0, %s) RETURNING "sID"', (session.id, uID,shared.dt())
     )
-    sID = int(cursor.lastrowid)
+    #sID = int(cursor.lastrowid)
+    sID = cursor.fetchone()[0]
     conn.commit()
     conn.close()
     sessionID.set(sID)
@@ -165,7 +166,7 @@ def theEnd():
         shared.endDiscussion(cursor, dID, msg)
         # Register the end of the session
         _ = cursor.execute(
-            f'UPDATE session SET end = "{shared.dt()}" WHERE sID = {sID}'
+            'UPDATE "session" SET "end" = %s WHERE "sID" = %s', (shared.dt(),sID)
         )
         conn.commit()
         conn.close()
@@ -174,7 +175,7 @@ def theEnd():
 @reactive.effect
 @reactive.event(input.selTopic)
 def _():
-    tID = topics[topics["tID"] == int(input.selTopic())].iloc[0]["tID"]
+    tID = int(topics[topics["tID"] == int(input.selTopic())].iloc[0]["tID"])
     conn = shared.appDBConn()
     cursor = conn.cursor()
     # Save the logs for the previous discussion (if any)
@@ -184,14 +185,17 @@ def _():
 
     # Register the start of the  new topic discussion
     _ = cursor.execute(
-        "INSERT INTO discussion (tID, sID, start)"
-        f'VALUES({tID}, {sessionID.get()}, "{shared.dt()}")'
+        'INSERT INTO "discussion" ("tID", "sID", "start")'
+        'VALUES(%s, %s, %s) RETURNING "dID"', (tID,sessionID.get(),shared.dt())
     )
-    discussionID.set(int(cursor.lastrowid))
+    discussionID.set(cursor.fetchone()[0])
+    # discussionID.set(int(cursor.lastrowid))
     # Only show the quiz button if there are any questions
-    if cursor.execute(
-        f"SELECT qID FROM question where tID = {tID} AND archived = 0"
-    ).fetchone():
+    _ = cursor.execute(
+        'SELECT "qID" FROM "question" WHERE "tID" = %s AND "archived" = 0',
+        (tID,)
+    )
+    if cursor.fetchone():
         elementDisplay("quiz", "s")
     else:
         elementDisplay("quiz", "h")
@@ -227,8 +231,8 @@ def _():
 def concepts():
     conn = shared.appDBConn()
     concepts = pd.read_sql_query(
-        f"SELECT * FROM concept WHERE tID = {int(input.selTopic())} AND archived = 0",
-        conn,
+        'SELECT * FROM "concept" WHERE "tID" = %s AND "archived" = 0',
+        params = (input.selTopic(),), con = conn,
     )
     conn.close()
     return concepts
@@ -342,8 +346,8 @@ def _():
     # Get a random question on the topic from the DB
     conn = shared.appDBConn()
     q = pd.read_sql_query(
-        f"SELECT * FROM question WHERE tID = {int(input.selTopic())} AND archived = 0",
-        conn,
+        'SELECT * FROM "question" WHERE "tID" = %s AND "archived" = 0',
+        params=(input.selTopic(),), con = conn
     )
     conn.close()
     q = q.sample(1).iloc[0].to_dict()
@@ -430,10 +434,9 @@ def _():
     conn = shared.appDBConn()
     cursor = conn.cursor()
     _ = cursor.execute(
-        'INSERT INTO response (sID, qID, "response", "correct", "start", "check", "end") '
-        f'VALUES({sessionID()}, {q["qID"]}, {q["response"]}, {q["correct"]},'
-        f'"{q["start"]}",{q["check"]},"{shared.dt()}")'
-    )
+        'INSERT INTO "response" ("sID", "qID", "response", "correct", "start", "check", "end")'
+        'VALUES(%s, %s, %s, %s, %s, %s, %s)',
+        (sessionID(),q["qID"],q["response"],q["correct"],q["start"],q["check"],shared.dt()))
     conn.commit()
     conn.close()
     ui.modal_remove()
@@ -487,7 +490,8 @@ def _():
     conn = shared.appDBConn()
     cursor = conn.cursor()
     _ = cursor.execute(
-        "INSERT INTO feedback_chat(dID,code,created,details) VALUES(?,?,?,?)",
+        'INSERT INTO "feedback_chat"("dID","code","created","details") ' 
+        'VALUES(%s,%s,%s,%s) RETURNING "fcID"',
         (
             discussionID.get(),
             int(input.feedbackChatCode()),
@@ -495,11 +499,12 @@ def _():
             input.feedbackChatDetails(),
         ),
     )
-    fcID = cursor.lastrowid
+    fcID = cursor.fetchone()[0]
+    # fcID = cursor.lastrowid
     tempID = json.loads(input.selectedMsg())
     tempID.sort()
     _ = cursor.executemany(
-        f"INSERT INTO feedback_chat_msg(fcID,mID) VALUES({fcID},?)",
+        f'INSERT INTO "feedback_chat_msg"("fcID","mID") VALUES({fcID},%s)',
         [(x,) for x in tempID],
     )
     conn.commit()
@@ -560,7 +565,7 @@ def _():
     conn = shared.appDBConn()
     cursor = conn.cursor()
     _ = cursor.execute(
-        "INSERT INTO feedback_general(sID,code,created,email,details) VALUES(?,?,?,?,?)",
+        'INSERT INTO "feedback_general"("sID","code","created","email","details") VALUES(%s,%s,%s,%s,%s)',
         (
             sessionID(),
             input.feedbackCode(),
