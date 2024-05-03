@@ -8,6 +8,7 @@
 # General
 import os
 import sqlite3
+import psycopg2
 from datetime import datetime
 import pandas as pd
 import toml
@@ -23,10 +24,10 @@ from llama_index.vector_stores.duckdb import DuckDBVectorStore
 with open("config.toml", "r") as f:
     config = toml.load(f)
 
-appDB = config["data"]["appDB"]
-vectorDB = config["data"]["vectorDB"]
+remoteAppDB = any(config["general"]["remoteAppDB"] == x for x in ["True", "true", "T", 1])
+vectorDB = config["localStorage"]["vectorDB"]
 allowMultiGuess = any(
-    config["settings"]["allowMultiGuess"] == x for x in ["True", "true", "T", 1]
+    config["general"]["allowMultiGuess"] == x for x in ["True", "true", "T", 1]
 )
 
 # Get the OpenAI API key and organistation
@@ -34,9 +35,6 @@ os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
 os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
 gptModel = config["LLM"]["gptModel"]
 llm = OpenAI(model=gptModel)
-
-if not os.path.exists(appDB):
-    raise ConnectionError("The app database was not found. Please run ACCORNS first")
 
 if not os.path.exists(vectorDB):
     raise ConnectionError("The vector database was not found. Please run ACCORNS first")
@@ -46,8 +44,33 @@ if os.environ["OPENAI_API_KEY"] is None:
         "There is no OpenAI API key stored in the the OPENAI_API_KEY environment variable"
     )
 
+# Load the vector index from storage
+vector_store = DuckDBVectorStore.from_local(vectorDB)
+index = VectorStoreIndex.from_vector_store(vector_store)
+
+
+# --- FUNCTIONS ---
+def dt():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+# Get a local or remote DB connection (depending on config)
+def appDBConn(remoteAppDB = remoteAppDB):
+    if remoteAppDB:
+        return(
+            psycopg2.connect(
+            host = config["postgres"]["host"],
+            user=config["postgres"]["username"],
+            password=os.environ.get("POSTGRES_PASS_SCUIRREL"),
+            database=config["postgres"]["db"]
+    )
+        )
+    else: 
+        if not os.path.exists(config["localStorage"]["appDB"]):
+            raise ConnectionError("The app database was not found. Please run ACCORNS first")
+        return sqlite3.connect(config["localStorage"]["appDB"])
+
 # Check if there are topics to discuss before proceeding
-conn = sqlite3.connect(appDB)
+conn = appDBConn()
 topics = pd.read_sql_query(
     "SELECT * FROM topic WHERE archived = 0 AND tID IN"
     "(SELECT DISTINCT tID from concept WHERE archived = 0)",
@@ -60,16 +83,6 @@ if topics.shape[0] == 0:
         " Please run the admin app first"
     )
 conn.close()
-
-# Load the vector index from storage
-vector_store = DuckDBVectorStore.from_local(vectorDB)
-index = VectorStoreIndex.from_vector_store(vector_store)
-
-
-# --- FUNCTIONS ---
-def dt():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
 
 # Adapt the chat engine to the topic
 def chatEngine(topic, concepts, cIndex, eval):
@@ -264,10 +277,10 @@ def endDiscussion(cursor, dID, messages, timeStamp=dt()):
     )
     # If a chat issue was submitted, update the temp IDs to the real ones
     idShift = cursor.lastrowid - messages.id + 1
-    if cursor.execute(f"SELECT fcID FROM issue_chat WHERE dID = {dID}").fetchone():
+    if cursor.execute(f"SELECT fcID FROM feedback_chat WHERE dID = {dID}").fetchone():
         _ = cursor.execute(
-            f"UPDATE issue_chat_msg SET mID = mID + {idShift} WHERE fcID IN "
-            f"(SELECT fcID FROM issue_chat WHERE dID = {dID})"
+            f"UPDATE feedback_chat_msg SET mID = mID + {idShift} WHERE fcID IN "
+            f"(SELECT fcID FROM feedback_chat WHERE dID = {dID})"
         )
 
 

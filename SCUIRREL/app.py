@@ -26,7 +26,7 @@ from htmltools import HTML, div
 # Non-reactive session variables (loaded before session starts)
 uID = 1  # if registered users update later
 
-conn = sqlite3.connect(shared.appDB)
+conn = shared.appDBConn()
 topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
 conn.close()
 
@@ -133,7 +133,7 @@ botLog = reactive.value(None)  # Chat sent to the LLM
 # Stuff to run once when the session has loaded
 if hasattr(session, "_process_ui"):
     # Register the session start in the DB
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
     # For now we only have anonymous users (appID 0 -> SCUIRREL)
     _ = cursor.execute(
@@ -159,7 +159,7 @@ def theEnd():
         msg = messages.get()
         sID = sessionID.get()
         # AUpdate the database
-        conn = sqlite3.connect(shared.appDB)
+        conn = shared.appDBConn()
         cursor = conn.cursor()
         # Log current discussion
         shared.endDiscussion(cursor, dID, msg)
@@ -175,7 +175,7 @@ def theEnd():
 @reactive.event(input.selTopic)
 def _():
     tID = topics[topics["tID"] == int(input.selTopic())].iloc[0]["tID"]
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
     # Save the logs for the previous discussion (if any)
     if messages.get():
@@ -225,7 +225,7 @@ def _():
 # Get the concepts related to the topic
 @reactive.calc
 def concepts():
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     concepts = pd.read_sql_query(
         f"SELECT * FROM concept WHERE tID = {int(input.selTopic())} AND archived = 0",
         conn,
@@ -340,7 +340,7 @@ quizQuestion = reactive.value()
 @reactive.event(input.quiz)
 def _():
     # Get a random question on the topic from the DB
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     q = pd.read_sql_query(
         f"SELECT * FROM question WHERE tID = {int(input.selTopic())} AND archived = 0",
         conn,
@@ -427,7 +427,7 @@ def _():
         q["response"] = f'"{q["response"]}"'
 
     # Add the response to the DB
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
     _ = cursor.execute(
         'INSERT INTO response (sID, qID, "response", "correct", "start", "check", "end") '
@@ -484,7 +484,7 @@ def _():
     # Because multiple issues can be submitted for a single conversation, we have to commit to the
     # DB immediately or it would become harder to keep track of TODO
     # This means we add a temp mID which will be updated in the end
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
     _ = cursor.execute(
         "INSERT INTO feedback_chat(dID,code,created,details) VALUES(?,?,?,?)",
@@ -557,7 +557,7 @@ def _():
 @reactive.effect
 @reactive.event(input.feedbackSubmit)
 def _():
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
     _ = cursor.execute(
         "INSERT INTO feedback_general(sID,code,created,email,details) VALUES(?,?,?,?,?)",

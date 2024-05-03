@@ -71,7 +71,7 @@ def createAppDB(DBpath, addDemo=False):
         return (1, "Database already exists. Skipping")
 
     # Create a new database from the SQL file
-    with open("appDB/createAppDB.sql", "r") as file:
+    with open("appDB/appDB_sqlite.sql", "r") as file:
         query = file.read().replace("\n", " ").replace("\t", "").split(";")
 
     conn = sqlite3.connect(DBpath)
