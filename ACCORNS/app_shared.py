@@ -8,6 +8,7 @@
 # -- General
 import os
 import sqlite3
+import psycopg2
 from datetime import datetime
 import regex as re
 import duckdb
@@ -36,10 +37,11 @@ with open("config.toml", "r") as f:
     config = toml.load(f)
 
 addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
-appDB = config["data"]["appDB"]
-vectorDB = config["data"]["vectorDB"]
-tempFolder = os.path.join(config["data"]["tempFolder"], "")
-storageFolder = os.path.join(config["data"]["storageFolder"], "")
+remoteAppDB = any(config["general"]["remoteAppDB"] == x for x in ["True", "true", "T", 1])
+appDB = config["localStorage"]["appDB"]
+vectorDB = config["localStorage"]["vectorDB"]
+tempFolder = os.path.join(config["localStorage"]["tempFolder"], "")
+storageFolder = os.path.join(config["localStorage"]["storageFolder"], "")
 
 # Get the OpenAI API key and organistation
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
@@ -64,11 +66,44 @@ def inputCheck(input):
     else:
         False
 
+# Get a local or remote DB connection (depending on config)
+def appDBConn(remoteAppDB = remoteAppDB):
+    if remoteAppDB:
+        return(psycopg2.connect(
+            host = config["postgres"]["host"],
+            user=config["postgres"]["username"],
+            password=os.environ.get("POSTGRES_PASS_SCUIRREL"),
+            database=config["postgres"]["db"])
+        )
+        
+    else: 
+        if not os.path.exists(config["localStorage"]["appDB"]):
+            raise ConnectionError("The app database was not found. Please run ACCORNS first")
+        return sqlite3.connect(config["localStorage"]["appDB"])
+
+def executeQuery(cursor, query, params = (), lastRowId = "", remoteAppDB = remoteAppDB):
+    query = query.replace("?", "%s") if remoteAppDB else query
+    query = query + f' RETURNING "{lastRowId}"' if remoteAppDB & (lastRowId != "") else query
+    
+    if isinstance(params, tuple):
+        cursor.execute(query, params)
+    else:
+        if len(params) > 1:
+            cursor.executemany(query, params[:-1])
+        cursor.execute(query, params[-1])
+    
+    if lastRowId != "":
+        if remoteAppDB:
+            return cursor.fetchone()[0]
+        else: 
+            return cursor.lastrowid
+        
+    return
 
 # Database to store app data (this is not the vector database!)
-def createAppDB(DBpath, addDemo=False):
+def createSQLiteAppDB(DBpath, addDemo=False):
     if os.path.exists(DBpath):
-        return (1, "Database already exists. Skipping")
+        return (2, "Database already exists. Skipping")
 
     # Create a new database from the SQL file
     with open("appDB/appDB_sqlite.sql", "r") as file:
@@ -80,61 +115,25 @@ def createAppDB(DBpath, addDemo=False):
     for x in query:
         _ = cursor.execute(x)
 
-    # Add the anonymous user and main admin
-    _ = cursor.execute(
-        "INSERT INTO user(username, isAdmin, created, modified)"
-        f'VALUES("anonymous", 0, "{dt()}", "{dt()}"), ("admin", 1, "{dt()}", "{dt()}")'
-    )
-
     if not addDemo:
         conn.commit()
         conn.close()
-        return
+        return (0, "DB created - No demo added")
 
-    # Add a test topic (to be removed later)
-    topic = "The central dogma of molecular biology"
-    _ = cursor.execute(
-        "INSERT INTO topic(topic, created, modified)"
-        f'VALUES("{topic}", "{dt()}", "{dt()}")'
-    )
-    tID = cursor.lastrowid
-
-    # Add topic concepts (to be removed later)
-    concepts = [
-        ("Central dogma of molecular biology: DNA makes RNA makes Protein",),
-        (
-            "DNA: Composed of adenine (A), cytosine (C), guanine (G), and thymine (T); Blueprint of life",
-        ),
-        ("Genes: Hold code for specific functional molecular products (RNA and Protein)",),
-        ("RNA: Composed of nucleotides (including uracil, U); Single-stranded",),
-        (
-            "Transcription: RNA polymerase unwinds DNA double helix; Synthesizes complementary RNA strand",
-        ),
-        ("Messenger RNA (mRNA): Carries genetic code from nucleus to cytoplasm",),
-        ("RNA splicing: Removes introns; Retains exons",),
-        ("Translation: Occurs in ribosomes; Deciphers mRNA to assemble protein",),
-        (
-            "Codons: Three-nucleotide sequences; Specify amino acids or signal start/termination of translation",
-        ),
-        ("Amino acids: Building blocks of proteins; Linked by peptide bonds",),
-        ("Protein folding: Adopts specific three-dimensional structure",),
-        (
-            "Post-translational modifications: Addition of chemical groups; Cleavage of specific segments",
-        ),
-    ]
-    _ = cursor.executemany(
-        "INSERT INTO concept(tID, concept, created, modified) "
-        f'VALUES({tID}, ?, "{dt()}", "{dt()}")',
-        concepts,
-    )
+    with open("appDB/appDB_sqlite_demo.sql", "r") as file:
+        query = file.read().replace("\n", " ").replace("\t", "").split(";")
+    
+    for x in query:
+        _ = cursor.execute(x)
+    
     conn.commit()
     conn.close()
 
-    return (0, "Creation completed")
+    return (1, "DB created - Demo added")
 
 
 # Make new app DB if needed
-print(createAppDB(appDB, addDemo=addDemo))
+print(createSQLiteAppDB(appDB, addDemo=addDemo))
 
 
 # Create DuckDB vector database and add files
@@ -260,29 +259,34 @@ if addDemo & (not os.path.exists(vectorDB)):
 
 def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=dt()):
     # Check if the table exists
-    if (
-        cursor.execute(
+    _  = executeQuery(cursor,
             f'SELECT * FROM sqlite_master WHERE tbl_name = "{table}"'
-        ).fetchone()
-        is None
-    ):
-        raise sqlite3.DataError("The table '{table}' does not exist in the database")
+        )
+    check = cursor.fetchone()
+    if (check is None):
+        raise ValueError("The table '{table}' does not exist in the database")
     # Get the Primary Key
-    PK = cursor.execute(
-        f"SELECT name FROM pragma_table_info('{table}') WHERE pk = 1"
-    ).fetchone()[0]
+    if remoteAppDB:
+        q = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' LIMIT 1"
+    else :
+        q = f"SELECT name FROM pragma_table_info('{table}') WHERE pk = 1"
+    
+    PK = executeQuery(cursor, q).fetchone()[0]
     # Check if the attribute exists
-    if (
-        cursor.execute(
-            f"SELECT name FROM pragma_table_info('{table}') WHERE name = '{attribute}'"
-        ).fetchone()
-        is None
-    ):
-        raise sqlite3.DataError(f"'{attribute}' is not a column of table '{table}'")
+    if remoteAppDB:
+        q = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' AND column_name = '{attribute}'"
+    else :
+        q = f"SELECT name FROM pragma_table_info('{table}') WHERE name = '{attribute}'"
+    
+    _  = executeQuery(cursor,q)
+    check = cursor.fetchone()
+    
+    if (check is None):
+        raise ValueError(f"'{attribute}' is not a column of table '{table}'")
     # Check isBot and assign 0, 1 or Null when False, True, None
     isBot = isBot + 0 if isBot is not None else "NULL"
     # Insert into backup
-    _ = cursor.execute(
+    _ = executeQuery(cursor,
         f"INSERT INTO backup (sID, modified, 'table', 'rowID', created, isBot, 'attribute', tValue) "
         f"SELECT {sID} as sID, '{timeStamp}' as 'modified', '{table}' as 'table', {rowID} as 'rowID', "
         f"modified as 'created', {isBot} as isBot, '{attribute}' as 'attribute', {attribute} as 'tValue' "

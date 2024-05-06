@@ -165,3 +165,8 @@ CREATE TABLE IF NOT EXISTS "feedback_chat_msg" (
   FOREIGN KEY("fcID") REFERENCES "feedback_chat"("fcID") 
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
+
+-- Add the main admin an anonymous user
+INSERT INTO user(username, isAdmin, created, modified)
+VALUES("anonymous", 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), 
+  ("admin", 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

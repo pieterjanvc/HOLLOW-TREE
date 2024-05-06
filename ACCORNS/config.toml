@@ -1,11 +1,20 @@
 [general]
 addDemo = "True"
+remoteAppDB = "True" # If True use postgres otherwise localStorage
 
-[data]
+[localStorage]
 appDB = "../appData/appDB.db"
 vectorDB = "../appData/vectordb.duckdb"
 storageFolder = "../appData/uploadedFiles"
-tempFolder = "../appData/temp"
+tempFolder = "temp"
+
+[postgres]
+host = "localhost"
+db = "scuirrel"
+username = "scuirrel"
+# Password retrieved from POSTGRES_PASS_SCUIRREL environment variable
 
 [LLM]
 gptModel = "gpt-3.5-turbo-0125"  # use gpt-3.5-turbo-0125 or gpt-4
+# Make sure OPENAI_API_KEY is set as environment variable
+# Make sure OPENAI_ORGANIZATION is set as environment variable
