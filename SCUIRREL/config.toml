@@ -9,7 +9,7 @@ vectorDB = "../appData/vectordb.duckdb"
 [postgres]
 host = "localhost"
 db = "scuirrel"
-username = "scuirrel_app"
+username = "scuirrel"
 # Password retrieved from POSTGRES_PASS_SCUIRREL environment variable
 
 [LLM]

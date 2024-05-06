@@ -13,6 +13,7 @@ import sqlite3
 from html import escape
 import pandas as pd
 import json
+import warnings
 
 # Shiny
 from shiny import reactive
@@ -26,10 +27,11 @@ from htmltools import HTML, div
 # Non-reactive session variables (loaded before session starts)
 uID = 1  # if registered users update later
 
-conn = shared.appDBConn()
-topics = pd.read_sql_query('SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0', conn)
-conn.close()
-
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    conn = shared.appDBConn()
+    topics = pd.read_sql_query('SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0', conn)
+    conn.close()
 
 # --- RENDERING UI ---
 # ********************
@@ -136,12 +138,10 @@ if hasattr(session, "_process_ui"):
     conn = shared.appDBConn()
     cursor = conn.cursor()
     # For now we only have anonymous users (appID 0 -> SCUIRREL)
-    _ = cursor.execute(
+    sID = shared.executeQuery(cursor,
         'INSERT INTO "session" ("shinyToken", "uID", "appID", "start")'
-        'VALUES(%s, %s, 0, %s) RETURNING "sID"', (session.id, uID,shared.dt())
+        'VALUES(?, ?, 0, ?)', (session.id, uID,shared.dt()), lastRowId="sID"
     )
-    #sID = int(cursor.lastrowid)
-    sID = cursor.fetchone()[0]
     conn.commit()
     conn.close()
     sessionID.set(sID)
@@ -165,8 +165,8 @@ def theEnd():
         # Log current discussion
         shared.endDiscussion(cursor, dID, msg)
         # Register the end of the session
-        _ = cursor.execute(
-            'UPDATE "session" SET "end" = %s WHERE "sID" = %s', (shared.dt(),sID)
+        _ = shared.executeQuery(cursor,
+            'UPDATE "session" SET "end" = ? WHERE "sID" = ?', (shared.dt(),sID)
         )
         conn.commit()
         conn.close()
@@ -184,15 +184,15 @@ def _():
         elementDisplay("chatIn", "s")  # In case hidden if previous finished
 
     # Register the start of the  new topic discussion
-    _ = cursor.execute(
+    dID = shared.executeQuery(cursor,
         'INSERT INTO "discussion" ("tID", "sID", "start")'
-        'VALUES(%s, %s, %s) RETURNING "dID"', (tID,sessionID.get(),shared.dt())
+        'VALUES(?, ?, ?)', (tID,sessionID.get(),shared.dt()),
+        lastRowId="dID"
     )
-    discussionID.set(cursor.fetchone()[0])
-    # discussionID.set(int(cursor.lastrowid))
+    discussionID.set(int(dID))
     # Only show the quiz button if there are any questions
-    _ = cursor.execute(
-        'SELECT "qID" FROM "question" WHERE "tID" = %s AND "archived" = 0',
+    _ = shared.executeQuery(cursor,
+        'SELECT "qID" FROM "question" WHERE "tID" = ? AND "archived" = 0',
         (tID,)
     )
     if cursor.fetchone():
@@ -230,10 +230,13 @@ def _():
 @reactive.calc
 def concepts():
     conn = shared.appDBConn()
-    concepts = pd.read_sql_query(
-        'SELECT * FROM "concept" WHERE "tID" = %s AND "archived" = 0',
-        params = (input.selTopic(),), con = conn,
-    )
+    placeholder = "%s" if shared.remoteAppDB else "?"
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        concepts = pd.read_sql_query(
+            f'SELECT * FROM "concept" WHERE "tID" = {placeholder} AND "archived" = 0',
+            params = (input.selTopic(),), con = conn,
+        )
     conn.close()
     return concepts
 
@@ -345,10 +348,13 @@ quizQuestion = reactive.value()
 def _():
     # Get a random question on the topic from the DB
     conn = shared.appDBConn()
-    q = pd.read_sql_query(
-        'SELECT * FROM "question" WHERE "tID" = %s AND "archived" = 0',
-        params=(input.selTopic(),), con = conn
-    )
+    placeholder = "%s" if shared.remoteAppDB else "?"
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        q = pd.read_sql_query(
+            f'SELECT * FROM "question" WHERE "tID" = {placeholder} AND "archived" = 0',
+            params=(input.selTopic(),), con = conn
+        )
     conn.close()
     q = q.sample(1).iloc[0].to_dict()
     q["start"] = shared.dt()
@@ -433,9 +439,9 @@ def _():
     # Add the response to the DB
     conn = shared.appDBConn()
     cursor = conn.cursor()
-    _ = cursor.execute(
+    _ = shared.executeQuery(cursor,
         'INSERT INTO "response" ("sID", "qID", "response", "correct", "start", "check", "end")'
-        'VALUES(%s, %s, %s, %s, %s, %s, %s)',
+        'VALUES(?, ?, ?, ?, ?, ?, ?)',
         (sessionID(),q["qID"],q["response"],q["correct"],q["start"],q["check"],shared.dt()))
     conn.commit()
     conn.close()
@@ -489,22 +495,20 @@ def _():
     # This means we add a temp mID which will be updated in the end
     conn = shared.appDBConn()
     cursor = conn.cursor()
-    _ = cursor.execute(
+    fcID = shared.executeQuery(cursor,
         'INSERT INTO "feedback_chat"("dID","code","created","details") ' 
-        'VALUES(%s,%s,%s,%s) RETURNING "fcID"',
+        'VALUES(?,?,?,?)',
         (
             discussionID.get(),
             int(input.feedbackChatCode()),
             shared.dt(),
             input.feedbackChatDetails(),
-        ),
+        ), lastRowId="fcID"
     )
-    fcID = cursor.fetchone()[0]
-    # fcID = cursor.lastrowid
     tempID = json.loads(input.selectedMsg())
     tempID.sort()
-    _ = cursor.executemany(
-        f'INSERT INTO "feedback_chat_msg"("fcID","mID") VALUES({fcID},%s)',
+    _ = shared.executeQuery(cursor,
+        f'INSERT INTO "feedback_chat_msg"("fcID","mID") VALUES({fcID},?)',
         [(x,) for x in tempID],
     )
     conn.commit()
@@ -564,8 +568,8 @@ def _():
 def _():
     conn = shared.appDBConn()
     cursor = conn.cursor()
-    _ = cursor.execute(
-        'INSERT INTO "feedback_general"("sID","code","created","email","details") VALUES(%s,%s,%s,%s,%s)',
+    _ = shared.executeQuery(cursor,
+        'INSERT INTO "feedback_general"("sID","code","created","email","details") VALUES(?,?,?,?,?)',
         (
             sessionID(),
             input.feedbackCode(),

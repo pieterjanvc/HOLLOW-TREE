@@ -1,21 +1,6 @@
 DROP DATABASE IF EXISTS :dbName;
 CREATE DATABASE :dbName;
 
-DO
-$$
-BEGIN
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scuirrel') THEN
-        DROP OWNED BY scuirrel;
-        DROP ROLE scuirrel;
-    END IF;
-END
-$$;
-
-CREATE ROLE scuirrel WITH LOGIN PASSWORD :'appPass';
-GRANT CONNECT ON DATABASE :dbName TO scuirrel;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO scuirrel;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO scuirrel;
-
 \c :dbName;
 
 CREATE TABLE "user" (
@@ -178,3 +163,18 @@ CREATE TABLE "feedback_chat_msg" (
 INSERT INTO "user" ("username", "isAdmin", "created", "modified") 
 VALUES ('anonymous', 0, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS')), 
 ('admin', 1, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
+
+DO
+$$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scuirrel') THEN
+        DROP OWNED BY scuirrel;
+        DROP ROLE scuirrel;
+    END IF;
+END
+$$;
+
+CREATE ROLE scuirrel WITH LOGIN PASSWORD :'appPass';
+GRANT CONNECT ON DATABASE :dbName TO scuirrel;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO scuirrel;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO scuirrel;
