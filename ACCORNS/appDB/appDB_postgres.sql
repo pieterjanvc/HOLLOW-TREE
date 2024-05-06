@@ -1,5 +1,24 @@
-DROP TABLE IF EXISTS "user";
-CREATE TABLE IF NOT EXISTS "user" (
+DROP DATABASE IF EXISTS :dbName;
+CREATE DATABASE :dbName;
+
+DO
+$$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scuirrel') THEN
+        DROP OWNED BY scuirrel;
+        DROP ROLE scuirrel;
+    END IF;
+END
+$$;
+
+CREATE ROLE scuirrel WITH LOGIN PASSWORD :'appPass';
+GRANT CONNECT ON DATABASE :dbName TO scuirrel;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO scuirrel;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO scuirrel;
+
+\c :dbName;
+
+CREATE TABLE "user" (
 	"uID" SERIAL PRIMARY KEY,
 	"username" TEXT UNIQUE,
   "isAdmin" INTEGER DEFAULT 0,
@@ -8,8 +27,7 @@ CREATE TABLE IF NOT EXISTS "user" (
   "modified" TEXT
 );
 
-DROP TABLE IF EXISTS "session";
-CREATE TABLE IF NOT EXISTS "session" (
+CREATE TABLE "session" (
 	"sID" SERIAL PRIMARY KEY,
   "uID" INTEGER,
   "appID" INTEGER,
@@ -20,8 +38,7 @@ CREATE TABLE IF NOT EXISTS "session" (
 		ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-DROP TABLE IF EXISTS "topic";
-CREATE TABLE IF NOT EXISTS "topic" (
+CREATE TABLE "topic" (
 	"tID" SERIAL PRIMARY KEY,
 	"topic" TEXT,
   "archived" INTEGER DEFAULT 0,
@@ -30,8 +47,7 @@ CREATE TABLE IF NOT EXISTS "topic" (
   "description" TEXT
 );
 
-DROP TABLE IF EXISTS "concept";
-CREATE TABLE IF NOT EXISTS "concept" (
+CREATE TABLE "concept" (
 	"cID" SERIAL PRIMARY KEY,
 	"tID" INTEGER,
   "concept" TEXT,
@@ -43,8 +59,7 @@ CREATE TABLE IF NOT EXISTS "concept" (
 		ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-DROP TABLE IF EXISTS "discussion";
-CREATE TABLE IF NOT EXISTS "discussion" (
+CREATE TABLE "discussion" (
 	"dID" SERIAL PRIMARY KEY,
 	"tID" INTEGER,
   "sID" INTEGER,
@@ -56,8 +71,7 @@ CREATE TABLE IF NOT EXISTS "discussion" (
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-DROP TABLE IF EXISTS "message";
-CREATE TABLE IF NOT EXISTS "message" (
+CREATE TABLE "message" (
 	"mID" SERIAL PRIMARY KEY,
 	"dID" INTEGER,
   "cID" INTEGER,
@@ -72,8 +86,7 @@ CREATE TABLE IF NOT EXISTS "message" (
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-DROP TABLE IF EXISTS "question";
-CREATE TABLE IF NOT EXISTS "question" (
+CREATE TABLE "question" (
 	"qID" SERIAL PRIMARY KEY,
   "sID" INTEGER,
   "tID" INTEGER,
@@ -99,8 +112,7 @@ CREATE TABLE IF NOT EXISTS "question" (
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-DROP TABLE IF EXISTS "response";
-CREATE TABLE IF NOT EXISTS "response" (
+CREATE TABLE "response" (
 	"rID" SERIAL PRIMARY KEY,
   "sID" INTEGER NOT NULL,
   "qID" INTEGER NOT NULL,  
@@ -115,8 +127,7 @@ CREATE TABLE IF NOT EXISTS "response" (
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-DROP TABLE IF EXISTS "backup";
-CREATE TABLE IF NOT EXISTS "backup" (
+CREATE TABLE "backup" (
 	"bID" SERIAL PRIMARY KEY,
   "sID" INTEGER NOT NULL,
   "modified" TEXT NOT NULL,
@@ -131,8 +142,7 @@ CREATE TABLE IF NOT EXISTS "backup" (
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-DROP TABLE IF EXISTS "feedback_general";
-CREATE TABLE IF NOT EXISTS "feedback_general" (
+CREATE TABLE "feedback_general" (
 	"fgID" SERIAL PRIMARY KEY,
   "sID" INTEGER NOT NULL,
   "code" INTEGER NOT NULL,
@@ -144,8 +154,7 @@ CREATE TABLE IF NOT EXISTS "feedback_general" (
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-DROP TABLE IF EXISTS "feedback_chat";
-CREATE TABLE IF NOT EXISTS "feedback_chat" (
+CREATE TABLE "feedback_chat" (
 	"fcID" SERIAL PRIMARY KEY,
   "dID" INTEGER NOT NULL,
   "code" INTEGER NOT NULL,
@@ -157,8 +166,7 @@ CREATE TABLE IF NOT EXISTS "feedback_chat" (
 
 -- We can't add a mID foreign key because the first time 
 -- the value is inserted it's a placeholder which gets updated 
-DROP TABLE IF EXISTS "feedback_chat_msg";
-CREATE TABLE IF NOT EXISTS "feedback_chat_msg" (
+CREATE TABLE "feedback_chat_msg" (
 	"fcmID" SERIAL PRIMARY KEY,
   "fcID" INTEGER NOT NULL,
   "mID" INTEGER NOT NULL, 
@@ -170,29 +178,3 @@ CREATE TABLE IF NOT EXISTS "feedback_chat_msg" (
 INSERT INTO "user" ("username", "isAdmin", "created", "modified") 
 VALUES ('anonymous', 0, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS')), 
 ('admin', 1, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
-
--- INSERT DEMO DATA (OPTIONAL)
-INSERT INTO topic("topic", "created", "modified")
-VALUES('The central dogma of molecular biology', to_char(now(), 
-  'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
-
-INSERT INTO "concept" ("tID", "concept", "created", "modified")
- VALUES (1,'Central dogma of molecular biology: DNA makes RNA makes Protein',
-  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
-  (1,'Genes: Hold code for specific functional molecular products (RNA and Protein)',
-  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
-  (1,'RNA: Composed of nucleotides (including uracil, U); Single-stranded',
-  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
-  (1,'Transcription: RNA polymerase unwinds DNA double helix; Synthesizes complementary RNA strand',
-  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
-  (1,'Messenger RNA (mRNA): Carries genetic code from nucleus to cytoplasm',
-  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
-  (1,'RNA splicing: Removes introns; Retains exons',
-  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
-  (1,'Translation: Occurs in ribosomes; Deciphers mRNA to assemble protein',
-  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
-  (1,'Amino acids: Building blocks of proteins; Linked by peptide bonds',
-  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
-  (1,'Protein folding: Adopts specific three-dimensional structure',
-  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
-  
