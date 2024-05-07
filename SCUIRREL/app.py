@@ -28,7 +28,9 @@ from htmltools import HTML, div
 uID = 1  # if registered users update later
 
 conn = shared.appDBConn()
-topics = shared.pandasQuery(conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0')
+topics = shared.pandasQuery(
+    conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
+)
 conn.close()
 
 # --- RENDERING UI ---
@@ -136,9 +138,12 @@ if hasattr(session, "_process_ui"):
     conn = shared.appDBConn()
     cursor = conn.cursor()
     # For now we only have anonymous users (appID 0 -> SCUIRREL)
-    sID = shared.executeQuery(cursor,
+    sID = shared.executeQuery(
+        cursor,
         'INSERT INTO "session" ("shinyToken", "uID", "appID", "start")'
-        'VALUES(?, ?, 0, ?)', (session.id, uID,shared.dt()), lastRowId="sID"
+        "VALUES(?, ?, 0, ?)",
+        (session.id, uID, shared.dt()),
+        lastRowId="sID",
     )
     conn.commit()
     conn.close()
@@ -163,8 +168,8 @@ def theEnd():
         # Log current discussion
         shared.endDiscussion(cursor, dID, msg)
         # Register the end of the session
-        _ = shared.executeQuery(cursor,
-            'UPDATE "session" SET "end" = ? WHERE "sID" = ?', (shared.dt(),sID)
+        _ = shared.executeQuery(
+            cursor, 'UPDATE "session" SET "end" = ? WHERE "sID" = ?', (shared.dt(), sID)
         )
         conn.commit()
         conn.close()
@@ -182,16 +187,18 @@ def _():
         elementDisplay("chatIn", "s")  # In case hidden if previous finished
 
     # Register the start of the  new topic discussion
-    dID = shared.executeQuery(cursor,
-        'INSERT INTO "discussion" ("tID", "sID", "start")'
-        'VALUES(?, ?, ?)', (tID,sessionID.get(),shared.dt()),
-        lastRowId="dID"
+    dID = shared.executeQuery(
+        cursor,
+        'INSERT INTO "discussion" ("tID", "sID", "start")' "VALUES(?, ?, ?)",
+        (tID, sessionID.get(), shared.dt()),
+        lastRowId="dID",
     )
     discussionID.set(int(dID))
     # Only show the quiz button if there are any questions
-    _ = shared.executeQuery(cursor,
+    _ = shared.executeQuery(
+        cursor,
         'SELECT "qID" FROM "question" WHERE "tID" = ? AND "archived" = 0',
-        (tID,)
+        (tID,),
     )
     if cursor.fetchone():
         elementDisplay("quiz", "s")
@@ -228,8 +235,9 @@ def _():
 @reactive.calc
 def concepts():
     conn = shared.appDBConn()
-    concepts = shared.pandasQuery(conn,
-        f'SELECT * FROM "concept" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0'
+    concepts = shared.pandasQuery(
+        conn,
+        f'SELECT * FROM "concept" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0',
     )
     conn.close()
     return concepts
@@ -299,18 +307,16 @@ def _():
         finished = False
         if int(eval["score"]) > 2:
             if i < (concepts().shape[0] - 1):
-                i = i + 1 
+                i = i + 1
             else:
                 finished = True
-            
+
             progressBar("chatProgress", int(100 * i / concepts().shape[0]))
-                
+
         # Add the evaluation of the student's last reply to the log
         msg = messages.get()
         msg.addEval(eval["score"], eval["comment"])
-        msg.add_message(
-            isBot=1, cID=int(concepts().iloc[i]["cID"]), content=resp
-        )
+        msg.add_message(isBot=1, cID=int(concepts().iloc[i]["cID"]), content=resp)
         messages.set(msg)
         conceptIndex.set(i)
         ui.insert_ui(
@@ -327,8 +333,8 @@ def _():
         # If conversation is over don't show new message box
         if not finished:
             elementDisplay("chatIn", "s")
-        else :
-            ui.insert_ui(HTML("<hr>"),"#conversation")
+        else:
+            ui.insert_ui(HTML("<hr>"), "#conversation")
 
 
 # -- QUIZ
@@ -342,8 +348,9 @@ quizQuestion = reactive.value()
 def _():
     # Get a random question on the topic from the DB
     conn = shared.appDBConn()
-    q = shared.pandasQuery(conn,
-         f'SELECT * FROM "question" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0'
+    q = shared.pandasQuery(
+        conn,
+        f'SELECT * FROM "question" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0',
     )
     conn.close()
     q = q.sample(1).iloc[0].to_dict()
@@ -429,10 +436,20 @@ def _():
     # Add the response to the DB
     conn = shared.appDBConn()
     cursor = conn.cursor()
-    _ = shared.executeQuery(cursor,
+    _ = shared.executeQuery(
+        cursor,
         'INSERT INTO "response" ("sID", "qID", "response", "correct", "start", "check", "end")'
-        'VALUES(?, ?, ?, ?, ?, ?, ?)',
-        (sessionID(),q["qID"],q["response"],q["correct"],q["start"],q["check"],shared.dt()))
+        "VALUES(?, ?, ?, ?, ?, ?, ?)",
+        (
+            sessionID(),
+            q["qID"],
+            q["response"],
+            q["correct"],
+            q["start"],
+            q["check"],
+            shared.dt(),
+        ),
+    )
     conn.commit()
     conn.close()
     ui.modal_remove()
@@ -485,19 +502,22 @@ def _():
     # This means we add a temp mID which will be updated in the end
     conn = shared.appDBConn()
     cursor = conn.cursor()
-    fcID = shared.executeQuery(cursor,
-        'INSERT INTO "feedback_chat"("dID","code","created","details") ' 
-        'VALUES(?,?,?,?)',
+    fcID = shared.executeQuery(
+        cursor,
+        'INSERT INTO "feedback_chat"("dID","code","created","details") '
+        "VALUES(?,?,?,?)",
         (
             discussionID.get(),
             int(input.feedbackChatCode()),
             shared.dt(),
             input.feedbackChatDetails(),
-        ), lastRowId="fcID"
+        ),
+        lastRowId="fcID",
     )
     tempID = json.loads(input.selectedMsg())
     tempID.sort()
-    _ = shared.executeQuery(cursor,
+    _ = shared.executeQuery(
+        cursor,
         f'INSERT INTO "feedback_chat_msg"("fcID","mID") VALUES({fcID},?)',
         [(x,) for x in tempID],
     )
@@ -558,7 +578,8 @@ def _():
 def _():
     conn = shared.appDBConn()
     cursor = conn.cursor()
-    _ = shared.executeQuery(cursor,
+    _ = shared.executeQuery(
+        cursor,
         'INSERT INTO "feedback_general"("sID","code","created","email","details") VALUES(?,?,?,?,?)',
         (
             sessionID(),

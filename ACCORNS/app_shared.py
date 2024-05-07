@@ -39,7 +39,9 @@ with open("config.toml", "r") as f:
     config = toml.load(f)
 
 addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
-remoteAppDB = any(config["general"]["remoteAppDB"] == x for x in ["True", "true", "T", 1])
+remoteAppDB = any(
+    config["general"]["remoteAppDB"] == x for x in ["True", "true", "T", 1]
+)
 appDB = config["localStorage"]["appDB"]
 vectorDB = config["localStorage"]["vectorDB"]
 tempFolder = os.path.join(config["localStorage"]["tempFolder"], "")
@@ -68,20 +70,24 @@ def inputCheck(input):
     else:
         False
 
+
 # Get a local or remote DB connection (depending on config)
-def appDBConn(remoteAppDB = remoteAppDB):
+def appDBConn(remoteAppDB=remoteAppDB):
     if remoteAppDB:
-        return(psycopg2.connect(
-            host = config["postgres"]["host"],
+        return psycopg2.connect(
+            host=config["postgres"]["host"],
             user=config["postgres"]["username"],
             password=os.environ.get("POSTGRES_PASS_SCUIRREL"),
-            database=config["postgres"]["db"])
+            database=config["postgres"]["db"],
         )
-        
-    else: 
+
+    else:
         if not os.path.exists(config["localStorage"]["appDB"]):
-            raise ConnectionError("The app database was not found. Please run ACCORNS first")
+            raise ConnectionError(
+                "The app database was not found. Please run ACCORNS first"
+            )
         return sqlite3.connect(config["localStorage"]["appDB"])
+
 
 # Check if the postgres scuirrel database is available when remoteAppDB is set to True
 def checkRemoteDB():
@@ -90,37 +96,46 @@ def checkRemoteDB():
         conn.close()
         return "Connection to postgres scuirrel database successful"
     except psycopg2.OperationalError as e:
-        raise psycopg2.OperationalError(str(e) + \
-            '\n\n POSTGRESQL connection error: '
-            'Please check the postgres connection settings in config.toml '
-            'and make sure POSTGRES_PASS_SCUIRREL is set as an environment variable.')
+        raise psycopg2.OperationalError(
+            str(e) + "\n\n POSTGRESQL connection error: "
+            "Please check the postgres connection settings in config.toml "
+            "and make sure POSTGRES_PASS_SCUIRREL is set as an environment variable."
+        )
+
 
 if remoteAppDB:
     print(checkRemoteDB())
 
-def executeQuery(cursor, query, params = (), lastRowId = "", remoteAppDB = remoteAppDB):
+
+def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB):
     query = query.replace("?", "%s") if remoteAppDB else query
-    query = query + f' RETURNING "{lastRowId}"' if remoteAppDB & (lastRowId != "") else query
-    
+    query = (
+        query + f' RETURNING "{lastRowId}"'
+        if remoteAppDB & (lastRowId != "")
+        else query
+    )
+
     if isinstance(params, tuple):
         cursor.execute(query, params)
     else:
         if len(params) > 1:
             cursor.executemany(query, params[:-1])
         cursor.execute(query, params[-1])
-    
+
     if lastRowId != "":
         if remoteAppDB:
             return cursor.fetchone()[0]
-        else: 
+        else:
             return cursor.lastrowid
-        
+
     return
+
 
 def pandasQuery(conn, query):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         return pd.read_sql_query(query, conn)
+
 
 # Database to store app data (this is not the vector database!)
 def createSQLiteAppDB(DBpath, addDemo=False):
@@ -144,10 +159,10 @@ def createSQLiteAppDB(DBpath, addDemo=False):
 
     with open("appDB/appDB_sqlite_demo.sql", "r") as file:
         query = file.read().replace("\n", " ").replace("\t", "").split(";")
-    
+
     for x in query:
         _ = cursor.execute(x)
-    
+
     conn.commit()
     conn.close()
 
@@ -283,34 +298,37 @@ def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=dt()
     # Get the Primary Key
     if remoteAppDB:
         q = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' LIMIT 1"
-    else :
+    else:
         q = f"SELECT name FROM pragma_table_info('{table}') WHERE pk = 1"
-    
+
     _ = executeQuery(cursor, q)
     PK = cursor.fetchone()[0]
-   
+
     if PK is None:
-        raise ValueError(f'There is no table with the name {table} in the SCUIRREL database')
-    
+        raise ValueError(
+            f"There is no table with the name {table} in the SCUIRREL database"
+        )
+
     # Check if the attribute exists
     if remoteAppDB:
         q = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' AND column_name = '{attribute}'"
-    else :
+    else:
         q = f"SELECT name FROM pragma_table_info('{table}') WHERE name = '{attribute}'"
-    
-    _  = executeQuery(cursor,q)
+
+    _ = executeQuery(cursor, q)
     check = cursor.fetchone()
-    
-    if (check is None):
+
+    if check is None:
         raise ValueError(f"'{attribute}' is not a column of table '{table}'")
     # Check isBot and assign 0, 1 or Null when False, True, None
     isBot = isBot + 0 if isBot is not None else "NULL"
     # Insert into backup
-    _ = executeQuery(cursor,
+    _ = executeQuery(
+        cursor,
         f'INSERT INTO "backup" ("sID", "modified", "table", "rowID", "created", "isBot", "attribute", "tValue") '
         f'SELECT {sID} as "sID", \'{timeStamp}\' as "modified", \'{table}\' as "table", {rowID} as "rowID", '
         f'"modified" as "created", {isBot} as "isBot", \'{attribute}\' as "attribute", {attribute} as "tValue" '
-        f'FROM "{table}" WHERE "{PK}" = {rowID}'
+        f'FROM "{table}" WHERE "{PK}" = {rowID}',
     )
 
 

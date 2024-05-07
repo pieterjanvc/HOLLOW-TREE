@@ -25,7 +25,9 @@ from llama_index.vector_stores.duckdb import DuckDBVectorStore
 with open("config.toml", "r") as f:
     config = toml.load(f)
 
-remoteAppDB = any(config["general"]["remoteAppDB"] == x for x in ["True", "true", "T", 1])
+remoteAppDB = any(
+    config["general"]["remoteAppDB"] == x for x in ["True", "true", "T", 1]
+)
 vectorDB = config["localStorage"]["vectorDB"]
 allowMultiGuess = any(
     config["general"]["allowMultiGuess"] == x for x in ["True", "true", "T", 1]
@@ -54,50 +56,61 @@ index = VectorStoreIndex.from_vector_store(vector_store)
 def dt():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+
 # Get a local or remote DB connection (depending on config)
-def appDBConn(remoteAppDB = remoteAppDB):
+def appDBConn(remoteAppDB=remoteAppDB):
     if remoteAppDB:
-        return(psycopg2.connect(
-            host = config["postgres"]["host"],
+        return psycopg2.connect(
+            host=config["postgres"]["host"],
             user=config["postgres"]["username"],
             password=os.environ.get("POSTGRES_PASS_SCUIRREL"),
-            database=config["postgres"]["db"])
+            database=config["postgres"]["db"],
         )
-        
-    else: 
+
+    else:
         if not os.path.exists(config["localStorage"]["appDB"]):
-            raise ConnectionError("The app database was not found. Please run ACCORNS first")
+            raise ConnectionError(
+                "The app database was not found. Please run ACCORNS first"
+            )
         return sqlite3.connect(config["localStorage"]["appDB"])
 
-def executeQuery(cursor, query, params = (), lastRowId = "", remoteAppDB = remoteAppDB):
+
+def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB):
     query = query.replace("?", "%s") if remoteAppDB else query
-    query = query + f' RETURNING "{lastRowId}"' if remoteAppDB & (lastRowId != "") else query
-    
+    query = (
+        query + f' RETURNING "{lastRowId}"'
+        if remoteAppDB & (lastRowId != "")
+        else query
+    )
+
     if isinstance(params, tuple):
         cursor.execute(query, params)
     else:
         if len(params) > 1:
             cursor.executemany(query, params[:-1])
         cursor.execute(query, params[-1])
-    
+
     if lastRowId != "":
         if remoteAppDB:
             return cursor.fetchone()[0]
-        else: 
+        else:
             return cursor.lastrowid
-        
+
     return
+
 
 def pandasQuery(conn, query):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         return pd.read_sql_query(query, conn)
 
+
 # Check if there are topics to discuss before proceeding
 conn = appDBConn()
-topics = pandasQuery(conn,
+topics = pandasQuery(
+    conn,
     'SELECT * FROM "topic" WHERE "archived" = 0 AND "tID" IN'
-    '(SELECT DISTINCT "tID" from "concept" WHERE "archived" = 0)'
+    '(SELECT DISTINCT "tID" from "concept" WHERE "archived" = 0)',
 )
 
 if topics.shape[0] == 0:
@@ -106,6 +119,7 @@ if topics.shape[0] == 0:
         " Please run the admin app first"
     )
 conn.close()
+
 
 # Adapt the chat engine to the topic
 def chatEngine(topic, concepts, cIndex, eval):
@@ -283,24 +297,32 @@ Please output your score in the following format:"""
 
 # Function to register the end of a discussion in the DB
 def endDiscussion(cursor, dID, messages, timeStamp=dt()):
-    _ = executeQuery(cursor,'UPDATE "discussion" SET "end" = ? WHERE "dID" = ?', (timeStamp,dID))
+    _ = executeQuery(
+        cursor, 'UPDATE "discussion" SET "end" = ? WHERE "dID" = ?', (timeStamp, dID)
+    )
     # Executemany is optimised in such a way that it can't return the lastrowid.
     # Therefor we insert the last message separately as we need to know the ID
     msg = messages.astuple(
         ["cID", "isBot", "timeStamp", "content", "pCode", "pMessage"]
     )
-    mID = executeQuery(cursor,
-            'INSERT INTO "message"("dID","cID","isBot","timestamp","message","progressCode","progressMessage") '
-            f'VALUES({dID}, ?, ?, ?, ?, ?, ?)',
-            msg, lastRowId="mID"
-        )
+    mID = executeQuery(
+        cursor,
+        'INSERT INTO "message"("dID","cID","isBot","timestamp","message","progressCode","progressMessage") '
+        f"VALUES({dID}, ?, ?, ?, ?, ?, ?)",
+        msg,
+        lastRowId="mID",
+    )
     # If a chat issue was submitted, update the temp IDs to the real ones
     idShift = int(mID) - messages.id + 1
-    _ = executeQuery(cursor, 'SELECT "fcID" FROM "feedback_chat" WHERE "dID" = ?',(dID,))
+    _ = executeQuery(
+        cursor, 'SELECT "fcID" FROM "feedback_chat" WHERE "dID" = ?', (dID,)
+    )
     if cursor.fetchone():
-        _ = executeQuery(cursor,
+        _ = executeQuery(
+            cursor,
             'UPDATE "feedback_chat_msg" SET "mID" = "mID" + ? WHERE "fcID" IN '
-            '(SELECT "fcID" FROM "feedback_chat" WHERE "dID" = ?)', (idShift,dID)
+            '(SELECT "fcID" FROM "feedback_chat" WHERE "dID" = ?)',
+            (idShift, dID),
         )
 
 
