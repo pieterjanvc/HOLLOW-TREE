@@ -5,11 +5,6 @@
 # All variables and functions below are shared across different session
 # https://shiny.posit.co/py/docs/express-in-depth.html#shared-objects
 
-import sys
-
-# Print the system path
-print(sys.path)
-
 from shared import shared
 
 # General

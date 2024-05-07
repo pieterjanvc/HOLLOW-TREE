@@ -3,9 +3,9 @@ addDemo = "True"
 remoteAppDB = "True" # If True use postgres otherwise localStorage
 
 [localStorage]
-appDB = "../appData/appDB.db"
-vectorDB = "../appData/vectordb.duckdb"
-storageFolder = "../appData/uploadedFiles"
+appDB = "appData/appDB.db"
+vectorDB = "appData/vectordb.duckdb"
+storageFolder = "appData/uploadedFiles"
 tempFolder = "temp"
 
 [postgres]

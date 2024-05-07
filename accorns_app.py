@@ -6,7 +6,8 @@
 # Admin Control Center Overseeing RAG Needed for SCUIRREL
 
 # See app_shared.py for variables and functions shared across sessions
-import app_shared as shared
+import ACCORNS.accorns_shared as accorns_shared
+import shared.shared as shared
 
 # -- General
 import duckdb
@@ -61,9 +62,11 @@ uiUploadFile = div(
 
 ui.page_opts(fillable=True, window_title="ACCORNS")
 ui.head_content(
-    ui.include_css("www/styles.css"), ui.include_js("www/custom.js", method="inline")
+    ui.include_css("ACCORNS/www/accorns_styles.css"), 
+    ui.include_css("shared/www/shared_styles.css"),
+    ui.include_js("ACCORNS/www/accorns_custom.js", method="inline"), 
+    ui.include_js("shared/www/shared_custom.js", method="inline")
 )
-
 # --- CUSTOM JS FUNCTIONS (Python side) ---
 
 
@@ -326,7 +329,7 @@ def addTopic_modal():
 @reactive.event(input.ntAdd)
 def addNewTopic():
     # Only proceed if the input is valid
-    if not shared.inputCheck(input.ntTopic()):
+    if not accorns_shared.inputCheck(input.ntTopic()):
         ui.remove_ui("#noGoodTopic")
         ui.insert_ui(
             HTML(
@@ -389,7 +392,7 @@ def _():
 @reactive.event(input.etEdit)
 def _():
     # Only proceed if the input is valid
-    if not shared.inputCheck(input.etInput()):
+    if not accorns_shared.inputCheck(input.etInput()):
         ui.remove_ui("#noGoodTopic")
         ui.insert_ui(
             HTML(
@@ -416,7 +419,7 @@ def _():
     conn = shared.appDBConn()
     cursor = conn.cursor()
     # Backup old value
-    shared.backupQuery(cursor, sessionID.get(), "topic", input.tID(), "topic", False)
+    accorns_shared.backupQuery(cursor, sessionID.get(), "topic", input.tID(), "topic", False)
     # Update to new
     _ = shared.executeQuery(
         cursor,
@@ -501,7 +504,7 @@ def _():
 @reactive.event(input.ncAdd)
 def _():
     # Only proceed if the input is valid
-    if not shared.inputCheck(input.ncInput()):
+    if not accorns_shared.inputCheck(input.ncInput()):
         ui.remove_ui("#noGoodConcept")
         ui.insert_ui(
             HTML(
@@ -558,7 +561,7 @@ def _():
 @reactive.event(input.ncEdit)
 def _():
     # Only proceed if the input is valid
-    if not shared.inputCheck(input.ecInput()):
+    if not accorns_shared.inputCheck(input.ecInput()):
         ui.remove_ui("#noGoodConcept")
         ui.insert_ui(
             HTML(
@@ -583,7 +586,7 @@ def _():
     conn = shared.appDBConn()
     cursor = conn.cursor()
     # Backup old value
-    shared.backupQuery(cursor, sessionID.get(), "concept", int(cID), "concept", False)
+    accorns_shared.backupQuery(cursor, sessionID.get(), "concept", int(cID), "concept", False)
     # Update to new
     _ = shared.executeQuery(
         cursor,
@@ -646,7 +649,7 @@ def _():
     updateVectorDB(
         input.newFile()[0]["datapath"],
         shared.vectorDB,
-        shared.storageFolder,
+        accorns_shared.storageFolder,
         input.newFile()[0]["name"],
     )
     ui.insert_ui(
@@ -662,7 +665,7 @@ def _():
 @reactive.extended_task
 async def updateVectorDB(newFile, vectorDB, storageFolder, newFileName):
     print("Start adding file...")
-    return shared.addFileToDB(newFile, vectorDB, storageFolder, newFileName)
+    return accorns_shared.addFileToDB(newFile, vectorDB, storageFolder, newFileName)
 
 
 @reactive.effect
@@ -861,7 +864,7 @@ def _():
     elementDisplay("qBtnSet", "s")
 
     if resp["resp"] is None:
-        shared.modalMsg(
+        accorns_shared.modalMsg(
             "The generation of a question with the LLM failed, try again later", "Error"
         )
         return
@@ -976,7 +979,7 @@ def _():
     updates = []
     for i, v in enumerate(fields):
         if input[v].get() != q.iloc[i + 1]:
-            shared.backupQuery(
+            accorns_shared.backupQuery(
                 cursor, sessionID.get(), "question", qID, q.index[i + 1], None, now
             )
             updates.append(f"\"{q.index[i+1]}\" = '{input[v].get()}'")
@@ -987,9 +990,9 @@ def _():
             cursor, f'UPDATE "question" SET {updates} WHERE "qID" = ?', (qID,)
         )
         conn.commit()
-        shared.modalMsg("Your edits were successfully saved", "Update complete")
+        accorns_shared.modalMsg("Your edits were successfully saved", "Update complete")
     else:
-        shared.modalMsg("No changes were detected")
+        accorns_shared.modalMsg("No changes were detected")
 
     conn.close()
 

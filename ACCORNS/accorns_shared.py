@@ -5,6 +5,8 @@
 # All variables and functions below are shared across different session
 # https://shiny.posit.co/py/docs/express-in-depth.html#shared-objects
 
+from shared import shared
+
 # -- General
 import os
 import sqlite3
@@ -35,7 +37,7 @@ nest_asyncio.apply()
 
 # --- Global variables
 
-with open("config.toml", "r") as f:
+with open("accorns_config.toml", "r") as f:
     config = toml.load(f)
 
 addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
