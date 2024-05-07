@@ -13,6 +13,7 @@ import sqlite3
 from html import escape
 import pandas as pd
 import json
+import warnings
 
 # Shiny
 from shiny import reactive
@@ -26,10 +27,11 @@ from htmltools import HTML, div
 # Non-reactive session variables (loaded before session starts)
 uID = 1  # if registered users update later
 
-conn = sqlite3.connect(shared.appDB)
-topics = pd.read_sql_query("SELECT tID, topic FROM topic WHERE archived = 0", conn)
+conn = shared.appDBConn()
+topics = shared.pandasQuery(
+    conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
+)
 conn.close()
-
 
 # --- RENDERING UI ---
 # ********************
@@ -133,14 +135,16 @@ botLog = reactive.value(None)  # Chat sent to the LLM
 # Stuff to run once when the session has loaded
 if hasattr(session, "_process_ui"):
     # Register the session start in the DB
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
     # For now we only have anonymous users (appID 0 -> SCUIRREL)
-    _ = cursor.execute(
-        "INSERT INTO session (shinyToken, uID, appID, start)"
-        f'VALUES("{session.id}", {uID}, 0, "{shared.dt()}")'
+    sID = shared.executeQuery(
+        cursor,
+        'INSERT INTO "session" ("shinyToken", "uID", "appID", "start")'
+        "VALUES(?, ?, 0, ?)",
+        (session.id, uID, shared.dt()),
+        lastRowId="sID",
     )
-    sID = int(cursor.lastrowid)
     conn.commit()
     conn.close()
     sessionID.set(sID)
@@ -159,13 +163,13 @@ def theEnd():
         msg = messages.get()
         sID = sessionID.get()
         # AUpdate the database
-        conn = sqlite3.connect(shared.appDB)
+        conn = shared.appDBConn()
         cursor = conn.cursor()
         # Log current discussion
         shared.endDiscussion(cursor, dID, msg)
         # Register the end of the session
-        _ = cursor.execute(
-            f'UPDATE session SET end = "{shared.dt()}" WHERE sID = {sID}'
+        _ = shared.executeQuery(
+            cursor, 'UPDATE "session" SET "end" = ? WHERE "sID" = ?', (shared.dt(), sID)
         )
         conn.commit()
         conn.close()
@@ -174,8 +178,8 @@ def theEnd():
 @reactive.effect
 @reactive.event(input.selTopic)
 def _():
-    tID = topics[topics["tID"] == int(input.selTopic())].iloc[0]["tID"]
-    conn = sqlite3.connect(shared.appDB)
+    tID = int(topics[topics["tID"] == int(input.selTopic())].iloc[0]["tID"])
+    conn = shared.appDBConn()
     cursor = conn.cursor()
     # Save the logs for the previous discussion (if any)
     if messages.get():
@@ -183,15 +187,20 @@ def _():
         elementDisplay("chatIn", "s")  # In case hidden if previous finished
 
     # Register the start of the  new topic discussion
-    _ = cursor.execute(
-        "INSERT INTO discussion (tID, sID, start)"
-        f'VALUES({tID}, {sessionID.get()}, "{shared.dt()}")'
+    dID = shared.executeQuery(
+        cursor,
+        'INSERT INTO "discussion" ("tID", "sID", "start")' "VALUES(?, ?, ?)",
+        (tID, sessionID.get(), shared.dt()),
+        lastRowId="dID",
     )
-    discussionID.set(int(cursor.lastrowid))
+    discussionID.set(int(dID))
     # Only show the quiz button if there are any questions
-    if cursor.execute(
-        f"SELECT qID FROM question where tID = {tID} AND archived = 0"
-    ).fetchone():
+    _ = shared.executeQuery(
+        cursor,
+        'SELECT "qID" FROM "question" WHERE "tID" = ? AND "archived" = 0',
+        (tID,),
+    )
+    if cursor.fetchone():
         elementDisplay("quiz", "s")
     else:
         elementDisplay("quiz", "h")
@@ -225,10 +234,10 @@ def _():
 # Get the concepts related to the topic
 @reactive.calc
 def concepts():
-    conn = sqlite3.connect(shared.appDB)
-    concepts = pd.read_sql_query(
-        f"SELECT * FROM concept WHERE tID = {int(input.selTopic())} AND archived = 0",
+    conn = shared.appDBConn()
+    concepts = shared.pandasQuery(
         conn,
+        f'SELECT * FROM "concept" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0',
     )
     conn.close()
     return concepts
@@ -276,9 +285,8 @@ async def botResponse(topic, concepts, cIndex, conversation):
     if int(eval["score"]) > 2:
         cIndex += 1
     # Check if all concepts have been covered successfully
-    if cIndex > concepts.shape[0]:
+    if cIndex >= concepts.shape[0]:
         resp = f"Well done! It seems you have demonstrated understanding of everything we wanted you to know about: {topic}"
-        elementDisplay("chatIn", "h")
     else:
         engine = shared.chatEngine(topic, concepts, cIndex, eval)
         resp = str(engine.query(conversation))
@@ -295,17 +303,22 @@ def _():
 
     with reactive.isolate():
         # Check the topic progress and move on to next concept if current one scored well
+        i = conceptIndex.get()
+        finished = False
         if int(eval["score"]) > 2:
-            i = conceptIndex.get() + 1
+            if i < (concepts().shape[0] - 1):
+                i = i + 1
+            else:
+                finished = True
+
             progressBar("chatProgress", int(100 * i / concepts().shape[0]))
-            conceptIndex.set(i)
+
         # Add the evaluation of the student's last reply to the log
         msg = messages.get()
         msg.addEval(eval["score"], eval["comment"])
-        msg.add_message(
-            isBot=1, cID=int(concepts().iloc[conceptIndex.get()]["cID"]), content=resp
-        )
+        msg.add_message(isBot=1, cID=int(concepts().iloc[i]["cID"]), content=resp)
         messages.set(msg)
+        conceptIndex.set(i)
         ui.insert_ui(
             HTML(
                 f"<div class='botChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'><p>{escape(resp)}</p></div>"
@@ -316,8 +329,12 @@ def _():
 
         # Now the LLM has finished the user can send a new response
         elementDisplay("waitResp", "h")
-        elementDisplay("chatIn", "s")
         ui.update_text_area("newChat", value="")
+        # If conversation is over don't show new message box
+        if not finished:
+            elementDisplay("chatIn", "s")
+        else:
+            ui.insert_ui(HTML("<hr>"), "#conversation")
 
 
 # -- QUIZ
@@ -330,10 +347,10 @@ quizQuestion = reactive.value()
 @reactive.event(input.quiz)
 def _():
     # Get a random question on the topic from the DB
-    conn = sqlite3.connect(shared.appDB)
-    q = pd.read_sql_query(
-        f"SELECT * FROM question WHERE tID = {int(input.selTopic())} AND archived = 0",
+    conn = shared.appDBConn()
+    q = shared.pandasQuery(
         conn,
+        f'SELECT * FROM "question" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0',
     )
     conn.close()
     q = q.sample(1).iloc[0].to_dict()
@@ -417,12 +434,21 @@ def _():
         q["response"] = f'"{q["response"]}"'
 
     # Add the response to the DB
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
-    _ = cursor.execute(
-        'INSERT INTO response (sID, qID, "response", "correct", "start", "check", "end") '
-        f'VALUES({sessionID()}, {q["qID"]}, {q["response"]}, {q["correct"]},'
-        f'"{q["start"]}",{q["check"]},"{shared.dt()}")'
+    _ = shared.executeQuery(
+        cursor,
+        'INSERT INTO "response" ("sID", "qID", "response", "correct", "start", "check", "end")'
+        "VALUES(?, ?, ?, ?, ?, ?, ?)",
+        (
+            sessionID(),
+            q["qID"],
+            q["response"],
+            q["correct"],
+            q["start"],
+            q["check"],
+            shared.dt(),
+        ),
     )
     conn.commit()
     conn.close()
@@ -474,22 +500,25 @@ def _():
     # Because multiple issues can be submitted for a single conversation, we have to commit to the
     # DB immediately or it would become harder to keep track of TODO
     # This means we add a temp mID which will be updated in the end
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
-    _ = cursor.execute(
-        "INSERT INTO feedback_chat(dID,code,created,details) VALUES(?,?,?,?)",
+    fcID = shared.executeQuery(
+        cursor,
+        'INSERT INTO "feedback_chat"("dID","code","created","details") '
+        "VALUES(?,?,?,?)",
         (
             discussionID.get(),
             int(input.feedbackChatCode()),
             shared.dt(),
             input.feedbackChatDetails(),
         ),
+        lastRowId="fcID",
     )
-    fcID = cursor.lastrowid
     tempID = json.loads(input.selectedMsg())
     tempID.sort()
-    _ = cursor.executemany(
-        f"INSERT INTO feedback_chat_msg(fcID,mID) VALUES({fcID},?)",
+    _ = shared.executeQuery(
+        cursor,
+        f'INSERT INTO "feedback_chat_msg"("fcID","mID") VALUES({fcID},?)',
         [(x,) for x in tempID],
     )
     conn.commit()
@@ -547,10 +576,11 @@ def _():
 @reactive.effect
 @reactive.event(input.feedbackSubmit)
 def _():
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
-    _ = cursor.execute(
-        "INSERT INTO feedback_general(sID,code,created,email,details) VALUES(?,?,?,?,?)",
+    _ = shared.executeQuery(
+        cursor,
+        'INSERT INTO "feedback_general"("sID","code","created","email","details") VALUES(?,?,?,?,?)',
         (
             sessionID(),
             input.feedbackCode(),

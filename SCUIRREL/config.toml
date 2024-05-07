@@ -1,9 +1,18 @@
-[data]
+[general]
+allowMultiGuess = "False"
+remoteAppDB = "True" # If True use postgres otherwise localStorage
+
+[localStorage]
 appDB = "../appData/appDB.db"
 vectorDB = "../appData/vectordb.duckdb"
 
+[postgres]
+host = "localhost"
+db = "scuirrel"
+username = "scuirrel"
+# Password retrieved from POSTGRES_PASS_SCUIRREL environment variable
+
 [LLM]
 gptModel = "gpt-3.5-turbo-0125"  # use gpt-3.5-turbo-0125 or gpt-4
-
-[settings]
-allowMultiGuess = "False"
+# Make sure OPENAI_API_KEY is set as environment variable
+# Make sure OPENAI_ORGANIZATION is set as environment variable

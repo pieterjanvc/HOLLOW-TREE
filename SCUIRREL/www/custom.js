@@ -61,3 +61,10 @@ function chatSelection(message, x){
 $(document).on('shiny:connected', function() {    
     Shiny.setInputValue("selectedMsg", JSON.stringify(flaggedMsg)); 
 });
+
+Shiny.addCustomMessageHandler("progressBar", function(x) {
+
+    var elem = document.getElementById(x.id);
+    elem.style.width = x.percent + '%';
+
+});

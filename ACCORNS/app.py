@@ -9,7 +9,6 @@
 import app_shared as shared
 
 # -- General
-import sqlite3
 import duckdb
 import pandas as pd
 import json
@@ -227,9 +226,7 @@ ui.input_action_button("feedback", "Provide Feedback")
 sessionID = reactive.value(0)
 
 conn = duckdb.connect(shared.vectorDB)
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    files = pd.read_sql_query("SELECT * FROM file", conn)
+files = shared.pandasQuery(conn, 'SELECT * FROM "file"')
 conn.close()
 
 # Hide the topic and question tab if the vector database is empty and show welcome message
@@ -259,17 +256,19 @@ files = reactive.value(files)
 # Stuff to run once when the session has loaded
 if hasattr(session, "_process_ui"):
     # Register the session start in the DB
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
     # For now we only have anonymous users (appID 1 -> ACCORNS)
-    _ = cursor.execute(
-        "INSERT INTO session (shinyToken, uID, appID, start)"
-        f'VALUES("{session.id}", {uID}, 1, "{shared.dt()}")'
+    sID = shared.executeQuery(
+        cursor,
+        'INSERT INTO "session" ("shinyToken", "uID", "appID", "start")'
+        "VALUES(?, ?, 1, ?)",
+        (session.id, uID, shared.dt()),
+        lastRowId="sID",
     )
-    sID = int(cursor.lastrowid)
     # Get all active topics
-    newTopics = pd.read_sql_query(
-        "SELECT tID, topic FROM topic WHERE archived = 0", conn
+    newTopics = shared.pandasQuery(
+        conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
     )
     conn.commit()
     conn.close()
@@ -287,10 +286,10 @@ def theEnd():
     with reactive.isolate():
         # Add logs to the database after user exits
         sID = sessionID.get()
-        conn = sqlite3.connect(shared.appDB)
+        conn = shared.appDBConn()
         cursor = conn.cursor()
-        _ = cursor.execute(
-            f'UPDATE session SET end = "{shared.dt()}" WHERE sID = {sID}'
+        _ = shared.executeQuery(
+            cursor, 'UPDATE "session" SET "end" = ? WHERE "sID" = ?', (shared.dt(), sID)
         )
         conn.commit()
         conn.close()
@@ -339,15 +338,17 @@ def addNewTopic():
         return
 
     # Add new topic to DB
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
-    _ = cursor.execute(
-        "INSERT INTO topic(topic, created, modified, description)"
-        f'VALUES("{input.ntTopic()}", "{shared.dt()}", "{shared.dt()}", "{input.ntDescr()}")'
+    tID = shared.executeQuery(
+        cursor,
+        'INSERT INTO "topic"("topic", "created", "modified", "description")'
+        "VALUES(?, ?, ?, ?)",
+        (input.ntTopic(), shared.dt(), shared.dt(), input.ntDescr()),
+        lastRowId="tID",
     )
-    tID = cursor.lastrowid
-    newTopics = pd.read_sql_query(
-        "SELECT tID, topic FROM topic WHERE archived = 0", conn
+    newTopics = shared.pandasQuery(
+        conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
     )
     conn.commit()
     conn.close()
@@ -412,17 +413,18 @@ def _():
         return
 
     # Update the DB
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
     # Backup old value
     shared.backupQuery(cursor, sessionID.get(), "topic", input.tID(), "topic", False)
     # Update to new
-    _ = cursor.execute(
-        f'UPDATE topic SET topic = "{input.etInput()}", '
-        f'modified = "{shared.dt()}" WHERE tID = {input.tID()}'
+    _ = shared.executeQuery(
+        cursor,
+        'UPDATE "topic" SET "topic" = ?, "modified" = ? WHERE "tID" = ?',
+        (input.etInput(), shared.dt(), input.tID()),
     )
-    newTopics = pd.read_sql_query(
-        "SELECT tID, topic FROM topic WHERE archived = 0", conn
+    newTopics = shared.pandasQuery(
+        conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
     )
     conn.commit()
     conn.close()
@@ -444,19 +446,22 @@ def _():
     if input.tID() is None:
         return
 
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
-    _ = cursor.execute(
-        "UPDATE topic SET archived = 1, "
-        f'modified = "{shared.dt()}" WHERE tID = {input.tID()}'
+    _ = shared.executeQuery(
+        cursor,
+        'UPDATE "topic" SET "archived" = 1, "modified" = ? WHERE "tID" = ?',
+        (shared.dt(), input.tID()),
     )
-    newTopics = pd.read_sql_query(
-        "SELECT tID, topic FROM topic WHERE archived = 0", conn
+    newTopics = shared.pandasQuery(
+        conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
     )
 
     # Empty the concept table is last topic was removed
     if topics.shape[0] == 0:
-        conceptList = pd.read_sql_query("SELECT * FROM concept WHERE tID = 0", conn)
+        conceptList = shared.pandasQuery(
+            conn, 'SELECT * FROM "concept" WHERE "tID" = 0'
+        )
         concepts.set(conceptList)
 
     conn.commit()
@@ -508,14 +513,15 @@ def _():
         return
 
     # Add new topic to DB
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
-    _ = cursor.execute(
-        "INSERT INTO concept(tID, concept, created, modified)"
-        f'VALUES({input.tID()}, "{input.ncInput()}", "{shared.dt()}", "{shared.dt()}")'
+    _ = shared.executeQuery(
+        cursor,
+        'INSERT INTO "concept"("tID", "concept", "created", "modified") VALUES(?, ?, ?, ?)',
+        (input.tID(), input.ncInput(), shared.dt(), shared.dt()),
     )
-    conceptList = pd.read_sql_query(
-        f"SELECT * FROM concept WHERE tID = {input.tID()} AND archived = 0", conn
+    conceptList = shared.pandasQuery(
+        conn, f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0'
     )
     conn.commit()
     conn.close()
@@ -574,17 +580,18 @@ def _():
 
     # Update the DB
     cID = concepts.get().iloc[conceptsTable.data_view(selected=True).index[0]]["cID"]
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
     # Backup old value
-    shared.backupQuery(cursor, sessionID.get(), "concept", cID, "concept", False)
+    shared.backupQuery(cursor, sessionID.get(), "concept", int(cID), "concept", False)
     # Update to new
-    _ = cursor.execute(
-        f'UPDATE concept SET concept = "{input.ecInput()}", '
-        f'modified = "{shared.dt()}" WHERE cID = {cID}'
+    _ = shared.executeQuery(
+        cursor,
+        'UPDATE "concept" SET "concept" = ?, "modified" = ? WHERE "cID" = ?',
+        (input.ecInput(), shared.dt(), int(cID)),
     )
-    conceptList = pd.read_sql_query(
-        f"SELECT * FROM concept WHERE tID = {input.tID()} AND archived = 0", conn
+    conceptList = shared.pandasQuery(
+        conn, f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0'
     )
     conn.commit()
     conn.close()
@@ -601,14 +608,15 @@ def _():
         return
 
     cID = concepts.get().iloc[conceptsTable.data_view(selected=True).index[0]]["cID"]
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
-    _ = cursor.execute(
-        "UPDATE concept SET archived = 1, "
-        f'modified = "{shared.dt()}" WHERE cID = {cID}'
+    _ = shared.executeQuery(
+        cursor,
+        'UPDATE "concept" SET "archived" = 1, "modified" = ? WHERE "cID" = ?',
+        (shared.dt(), int(cID)),
     )
-    conceptList = pd.read_sql_query(
-        f"SELECT * FROM concept WHERE tID = {input.tID()} AND archived = 0", conn
+    conceptList = shared.pandasQuery(
+        conn, f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0'
     )
     conn.commit()
     conn.close()
@@ -620,9 +628,9 @@ def _():
 @reactive.event(input.tID)
 def _():
     tID = input.tID() if input.tID() else 0
-    conn = sqlite3.connect(shared.appDB)
-    conceptList = pd.read_sql_query(
-        f"SELECT * FROM concept WHERE tID = {tID} AND archived = 0", conn
+    conn = shared.appDBConn()
+    conceptList = shared.pandasQuery(
+        conn, f'SELECT * FROM "concept" WHERE "tID" = {tID} AND "archived" = 0'
     )
     conn.close()
     concepts.set(conceptList)
@@ -666,8 +674,8 @@ def _():
         else "A file with the same name already exists. Skipping upload"
     )
     ui.modal_show(ui.modal(msg, title="Success" if insertionResult == 0 else "Issue"))
-    conn = sqlite3.connect(shared.appDB)
-    getFiles = pd.read_sql_query("SELECT * FROM file", conn)
+    conn = duckdb.connect(shared.vectorDB)
+    getFiles = shared.pandasQuery(conn, 'SELECT * FROM "file"')
     files.set(getFiles)
     conn.close()
     index.set(
@@ -693,8 +701,8 @@ def fileInfo():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         conn = duckdb.connect(shared.vectorDB)
-        keywords = pd.read_sql_query(
-            f"SELECT keyword FROM keyword WHERE fID = {info.fID}", conn
+        keywords = shared.pandasQuery(
+            conn, f'SELECT "keyword" FROM "keyword" WHERE "fID" = {int(info.fID)}'
         )
         conn.close()
     keywords = "; ".join(keywords["keyword"])
@@ -783,18 +791,20 @@ def _():
     elementDisplay("qBusyMsg", "s")
     elementDisplay("qBtnSet", "h")
 
-    conn = sqlite3.connect(shared.appDB)
-    topic = pd.read_sql_query(
-        f"SELECT topic FROM topic WHERE tID = {input.qtID()}", conn
+    conn = shared.appDBConn()
+    topic = shared.pandasQuery(
+        conn, f'SELECT "topic" FROM "topic" WHERE "tID" = {input.qtID()}'
     )
-    conceptList = pd.read_sql_query(
-        f"SELECT cID, max(concept) as concept, count() as n FROM (SELECT cID, concept FROM concept WHERE tID = {input.qtID()} "
-        f"UNION ALL SELECT cID, '' as concept FROM question where tID = {input.qtID()}) GROUP BY cID",
+    conceptList = shared.pandasQuery(
         conn,
+        'SELECT "cID", max("concept") as "concept", count() as n FROM '
+        f'(SELECT "cID", "concept" FROM "concept" WHERE "tID" = {input.qtID()} '
+        f'UNION ALL SELECT "cID", "" as concept FROM "question" where "tID" = {input.qtID()}) GROUP BY "cID"',
     )
     cID = int(conceptList[conceptList["n"] == min(conceptList["n"])].sample(1)["cID"])
-    prevQuestions = pd.read_sql_query(
-        f"SELECT question FROM question WHERE cID = {cID} AND archived = 0", conn
+    prevQuestions = shared.pandasQuery(
+        conn,
+        f'SELECT "question" FROM "question" WHERE "cID" = {cID} AND "archived" = 0',
     )
     conn.close()
 
@@ -859,19 +869,36 @@ def _():
     with reactive.isolate():
         q = resp["resp"].iloc[0]  # For now only processing one
         # Save the questions in the appAB
-        conn = sqlite3.connect(shared.appDB)
+        conn = shared.appDBConn()
         cursor = conn.cursor()
         # Insert question
-        _ = cursor.execute(
-            'INSERT INTO question(sID,tID,cID,question,answer,archived,created,modified,'
-            'optionA,explanationA,optionB,explanationB,optionC,explanationC,optionD,explanationD)'
-            f'VALUES({sessionID.get()},{input.tID()},{resp["cID"]},"{q["question"]}","{q["answer"]}",0,"{shared.dt()}","{shared.dt()}",'
-            f'"{q["optionA"]}","{q["explanationA"]}","{q["optionB"]}","{q["explanationB"]}","{q["optionC"]}",'
-            f'"{q["explanationC"]}","{q["optionD"]}","{q["explanationD"]}")'
+        qID = shared.executeQuery(
+            cursor,
+            'INSERT INTO "question"("sID","tID","cID","question","answer","archived","created","modified",'
+            '"optionA","explanationA","optionB","explanationB","optionC","explanationC","optionD","explanationD")'
+            "VALUES(?,?,?,?,?,0,?,?,?,?,?,?,?,?,?,?)",
+            (
+                sessionID.get(),
+                input.tID(),
+                resp["cID"],
+                q["question"],
+                q["answer"],
+                shared.dt(),
+                shared.dt(),
+                q["optionA"],
+                q["explanationA"],
+                q["optionB"],
+                q["explanationB"],
+                q["optionC"],
+                q["explanationC"],
+                q["optionD"],
+                q["explanationD"],
+            ),
+            lastRowId="qID",
         )
-        qID = cursor.lastrowid
-        q = pd.read_sql_query(
-            f"SELECT qID, question FROM question WHERE tID = {input.qtID()} AND archived = 0",
+        q = shared.pandasQuery(
+            conn,
+            f'SELECT "qID", "question" FROM "question" WHERE "tID" = {input.qtID()} AND "archived" = 0',
             conn,
         )
         conn.commit()
@@ -886,10 +913,10 @@ def _():
 @reactive.event(input.qtID)
 def _():
     # Get the question info from the DB
-    conn = sqlite3.connect(shared.appDB)
-    q = pd.read_sql_query(
-        f"SELECT qID, question FROM question WHERE tID = {input.qtID()} AND archived = 0",
+    conn = shared.appDBConn()
+    q = shared.pandasQuery(
         conn,
+        f'SELECT "qID", "question" FROM "question" WHERE "tID" = {input.qtID()} AND "archived" = 0',
     )
     conn.close()
     # Update the UI
@@ -900,9 +927,9 @@ def _():
 @reactive.event(input.qID, input.qDiscardChanges)
 def _():
     # Get the question info from the DB
-    conn = sqlite3.connect(shared.appDB)
-    q = pd.read_sql_query(
-        f"SELECT * FROM question WHERE qID = {input.qID()}", conn
+    conn = shared.appDBConn()
+    q = shared.pandasQuery(
+        conn, f'SELECT * FROM "question" WHERE "qID" = {input.qID()}'
     ).iloc[0]
     conn.close()
     # Update the UI
@@ -923,12 +950,12 @@ def _():
 @reactive.event(input.qSaveChanges)
 def _():
     # Get the original question
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
-    q = pd.read_sql_query(
-        "SELECT qID,question,answer,optionA,explanationA,optionB,explanationB,optionC,"
-        f"explanationC,optionD,explanationD FROM question WHERE qID = {input.qID()}",
+    q = shared.pandasQuery(
         conn,
+        'SELECT "qID","question","answer","optionA","explanationA","optionB","explanationB","optionC",'
+        f'"explanationC","optionD","explanationD" FROM "question" WHERE "qID" = {input.qID()}',
     ).iloc[0]
     qID = int(q.iloc[0])
     fields = [
@@ -952,11 +979,13 @@ def _():
             shared.backupQuery(
                 cursor, sessionID.get(), "question", qID, q.index[i + 1], None, now
             )
-            updates.append(f'{q.index[i+1]} = "{input[v].get()}"')
+            updates.append(f"\"{q.index[i+1]}\" = '{input[v].get()}'")
     # Update the question
     if updates != []:
-        updates = ",".join(updates) + f', modified = "{now}"'
-        _ = cursor.execute(f"UPDATE question SET {updates} WHERE qID = {qID}")
+        updates = ",".join(updates) + f", \"modified\" = '{now}'"
+        _ = shared.executeQuery(
+            cursor, f'UPDATE "question" SET {updates} WHERE "qID" = ?', (qID,)
+        )
         conn.commit()
         shared.modalMsg("Your edits were successfully saved", "Update complete")
     else:
@@ -1009,10 +1038,11 @@ def _():
 @reactive.effect
 @reactive.event(input.feedbackSubmit)
 def _():
-    conn = sqlite3.connect(shared.appDB)
+    conn = shared.appDBConn()
     cursor = conn.cursor()
-    _ = cursor.execute(
-        "INSERT INTO feedback_general(sID,code,created,email,details) VALUES(?,?,?,?,?)",
+    _ = shared.executeQuery(
+        cursor,
+        'INSERT INTO "feedback_general"("sID","code","created","email","details") VALUES(?,?,?,?,?)',
         (
             sessionID(),
             input.feedbackCode(),
