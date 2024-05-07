@@ -9,7 +9,6 @@
 import app_shared as shared
 
 # -- General
-import sqlite3
 import duckdb
 import pandas as pd
 import json
@@ -227,9 +226,7 @@ ui.input_action_button("feedback", "Provide Feedback")
 sessionID = reactive.value(0)
 
 conn = duckdb.connect(shared.vectorDB)
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    files = pd.read_sql_query("SELECT * FROM file", conn)
+files = shared.pandasQuery(conn,'SELECT * FROM "file"')
 conn.close()
 
 # Hide the topic and question tab if the vector database is empty and show welcome message
@@ -269,9 +266,7 @@ if hasattr(session, "_process_ui"):
         lastRowId="sID"
     )
     # Get all active topics
-    newTopics = pd.read_sql_query(
-        'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0', conn
-    )
+    newTopics = shared.pandasQuery(conn,'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0')
     conn.commit()
     conn.close()
     sessionID.set(sID)
@@ -349,9 +344,7 @@ def addNewTopic():
         (input.ntTopic(), shared.dt(),shared.dt(),input.ntDescr()),
         lastRowId="tID"
     )
-    newTopics = pd.read_sql_query(
-        "SELECT tID, topic FROM topic WHERE archived = 0", conn
-    )
+    newTopics = shared.pandasQuery(conn,'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0')
     conn.commit()
     conn.close()
 
@@ -424,9 +417,7 @@ def _():
         'UPDATE "topic" SET "topic" = ?, "modified" = ? WHERE "tID" = ?',
         (input.etInput(),shared.dt(),input.tID())
     )
-    newTopics = pd.read_sql_query(
-        'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0', conn
-    )
+    newTopics = shared.pandasQuery(conn,'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0')
     conn.commit()
     conn.close()
 
@@ -453,13 +444,11 @@ def _():
         'UPDATE "topic" SET "archived" = 1, "modified" = ? WHERE "tID" = ?',
         (shared.dt(),input.tID())
     )
-    newTopics = pd.read_sql_query(
-        'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0', conn
-    )
+    newTopics = shared.pandasQuery(conn,'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0')
 
     # Empty the concept table is last topic was removed
     if topics.shape[0] == 0:
-        conceptList = pd.read_sql_query("SELECT * FROM concept WHERE tID = 0", conn)
+        conceptList = shared.pandasQuery(conn,'SELECT * FROM "concept" WHERE "tID" = 0')
         concepts.set(conceptList)
 
     conn.commit()
@@ -517,8 +506,8 @@ def _():
         'INSERT INTO "concept"("tID", "concept", "created", "modified") VALUES(?, ?, ?, ?)',
         (input.tID(),input.ncInput(),shared.dt(),shared.dt())
     )
-    conceptList = pd.read_sql_query(
-        f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0', conn
+    conceptList = shared.pandasQuery(conn,
+        f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0'
     )
     conn.commit()
     conn.close()
@@ -580,14 +569,14 @@ def _():
     conn = shared.appDBConn()
     cursor = conn.cursor()
     # Backup old value
-    shared.backupQuery(cursor, sessionID.get(), "concept", cID, "concept", False)
+    shared.backupQuery(cursor, sessionID.get(), "concept", int(cID), "concept", False)
     # Update to new
     _ = shared.executeQuery(cursor,
         'UPDATE "concept" SET "concept" = ?, "modified" = ? WHERE "cID" = ?',
-        (input.ecInput(),shared.dt(),cID)
+        (input.ecInput(),shared.dt(),int(cID))
     )
-    conceptList = pd.read_sql_query(
-        f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0', conn
+    conceptList = shared.pandasQuery(conn,
+        f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0'
     )
     conn.commit()
     conn.close()
@@ -608,10 +597,10 @@ def _():
     cursor = conn.cursor()
     _ = shared.executeQuery(cursor,
         'UPDATE "concept" SET "archived" = 1, "modified" = ? WHERE "cID" = ?',
-        (shared.dt(),cID)
+        (shared.dt(),int(cID))
     )
-    conceptList = pd.read_sql_query(
-        f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0', conn
+    conceptList = shared.pandasQuery(conn, 
+        f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0'
     )
     conn.commit()
     conn.close()
@@ -624,8 +613,8 @@ def _():
 def _():
     tID = input.tID() if input.tID() else 0
     conn = shared.appDBConn()
-    conceptList = pd.read_sql_query(
-        f"SELECT * FROM concept WHERE tID = {tID} AND archived = 0", conn
+    conceptList = shared.pandasQuery(conn, 
+        f'SELECT * FROM "concept" WHERE "tID" = {tID} AND "archived" = 0'
     )
     conn.close()
     concepts.set(conceptList)
@@ -669,8 +658,8 @@ def _():
         else "A file with the same name already exists. Skipping upload"
     )
     ui.modal_show(ui.modal(msg, title="Success" if insertionResult == 0 else "Issue"))
-    conn = shared.appDBConn()
-    getFiles = pd.read_sql_query("SELECT * FROM file", conn)
+    conn = duckdb.connect(shared.vectorDB)
+    getFiles = shared.pandasQuery(conn, 'SELECT * FROM "file"')
     files.set(getFiles)
     conn.close()
     index.set(
@@ -696,8 +685,8 @@ def fileInfo():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         conn = duckdb.connect(shared.vectorDB)
-        keywords = pd.read_sql_query(
-            f"SELECT keyword FROM keyword WHERE fID = {info.fID}", conn
+        keywords = shared.pandasQuery(conn, 
+            f'SELECT "keyword" FROM "keyword" WHERE "fID" = {int(info.fID)}'
         )
         conn.close()
     keywords = "; ".join(keywords["keyword"])
@@ -787,17 +776,17 @@ def _():
     elementDisplay("qBtnSet", "h")
 
     conn = shared.appDBConn()
-    topic = pd.read_sql_query(
-        f"SELECT topic FROM topic WHERE tID = {input.qtID()}", conn
+    topic = shared.pandasQuery(conn, 
+        f'SELECT "topic" FROM "topic" WHERE "tID" = {input.qtID()}'
     )
-    conceptList = pd.read_sql_query(
-        f"SELECT cID, max(concept) as concept, count() as n FROM (SELECT cID, concept FROM concept WHERE tID = {input.qtID()} "
-        f"UNION ALL SELECT cID, '' as concept FROM question where tID = {input.qtID()}) GROUP BY cID",
-        conn,
+    conceptList = shared.pandasQuery(conn, 
+        'SELECT "cID", max("concept") as "concept", count() as n FROM ' 
+        f'(SELECT "cID", "concept" FROM "concept" WHERE "tID" = {input.qtID()} '
+        f'UNION ALL SELECT "cID", "" as concept FROM "question" where "tID" = {input.qtID()}) GROUP BY "cID"'
     )
     cID = int(conceptList[conceptList["n"] == min(conceptList["n"])].sample(1)["cID"])
-    prevQuestions = pd.read_sql_query(
-        f"SELECT question FROM question WHERE cID = {cID} AND archived = 0", conn
+    prevQuestions = shared.pandasQuery(conn, 
+        f'SELECT "question" FROM "question" WHERE "cID" = {cID} AND "archived" = 0'
     )
     conn.close()
 
@@ -874,7 +863,7 @@ def _():
              q["explanationB"],q["optionC"],q["explanationC"],q["optionD"],q["explanationD"]),
              lastRowId="qID"
         )
-        q = pd.read_sql_query(
+        q = shared.pandasQuery(conn, 
             f'SELECT "qID", "question" FROM "question" WHERE "tID" = {input.qtID()} AND "archived" = 0',
             conn,
         )
@@ -891,9 +880,8 @@ def _():
 def _():
     # Get the question info from the DB
     conn = shared.appDBConn()
-    q = pd.read_sql_query(
-        f"SELECT qID, question FROM question WHERE tID = {input.qtID()} AND archived = 0",
-        conn,
+    q = shared.pandasQuery(conn, 
+        f'SELECT "qID", "question" FROM "question" WHERE "tID" = {input.qtID()} AND "archived" = 0'
     )
     conn.close()
     # Update the UI
@@ -905,8 +893,8 @@ def _():
 def _():
     # Get the question info from the DB
     conn = shared.appDBConn()
-    q = pd.read_sql_query(
-        f"SELECT * FROM question WHERE qID = {input.qID()}", conn
+    q = shared.pandasQuery(conn, 
+        f'SELECT * FROM "question" WHERE "qID" = {input.qID()}'
     ).iloc[0]
     conn.close()
     # Update the UI
@@ -929,10 +917,9 @@ def _():
     # Get the original question
     conn = shared.appDBConn()
     cursor = conn.cursor()
-    q = pd.read_sql_query(
-        "SELECT qID,question,answer,optionA,explanationA,optionB,explanationB,optionC,"
-        f"explanationC,optionD,explanationD FROM question WHERE qID = {input.qID()}",
-        conn,
+    q = shared.pandasQuery(conn, 
+        'SELECT "qID","question","answer","optionA","explanationA","optionB","explanationB","optionC",'
+        f'"explanationC","optionD","explanationD" FROM "question" WHERE "qID" = {input.qID()}'
     ).iloc[0]
     qID = int(q.iloc[0])
     fields = [

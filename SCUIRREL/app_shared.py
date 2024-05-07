@@ -12,6 +12,7 @@ import psycopg2
 from datetime import datetime
 import pandas as pd
 import toml
+import warnings
 
 # Llamaindex
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate
@@ -87,12 +88,16 @@ def executeQuery(cursor, query, params = (), lastRowId = "", remoteAppDB = remot
         
     return
 
+def pandasQuery(conn, query):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return pd.read_sql_query(query, conn)
+
 # Check if there are topics to discuss before proceeding
 conn = appDBConn()
-topics = pd.read_sql_query(
+topics = pandasQuery(conn,
     'SELECT * FROM "topic" WHERE "archived" = 0 AND "tID" IN'
-    '(SELECT DISTINCT "tID" from "concept" WHERE "archived" = 0)',
-    conn,
+    '(SELECT DISTINCT "tID" from "concept" WHERE "archived" = 0)'
 )
 
 if topics.shape[0] == 0:

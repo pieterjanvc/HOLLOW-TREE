@@ -27,11 +27,9 @@ from htmltools import HTML, div
 # Non-reactive session variables (loaded before session starts)
 uID = 1  # if registered users update later
 
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    conn = shared.appDBConn()
-    topics = pd.read_sql_query('SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0', conn)
-    conn.close()
+conn = shared.appDBConn()
+topics = shared.pandasQuery(conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0')
+conn.close()
 
 # --- RENDERING UI ---
 # ********************
@@ -230,13 +228,9 @@ def _():
 @reactive.calc
 def concepts():
     conn = shared.appDBConn()
-    placeholder = "%s" if shared.remoteAppDB else "?"
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        concepts = pd.read_sql_query(
-            f'SELECT * FROM "concept" WHERE "tID" = {placeholder} AND "archived" = 0',
-            params = (input.selTopic(),), con = conn,
-        )
+    concepts = shared.pandasQuery(conn,
+        f'SELECT * FROM "concept" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0'
+    )
     conn.close()
     return concepts
 
@@ -348,13 +342,9 @@ quizQuestion = reactive.value()
 def _():
     # Get a random question on the topic from the DB
     conn = shared.appDBConn()
-    placeholder = "%s" if shared.remoteAppDB else "?"
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        q = pd.read_sql_query(
-            f'SELECT * FROM "question" WHERE "tID" = {placeholder} AND "archived" = 0',
-            params=(input.selTopic(),), con = conn
-        )
+    q = shared.pandasQuery(conn,
+         f'SELECT * FROM "question" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0'
+    )
     conn.close()
     q = q.sample(1).iloc[0].to_dict()
     q["start"] = shared.dt()

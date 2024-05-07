@@ -1,6 +1,10 @@
 @echo off
-@REM These command should be executed only ONCE to setup or reset the postgres database
-@REM Make sure POSTGRES_PASS_SCUIRREL is set as an environment variable!
+
+@REM This script should be executed only once to setup or reset the postgres database
+
+@REM Make sure POSTGRES_PASS_SCUIRREL is set as an environment variable
+@REM which will be used as the password for the 'scuirrel' database and is 
+@REM also needed by both apps to connect to the database
 
 @REM VARIABLES TO SET BEFORE RUNNING
 @REM Note that if postgres bin is not in the PATH to put in the full path
@@ -26,7 +30,6 @@ IF NOT EXIST "%sqlFile%" (
     echo ERROR SQL file does not exist.
     exit /b 1
 )
-
 
 SET "errorFile=%TEMP%\error.txt"
 

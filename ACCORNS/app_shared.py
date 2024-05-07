@@ -16,6 +16,8 @@ import json
 from shutil import move
 import toml
 from urllib.request import urlretrieve
+import pandas as pd
+import warnings
 
 # -- Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
@@ -81,6 +83,21 @@ def appDBConn(remoteAppDB = remoteAppDB):
             raise ConnectionError("The app database was not found. Please run ACCORNS first")
         return sqlite3.connect(config["localStorage"]["appDB"])
 
+# Check if the postgres scuirrel database is available when remoteAppDB is set to True
+def checkRemoteDB():
+    try:
+        conn = appDBConn()
+        conn.close()
+        return "Connection to postgres scuirrel database successful"
+    except psycopg2.OperationalError as e:
+        raise psycopg2.OperationalError(str(e) + \
+            '\n\n POSTGRESQL connection error: '
+            'Please check the postgres connection settings in config.toml '
+            'and make sure POSTGRES_PASS_SCUIRREL is set as an environment variable.')
+
+if remoteAppDB:
+    print(checkRemoteDB())
+
 def executeQuery(cursor, query, params = (), lastRowId = "", remoteAppDB = remoteAppDB):
     query = query.replace("?", "%s") if remoteAppDB else query
     query = query + f' RETURNING "{lastRowId}"' if remoteAppDB & (lastRowId != "") else query
@@ -99,6 +116,11 @@ def executeQuery(cursor, query, params = (), lastRowId = "", remoteAppDB = remot
             return cursor.lastrowid
         
     return
+
+def pandasQuery(conn, query):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return pd.read_sql_query(query, conn)
 
 # Database to store app data (this is not the vector database!)
 def createSQLiteAppDB(DBpath, addDemo=False):
@@ -195,7 +217,7 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
         with open("appDB/expandVectorDB.sql", "r") as file:
             query = file.read().replace("\n", " ").replace("\t", "").split(";")
 
-        conn = duckdb.connect("../appData/vectordb.duckdb")
+        conn = duckdb.connect(vectorDB)
         cursor = conn.cursor()
 
         for x in query:
@@ -258,20 +280,18 @@ if addDemo & (not os.path.exists(vectorDB)):
 
 
 def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=dt()):
-    # Check if the table exists
-    _  = executeQuery(cursor,
-            f'SELECT * FROM sqlite_master WHERE tbl_name = "{table}"'
-        )
-    check = cursor.fetchone()
-    if (check is None):
-        raise ValueError("The table '{table}' does not exist in the database")
     # Get the Primary Key
     if remoteAppDB:
         q = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' LIMIT 1"
     else :
         q = f"SELECT name FROM pragma_table_info('{table}') WHERE pk = 1"
     
-    PK = executeQuery(cursor, q).fetchone()[0]
+    _ = executeQuery(cursor, q)
+    PK = cursor.fetchone()[0]
+   
+    if PK is None:
+        raise ValueError(f'There is no table with the name {table} in the SCUIRREL database')
+    
     # Check if the attribute exists
     if remoteAppDB:
         q = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' AND column_name = '{attribute}'"
@@ -287,10 +307,10 @@ def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=dt()
     isBot = isBot + 0 if isBot is not None else "NULL"
     # Insert into backup
     _ = executeQuery(cursor,
-        f"INSERT INTO backup (sID, modified, 'table', 'rowID', created, isBot, 'attribute', tValue) "
-        f"SELECT {sID} as sID, '{timeStamp}' as 'modified', '{table}' as 'table', {rowID} as 'rowID', "
-        f"modified as 'created', {isBot} as isBot, '{attribute}' as 'attribute', {attribute} as 'tValue' "
-        f"FROM {table} WHERE {PK} = {rowID}"
+        f'INSERT INTO "backup" ("sID", "modified", "table", "rowID", "created", "isBot", "attribute", "tValue") '
+        f'SELECT {sID} as "sID", \'{timeStamp}\' as "modified", \'{table}\' as "table", {rowID} as "rowID", '
+        f'"modified" as "created", {isBot} as "isBot", \'{attribute}\' as "attribute", {attribute} as "tValue" '
+        f'FROM "{table}" WHERE "{PK}" = {rowID}'
     )
 
 
