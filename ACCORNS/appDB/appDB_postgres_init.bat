@@ -9,7 +9,7 @@ SET "postgresBin=psql"
 SET "appDBFolder=%~dp0"
 SET "addDemo=True"
 SET "dbName=scuirrel"
-SET "override=True"
+SET "overWrite=True"
 
 SET "sqlFile=%appDBFolder%\appDB_postgres.sql" 
 SET "sqlDemo=%appDBFolder%\appDB_postgres_demo.sql" 
@@ -28,19 +28,33 @@ IF NOT EXIST "%sqlFile%" (
 )
 
 
+SET "errorFile=%TEMP%\error.txt"
 
+@REM Initialize the database based on settings
 IF "%addDemo%"=="True" (
     IF NOT EXIST "%sqlDemo%" (
         echo ERROR Demo SQL file does not exist.
         exit /b 1
     )
     "%postgresBin%" -U %postgresAdmin% -f %sqlFile% -f %sqlDemo% ^
-        -v admin="%postgresAdmin%" -v dbName="%dbName%" ^
-        -v appPass=%POSTGRES_PASS_SCUIRREL% > nul
+        -v dbName="%dbName%" -v overWrite=%overWrite% ^
+        -v appPass=%POSTGRES_PASS_SCUIRREL% > nul 2> "%errorFile%"
 ) ELSE (
     "%postgresBin%" -U %postgresAdmin% -f %sqlFile% ^
-        -v admin="%postgresAdmin%" -v dbName="%dbName%" ^
-        -v appPass=%POSTGRES_PASS_SCUIRREL% > nul
+        -v dbName="%dbName%" -v overWrite=%overWrite% ^
+        -v appPass=%POSTGRES_PASS_SCUIRREL% > nul 2> "%errorFile%"
 )
 
-echo SUCCESS: Database %dbName% succesfully created and user 'scuirrel' added
+@REM check if erorr file is empty otherwise print error
+FOR %%i IN ("%errorFile%") DO IF %%~zi EQU 0 (
+    del "%errorFile%"
+) ELSE (
+    type "%errorFile%"
+    del "%errorFile%"
+    echo.
+    echo ERROR: An error occurred while creating the database. Check the error log.
+    exit /b 1
+)
+
+echo.
+echo SUCCESS: Database %dbName% was successfully created and the user 'scuirrel' was added

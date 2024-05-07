@@ -1,3 +1,21 @@
+
+\set ON_ERROR_STOP on
+
+-- Check if the database already exists and if overWrite is set to false
+CREATE OR REPLACE FUNCTION check_overwrite(overWrite boolean)
+RETURNS void AS $$
+BEGIN
+  IF NOT overWrite THEN
+    IF EXISTS (SELECT 1 FROM pg_database WHERE datname = 'scuirrel') THEN
+        RAISE EXCEPTION 'Database scuirrel already exists and overWrite is set to false';
+    END IF;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT check_overwrite(:overWrite);
+
+-- Drop and create the database
 DROP DATABASE IF EXISTS :dbName;
 CREATE DATABASE :dbName;
 
@@ -164,10 +182,13 @@ INSERT INTO "user" ("username", "isAdmin", "created", "modified")
 VALUES ('anonymous', 0, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS')), 
 ('admin', 1, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
 
+
+
 DO
 $$
 BEGIN
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scuirrel') THEN
+        REASSIGN OWNED BY scuirrel TO CURRENT_USER;
         DROP OWNED BY scuirrel;
         DROP ROLE scuirrel;
     END IF;
