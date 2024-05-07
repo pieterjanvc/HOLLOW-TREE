@@ -7,3 +7,5 @@ backup/*
 .venv/*
 .vscode/*
 *.code-workspace
+publish/*
+!publish/publish.py

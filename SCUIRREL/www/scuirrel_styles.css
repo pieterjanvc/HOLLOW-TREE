@@ -1,54 +1,10 @@
-/* Overall settings */
-html {
-    margin:    0 auto;
-    max-width: 1280px;
-}
-
-:root {
-    --background: #252525;
-    --theme1: #AF6B50; /* Accent colour 1 */
-    --theme2: #65AF50; /* Main clickable elements */
-    --theme3: #5094AF; /* Accent colour 2 */
-    --theme4: #9A50AF; /* Messaging or feedback */
-
-    --bs-link-color:  var(--theme2);
-    --bs-nav-link-hover-color: var(--theme3);
-    --bs-btn-bg: var(--theme2)
-}
-
-.nav-pills {
-    --bs-nav-pills-link-active-bg: var(--theme2);
-    --bs-link-hover-color: white;
-}
-
-body {
-    
+body {    
     --botCol: var(--theme3);
     --userCol: var(--theme1);
-    
-    background: var(--background);
 }
 
 #chatWindow .card-body {
     flex-direction: column-reverse;
-}
-
-.nav-link.active {
-    background-color:  var(--theme2);
-}
-
-.btn-default {
-    background-color: var(--theme2);
-    color: white;
-}
-
-/* The following two fix bugs in DT rendering */
-.table>:not(caption)>*>* {
-    background-color: transparent; /* see which row in a table is selected */
-}
-
-thead, tbody, tfoot, tr, td, th {
-    border-bottom: 1px solid #dadada; /* row dividers */
 }
 
 /* 
@@ -68,26 +24,11 @@ https://codepen.io/Founts/pen/AJyVOr
 	height: auto;	
 }
 
-/* .tri:after{
-	content: ' ';
-	position: absolute;
-	width: 0;
-	height: 0;
-    left: auto;
-	right: 38px;
-	bottom: -20px;
-	border: 12px solid;	
-} */
-
 .botChat{
     color: white;    
     background-color: var(--botCol);
     border-color: var(--botCol);
 }
-
-/* .botChat.tri:after{
-    border-color: var(--botCol) var(--botCol) transparent transparent;
-} */
 
 .userChat{
     color: white;
@@ -95,10 +36,6 @@ https://codepen.io/Founts/pen/AJyVOr
     background-color: var(--userCol);
     border-color: var(--userCol);
 }
-
-/* .userChat.tri:after{
-    border-color: var(--userCol) var(--userCol) transparent transparent;
-} */
 
 .isSel{
     background-color: var(--theme4);
@@ -173,9 +110,4 @@ https://gist.github.com/WeiChiaChang/abe92ca2e8da86ef69560b63903e8764
 
 #chatFeedback:hover {
     transform: translateX(-50%) scale(1.1);
-}
-
-.shiny-notification {
-    background-color: var(--theme4);
-    color: white;
 }

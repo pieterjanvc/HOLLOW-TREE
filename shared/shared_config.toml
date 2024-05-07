@@ -3,8 +3,8 @@ allowMultiGuess = "False"
 remoteAppDB = "True" # If True use postgres otherwise localStorage
 
 [localStorage]
-appDB = "../appData/appDB.db"
-vectorDB = "../appData/vectordb.duckdb"
+appDB = "appData/appDB.db"
+vectorDB = "appData/vectordb.duckdb"
 
 [postgres]
 host = "localhost"

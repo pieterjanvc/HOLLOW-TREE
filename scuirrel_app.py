@@ -6,14 +6,12 @@
 # Science Concept Understanding with Interactive Research RAG Educational LLM
 
 # See app_shared.py for variables and functions shared across sessions
-import app_shared as shared
+import SCUIRREL.scuirrel_shared as scuirrel_shared
+import shared.shared as shared
 
 # General
-import sqlite3
 from html import escape
-import pandas as pd
 import json
-import warnings
 
 # Shiny
 from shiny import reactive
@@ -38,7 +36,10 @@ conn.close()
 
 ui.page_opts(fillable=True)
 ui.head_content(
-    ui.include_css("www/styles.css"), ui.include_js("www/custom.js", method="inline")
+    ui.include_css("SCUIRREL/www/scuirrel_styles.css"), 
+    ui.include_css("shared/www/shared_styles.css"),
+    ui.include_js("SCUIRREL/www/scuirrel_custom.js", method="inline"), 
+    ui.include_js("shared/www/shared_custom.js", method="inline")
 )
 
 # --- CUSTOM JS FUNCTIONS (Python side) ---
@@ -166,7 +167,7 @@ def theEnd():
         conn = shared.appDBConn()
         cursor = conn.cursor()
         # Log current discussion
-        shared.endDiscussion(cursor, dID, msg)
+        scuirrel_shared.endDiscussion(cursor, dID, msg)
         # Register the end of the session
         _ = shared.executeQuery(
             cursor, 'UPDATE "session" SET "end" = ? WHERE "sID" = ?', (shared.dt(), sID)
@@ -183,7 +184,7 @@ def _():
     cursor = conn.cursor()
     # Save the logs for the previous discussion (if any)
     if messages.get():
-        shared.endDiscussion(cursor, discussionID.get(), messages.get())
+        scuirrel_shared.endDiscussion(cursor, discussionID.get(), messages.get())
         elementDisplay("chatIn", "s")  # In case hidden if previous finished
 
     # Register the start of the  new topic discussion
@@ -213,7 +214,7 @@ def _():
         f'{topics.iloc[0]["topic"]}. What do you already know about this?'
     )
 
-    msg = shared.Conversation()
+    msg = scuirrel_shared.Conversation()
     msg.add_message(
         isBot=1,
         cID=int(concepts().iloc[conceptIndex.get()]["cID"]),
@@ -279,7 +280,7 @@ def _():
 @reactive.extended_task
 async def botResponse(topic, concepts, cIndex, conversation):
     # Check the student's progress on the current concept based on the last reply (other engine)
-    engine = shared.progressCheckEngine(conversation, topic, concepts, cIndex)
+    engine = scuirrel_shared.progressCheckEngine(conversation, topic, concepts, cIndex)
     eval = json.loads(str(engine.query(conversation)))
     # See if the LLM thinks we can move on to the next concept or or not
     if int(eval["score"]) > 2:
@@ -288,7 +289,7 @@ async def botResponse(topic, concepts, cIndex, conversation):
     if cIndex >= concepts.shape[0]:
         resp = f"Well done! It seems you have demonstrated understanding of everything we wanted you to know about: {topic}"
     else:
-        engine = shared.chatEngine(topic, concepts, cIndex, eval)
+        engine = scuirrel_shared.chatEngine(topic, concepts, cIndex, eval)
         resp = str(engine.query(conversation))
 
     return {"resp": resp, "eval": eval}
@@ -406,7 +407,7 @@ def checkAnswer():
     # Add the response to the database
 
     # Hide the answer button (don't allow for multiple guessing)
-    if not shared.allowMultiGuess:
+    if not scuirrel_shared.allowMultiGuess:
         elementDisplay("checkAnswer", "h")
 
     # Add the timestamp the answer was checked

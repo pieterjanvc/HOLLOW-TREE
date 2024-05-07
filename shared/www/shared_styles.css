@@ -1,0 +1,49 @@
+/* Overall settings */
+html {
+    margin:    0 auto;
+    max-width: 1280px;
+}
+
+:root {
+    --background: #252525;
+    --theme1: #AF6B50; /* Accent colour 1 */
+    --theme2: #65AF50; /* Main clickable elements */
+    --theme3: #5094AF; /* Accent colour 2 */
+    --theme4: #9A50AF; /* Messaging or feedback */
+
+    --bs-link-color:  var(--theme2);
+    --bs-nav-link-hover-color: var(--theme3);
+    --bs-btn-bg: var(--theme2)
+}
+
+.nav-pills {
+    --bs-nav-pills-link-active-bg: var(--theme2);
+    --bs-link-hover-color: white;
+}
+
+body {    
+    background: var(--background);
+}
+
+.nav-link.active {
+    background-color:  var(--theme2);
+}
+
+.btn-default {
+    background-color: var(--theme2);
+    color: white;
+}
+
+/* The following two fix bugs in DT rendering */
+.table>:not(caption)>*>* {
+    background-color: transparent; /* see which row in a table is selected */
+}
+
+thead, tbody, tfoot, tr, td, th {
+    border-bottom: 1px solid #dadada; /* row dividers */
+}
+
+.shiny-notification {
+    background-color: var(--theme4);
+    color: white;
+}
