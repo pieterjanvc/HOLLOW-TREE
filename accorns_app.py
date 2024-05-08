@@ -329,7 +329,7 @@ def addTopic_modal():
 @reactive.event(input.ntAdd)
 def addNewTopic():
     # Only proceed if the input is valid
-    if not accorns_shared.inputCheck(input.ntTopic()):
+    if not shared.inputCheck(input.ntTopic()):
         ui.remove_ui("#noGoodTopic")
         ui.insert_ui(
             HTML(
@@ -392,7 +392,7 @@ def _():
 @reactive.event(input.etEdit)
 def _():
     # Only proceed if the input is valid
-    if not accorns_shared.inputCheck(input.etInput()):
+    if not shared.inputCheck(input.etInput()):
         ui.remove_ui("#noGoodTopic")
         ui.insert_ui(
             HTML(
@@ -504,7 +504,7 @@ def _():
 @reactive.event(input.ncAdd)
 def _():
     # Only proceed if the input is valid
-    if not accorns_shared.inputCheck(input.ncInput()):
+    if not shared.inputCheck(input.ncInput()):
         ui.remove_ui("#noGoodConcept")
         ui.insert_ui(
             HTML(
@@ -561,9 +561,9 @@ def _():
 @reactive.event(input.ncEdit)
 def _():
     # Only proceed if the input is valid
-    if not accorns_shared.inputCheck(input.ecInput()):
+    if not shared.inputCheck(input.ecInput()):
         ui.remove_ui("#noGoodConcept")
-        ui.insert_ui(
+        ui.insert_ui( 
             HTML(
                 "<div id=noGoodConcept style='color: red'>A concept must be at least 6 characters</div>"
             ),
@@ -800,9 +800,9 @@ def _():
     )
     conceptList = shared.pandasQuery(
         conn,
-        'SELECT "cID", max("concept") as "concept", count() as n FROM '
+        'SELECT "cID", max("concept") as "concept", count(*) as n FROM '
         f'(SELECT "cID", "concept" FROM "concept" WHERE "tID" = {input.qtID()} '
-        f'UNION ALL SELECT "cID", "" as concept FROM "question" where "tID" = {input.qtID()}) GROUP BY "cID"',
+        f'UNION ALL SELECT "cID", \'\' as concept FROM "question" where "tID" = {input.qtID()}) GROUP BY "cID"',
     )
     cID = int(conceptList[conceptList["n"] == min(conceptList["n"])].sample(1)["cID"])
     prevQuestions = shared.pandasQuery(
@@ -902,7 +902,6 @@ def _():
         q = shared.pandasQuery(
             conn,
             f'SELECT "qID", "question" FROM "question" WHERE "tID" = {input.qtID()} AND "archived" = 0',
-            conn,
         )
         conn.commit()
         conn.close()

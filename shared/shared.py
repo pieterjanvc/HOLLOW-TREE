@@ -13,6 +13,7 @@ from datetime import datetime
 import pandas as pd
 import toml
 import warnings
+from regex import search as re_search
 
 # Llamaindex
 from llama_index.core import VectorStoreIndex
@@ -29,7 +30,8 @@ with open("shared/shared_config.toml", "r") as f:
 remoteAppDB = any(
     config["general"]["remoteAppDB"] == x for x in ["True", "true", "T", 1]
 )
-vectorDB = config["localStorage"]["vectorDB"]
+vectorDB = config["localStorage"]["duckDB"]
+sqliteDB = config["localStorage"]["sqliteDB"]
 
 # Get the OpenAI API key and organistation
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
@@ -54,6 +56,11 @@ index = VectorStoreIndex.from_vector_store(vector_store)
 def dt():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+def inputCheck(input):
+    if re_search(r"(?=(.*[a-zA-Z0-9]){6,}).*", input):
+        return True
+    else:
+        False
 
 # Get a local or remote DB connection (depending on config)
 def appDBConn(remoteAppDB=remoteAppDB):
@@ -66,12 +73,27 @@ def appDBConn(remoteAppDB=remoteAppDB):
         )
 
     else:
-        if not os.path.exists(config["localStorage"]["appDB"]):
+        if not os.path.exists(config["localStorage"]["sqliteDB"]):
             raise ConnectionError(
                 "The app database was not found. Please run ACCORNS first"
             )
-        return sqlite3.connect(config["localStorage"]["appDB"])
+        return sqlite3.connect(config["localStorage"]["sqliteDB"])
 
+# Check if the postgres scuirrel database is available when remoteAppDB is set to True
+def checkRemoteDB():
+    try:
+        conn = appDBConn()
+        conn.close()
+        return "Connection to postgres scuirrel database successful"
+    except psycopg2.OperationalError as e:
+        raise psycopg2.OperationalError(
+            str(e) + "\n\n POSTGRESQL connection error: "
+            "Please check the postgres connection settings in config.toml "
+            "and make sure POSTGRES_PASS_SCUIRREL is set as an environment variable."
+        )
+    
+if remoteAppDB:
+    print(shared.checkRemoteDB())
 
 def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB):
     query = query.replace("?", "%s") if remoteAppDB else query

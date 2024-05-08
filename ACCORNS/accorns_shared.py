@@ -10,16 +10,11 @@ from shared import shared
 # -- General
 import os
 import sqlite3
-import psycopg2
-from datetime import datetime
-import regex as re
 import duckdb
 import json
 from shutil import move
 import toml
 from urllib.request import urlretrieve
-import pandas as pd
-import warnings
 
 # -- Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
@@ -37,107 +32,15 @@ nest_asyncio.apply()
 
 # --- Global variables
 
-with open("accorns_config.toml", "r") as f:
+with open("ACCORNS/accorns_config.toml", "r") as f:
     config = toml.load(f)
 
 addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
-remoteAppDB = any(
-    config["general"]["remoteAppDB"] == x for x in ["True", "true", "T", 1]
-)
-appDB = config["localStorage"]["appDB"]
-vectorDB = config["localStorage"]["vectorDB"]
 tempFolder = os.path.join(config["localStorage"]["tempFolder"], "")
 storageFolder = os.path.join(config["localStorage"]["storageFolder"], "")
 
-# Get the OpenAI API key and organistation
-os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
-os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
-gptModel = config["LLM"]["gptModel"]
-
-# Use OpenAI LLM from Llamaindex
-llm = OpenAI(model=gptModel)
-
-
 # ----------- FUNCTIONS -----------
 # *********************************
-
-
-def dt():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-
-def inputCheck(input):
-    if re.search(r"(?=(.*[a-zA-Z0-9]){6,}).*", input):
-        return True
-    else:
-        False
-
-
-# Get a local or remote DB connection (depending on config)
-def appDBConn(remoteAppDB=remoteAppDB):
-    if remoteAppDB:
-        return psycopg2.connect(
-            host=config["postgres"]["host"],
-            user=config["postgres"]["username"],
-            password=os.environ.get("POSTGRES_PASS_SCUIRREL"),
-            database=config["postgres"]["db"],
-        )
-
-    else:
-        if not os.path.exists(config["localStorage"]["appDB"]):
-            raise ConnectionError(
-                "The app database was not found. Please run ACCORNS first"
-            )
-        return sqlite3.connect(config["localStorage"]["appDB"])
-
-
-# Check if the postgres scuirrel database is available when remoteAppDB is set to True
-def checkRemoteDB():
-    try:
-        conn = appDBConn()
-        conn.close()
-        return "Connection to postgres scuirrel database successful"
-    except psycopg2.OperationalError as e:
-        raise psycopg2.OperationalError(
-            str(e) + "\n\n POSTGRESQL connection error: "
-            "Please check the postgres connection settings in config.toml "
-            "and make sure POSTGRES_PASS_SCUIRREL is set as an environment variable."
-        )
-
-
-if remoteAppDB:
-    print(checkRemoteDB())
-
-
-def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB):
-    query = query.replace("?", "%s") if remoteAppDB else query
-    query = (
-        query + f' RETURNING "{lastRowId}"'
-        if remoteAppDB & (lastRowId != "")
-        else query
-    )
-
-    if isinstance(params, tuple):
-        cursor.execute(query, params)
-    else:
-        if len(params) > 1:
-            cursor.executemany(query, params[:-1])
-        cursor.execute(query, params[-1])
-
-    if lastRowId != "":
-        if remoteAppDB:
-            return cursor.fetchone()[0]
-        else:
-            return cursor.lastrowid
-
-    return
-
-
-def pandasQuery(conn, query):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return pd.read_sql_query(query, conn)
-
 
 # Database to store app data (this is not the vector database!)
 def createSQLiteAppDB(DBpath, addDemo=False):
@@ -172,7 +75,7 @@ def createSQLiteAppDB(DBpath, addDemo=False):
 
 
 # Make new app DB if needed
-print(createSQLiteAppDB(appDB, addDemo=addDemo))
+print(createSQLiteAppDB(shared.sqliteDB, addDemo=addDemo))
 
 
 # Create DuckDB vector database and add files
@@ -273,14 +176,15 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
     cursor = conn.cursor()
     _ = cursor.execute(
         (
-            'INSERT INTO file(fID, fileName, title, subtitle, created) '
-            f"VALUES(nextval('seq_fID'), '{fileName}', '{docSum['title']}', '{docSum['subtitle']}', '{dt()}')"
+            'INSERT INTO "file"("fID", "fileName", "title", "subtitle", "created") '
+            "VALUES(nextval('seq_fID'), ?, ?, ?, ?)",
+            (fileName,docSum['title'],docSum['subtitle'])
         )
     )
     fID = cursor.execute("SELECT currval('seq_fID')").fetchall()[0][0]
     _ = cursor.executemany(
-        "INSERT INTO keyword(kID, fID, keyword) "
-        f"VALUES(nextval('seq_kID'),'{fID}', ?)",
+        'INSERT INTO "keyword"("kID", "fID", "keyword") '
+        f"VALUES(nextval('seq_kID'),{int(fID)}, ?)",
         [(item,) for item in docSum["keywords"]],
     )
     conn.commit()
@@ -291,19 +195,19 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
 
 # When demo data is to be added use a file stored in a GitHub issue
 # TODO Replace URL once public!
-if addDemo & (not os.path.exists(vectorDB)):
+if addDemo & (not os.path.exists(shared.vectorDB)):
     newFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
-    addFileToDB(newFile, vectorDB)
+    addFileToDB(newFile, shared.vectorDB)
 
 
-def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=dt()):
+def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=shared.dt()):
     # Get the Primary Key
-    if remoteAppDB:
+    if shared.remoteAppDB:
         q = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' LIMIT 1"
     else:
         q = f"SELECT name FROM pragma_table_info('{table}') WHERE pk = 1"
 
-    _ = executeQuery(cursor, q)
+    _ = shared.executeQuery(cursor, q)
     PK = cursor.fetchone()[0]
 
     if PK is None:
@@ -312,12 +216,12 @@ def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=dt()
         )
 
     # Check if the attribute exists
-    if remoteAppDB:
+    if shared.remoteAppDB:
         q = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' AND column_name = '{attribute}'"
     else:
         q = f"SELECT name FROM pragma_table_info('{table}') WHERE name = '{attribute}'"
 
-    _ = executeQuery(cursor, q)
+    _ = shared.executeQuery(cursor, q)
     check = cursor.fetchone()
 
     if check is None:
@@ -325,11 +229,11 @@ def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=dt()
     # Check isBot and assign 0, 1 or Null when False, True, None
     isBot = isBot + 0 if isBot is not None else "NULL"
     # Insert into backup
-    _ = executeQuery(
+    _ = shared.executeQuery(
         cursor,
         f'INSERT INTO "backup" ("sID", "modified", "table", "rowID", "created", "isBot", "attribute", "tValue") '
         f'SELECT {sID} as "sID", \'{timeStamp}\' as "modified", \'{table}\' as "table", {rowID} as "rowID", '
-        f'"modified" as "created", {isBot} as "isBot", \'{attribute}\' as "attribute", {attribute} as "tValue" '
+        f'"modified" as "created", {isBot} as "isBot", \'{attribute}\' as "attribute", "{attribute}" as "tValue" '
         f'FROM "{table}" WHERE "{PK}" = {rowID}',
     )
 

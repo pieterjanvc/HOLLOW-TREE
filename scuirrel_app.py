@@ -25,6 +25,10 @@ from htmltools import HTML, div
 # Non-reactive session variables (loaded before session starts)
 uID = 1  # if registered users update later
 
+if shared.remoteAppDB:
+    _ = shared.checkRemoteDB()
+
+
 conn = shared.appDBConn()
 topics = shared.pandasQuery(
     conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
@@ -427,12 +431,9 @@ def _():
 
     # Handle the case where user returns before checking an answer
     if "check" not in q:
-        q["check"] = "NULL"
-        q["response"] = "NULL"
-        q["correct"] = "NULL"
-    else:
-        q["check"] = f'"{q["check"]}"'
-        q["response"] = f'"{q["response"]}"'
+        q["check"] = None
+        q["response"] = None
+        q["correct"] = None
 
     # Add the response to the DB
     conn = shared.appDBConn()
