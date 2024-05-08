@@ -38,6 +38,8 @@ with open("ACCORNS/accorns_config.toml", "r") as f:
 addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
 tempFolder = os.path.join(config["localStorage"]["tempFolder"], "")
 storageFolder = os.path.join(config["localStorage"]["storageFolder"], "")
+appDBFolder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "appDB")
+
 
 # ----------- FUNCTIONS -----------
 # *********************************
@@ -48,7 +50,7 @@ def createSQLiteAppDB(DBpath, addDemo=False):
         return (2, "Database already exists. Skipping")
 
     # Create a new database from the SQL file
-    with open("appDB/appDB_sqlite.sql", "r") as file:
+    with open(os.path.join(appDBFolder,"appDB_sqlite.sql"), "r") as file:
         query = file.read().replace("\n", " ").replace("\t", "").split(";")
 
     conn = sqlite3.connect(DBpath)
@@ -62,7 +64,7 @@ def createSQLiteAppDB(DBpath, addDemo=False):
         conn.close()
         return (0, "DB created - No demo added")
 
-    with open("appDB/appDB_sqlite_demo.sql", "r") as file:
+    with open(os.path.join(appDBFolder,"appDB_sqlite_demo.sql"), "r") as file:
         query = file.read().replace("\n", " ").replace("\t", "").split(";")
 
     for x in query:
@@ -131,10 +133,9 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
             newData,
             storage_context=storage_context,
             transformations=[TitleExtractor(), KeywordExtractor()],
-        )
+        )        
 
-        # Add the a custom file info and keywords table
-        with open("appDB/expandVectorDB.sql", "r") as file:
+        with open(os.path.join(appDBFolder,"expandVectorDB.sql"), "r") as file:
             query = file.read().replace("\n", " ").replace("\t", "").split(";")
 
         conn = duckdb.connect(vectorDB)
@@ -175,15 +176,13 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
     conn = duckdb.connect(vectorDB)
     cursor = conn.cursor()
     _ = cursor.execute(
-        (
-            'INSERT INTO "file"("fID", "fileName", "title", "subtitle", "created") '
+            'INSERT INTO file(fID, fileName, title, subtitle, created) '
             "VALUES(nextval('seq_fID'), ?, ?, ?, ?)",
-            (fileName,docSum['title'],docSum['subtitle'])
-        )
+            (fileName,docSum['title'],docSum['subtitle'], shared.dt())
     )
     fID = cursor.execute("SELECT currval('seq_fID')").fetchall()[0][0]
     _ = cursor.executemany(
-        'INSERT INTO "keyword"("kID", "fID", "keyword") '
+        'INSERT INTO keyword(kID, fID, keyword) '
         f"VALUES(nextval('seq_kID'),{int(fID)}, ?)",
         [(item,) for item in docSum["keywords"]],
     )
@@ -199,6 +198,9 @@ if addDemo & (not os.path.exists(shared.vectorDB)):
     newFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
     addFileToDB(newFile, shared.vectorDB)
 
+# Load the vector index from storage
+vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
+index = VectorStoreIndex.from_vector_store(vector_store)
 
 def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=shared.dt()):
     # Get the Primary Key

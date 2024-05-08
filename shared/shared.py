@@ -33,24 +33,28 @@ remoteAppDB = any(
 vectorDB = config["localStorage"]["duckDB"]
 sqliteDB = config["localStorage"]["sqliteDB"]
 
+# Create the parent directory for the sqliteDB if it does not exist
+if not os.path.exists(os.path.dirname(sqliteDB)):
+    os.makedirs(os.path.dirname(sqliteDB))
+
+# Do the same for the vectorDB
+if not os.path.exists(os.path.dirname(vectorDB)):
+    os.makedirs(os.path.dirname(vectorDB))
+
+
 # Get the OpenAI API key and organistation
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
 os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
 gptModel = config["LLM"]["gptModel"]
 llm = OpenAI(model=gptModel)
 
-if not os.path.exists(vectorDB) & shared.remoteAppDB:
+if not os.path.exists(vectorDB) and not shared.remoteAppDB:
     raise ConnectionError("The vector database was not found. Please run ACCORNS first")
 
 if os.environ["OPENAI_API_KEY"] is None:
     raise ValueError(
         "There is no OpenAI API key stored in the the OPENAI_API_KEY environment variable"
     )
-
-# Load the vector index from storage
-vector_store = DuckDBVectorStore.from_local(vectorDB)
-index = VectorStoreIndex.from_vector_store(vector_store)
-
 
 # --- FUNCTIONS ---
 def dt():

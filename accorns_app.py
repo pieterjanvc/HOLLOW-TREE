@@ -62,8 +62,8 @@ uiUploadFile = div(
 
 ui.page_opts(fillable=True, window_title="ACCORNS")
 ui.head_content(
-    ui.include_css("ACCORNS/www/accorns_styles.css"), 
     ui.include_css("shared/www/shared_styles.css"),
+    ui.include_css("ACCORNS/www/accorns_styles.css"),     
     ui.include_js("ACCORNS/www/accorns_custom.js", method="inline"), 
     ui.include_js("shared/www/shared_custom.js", method="inline")
 )
