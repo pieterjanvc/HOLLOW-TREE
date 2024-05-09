@@ -1,5 +1,5 @@
 // ---------------------------------
-// ------ CUSTOM JS FUNCTIONS ------
+// ------ SHARED JS FUNCTIONS ------
 // --------------------------------- 
 
 // Function to hide/show/enable/disable elements
@@ -27,7 +27,6 @@ Shiny.addCustomMessageHandler("hideShow", function(x) {
         case "s":
             element.style.display = "";
             break;
-    }
+    }    
     
 });
-

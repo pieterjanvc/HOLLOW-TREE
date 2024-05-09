@@ -5,109 +5,32 @@
 # All variables and functions below are shared across different session
 # https://shiny.posit.co/py/docs/express-in-depth.html#shared-objects
 
+from shared import shared
+
 # General
 import os
-import sqlite3
-import psycopg2
-from datetime import datetime
 import pandas as pd
 import toml
-import warnings
 
 # Llamaindex
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate
 from llama_index.core.llms import ChatMessage, MessageRole
-from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
 
 # --- VARIABLES ---
 
-with open("config.toml", "r") as f:
+curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+
+with open(os.path.join(curDir,"scuirrel_config.toml"), "r") as f:
     config = toml.load(f)
 
-remoteAppDB = any(
-    config["general"]["remoteAppDB"] == x for x in ["True", "true", "T", 1]
-)
-vectorDB = config["localStorage"]["vectorDB"]
 allowMultiGuess = any(
     config["general"]["allowMultiGuess"] == x for x in ["True", "true", "T", 1]
 )
 
-# Get the OpenAI API key and organistation
-os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
-os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
-gptModel = config["LLM"]["gptModel"]
-llm = OpenAI(model=gptModel)
-
-if not os.path.exists(vectorDB):
-    raise ConnectionError("The vector database was not found. Please run ACCORNS first")
-
-if os.environ["OPENAI_API_KEY"] is None:
-    raise ValueError(
-        "There is no OpenAI API key stored in the the OPENAI_API_KEY environment variable"
-    )
-
-# Load the vector index from storage
-vector_store = DuckDBVectorStore.from_local(vectorDB)
-index = VectorStoreIndex.from_vector_store(vector_store)
-
-
-# --- FUNCTIONS ---
-def dt():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-
-# Get a local or remote DB connection (depending on config)
-def appDBConn(remoteAppDB=remoteAppDB):
-    if remoteAppDB:
-        return psycopg2.connect(
-            host=config["postgres"]["host"],
-            user=config["postgres"]["username"],
-            password=os.environ.get("POSTGRES_PASS_SCUIRREL"),
-            database=config["postgres"]["db"],
-        )
-
-    else:
-        if not os.path.exists(config["localStorage"]["appDB"]):
-            raise ConnectionError(
-                "The app database was not found. Please run ACCORNS first"
-            )
-        return sqlite3.connect(config["localStorage"]["appDB"])
-
-
-def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB):
-    query = query.replace("?", "%s") if remoteAppDB else query
-    query = (
-        query + f' RETURNING "{lastRowId}"'
-        if remoteAppDB & (lastRowId != "")
-        else query
-    )
-
-    if isinstance(params, tuple):
-        cursor.execute(query, params)
-    else:
-        if len(params) > 1:
-            cursor.executemany(query, params[:-1])
-        cursor.execute(query, params[-1])
-
-    if lastRowId != "":
-        if remoteAppDB:
-            return cursor.fetchone()[0]
-        else:
-            return cursor.lastrowid
-
-    return
-
-
-def pandasQuery(conn, query):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return pd.read_sql_query(query, conn)
-
-
 # Check if there are topics to discuss before proceeding
-conn = appDBConn()
-topics = pandasQuery(
+conn = shared.appDBConn()
+topics = shared.pandasQuery(
     conn,
     'SELECT * FROM "topic" WHERE "archived" = 0 AND "tID" IN'
     '(SELECT DISTINCT "tID" from "concept" WHERE "archived" = 0)',
@@ -120,6 +43,9 @@ if topics.shape[0] == 0:
     )
 conn.close()
 
+# Load the vector index from storage
+vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
+index = VectorStoreIndex.from_vector_store(vector_store)
 
 # Adapt the chat engine to the topic
 def chatEngine(topic, concepts, cIndex, eval):
@@ -222,7 +148,7 @@ interesting
     return index.as_query_engine(
         text_qa_template=text_qa_template,
         refine_template=refine_template,
-        llm=llm,
+        llm=shared.llm,
     )
 
 
@@ -291,13 +217,13 @@ Please output your score in the following format:"""
     return index.as_query_engine(
         text_qa_template=text_qa_template,
         refine_template=refine_template,
-        llm=llm,
+        llm=shared.llm,
     )
 
 
 # Function to register the end of a discussion in the DB
-def endDiscussion(cursor, dID, messages, timeStamp=dt()):
-    _ = executeQuery(
+def endDiscussion(cursor, dID, messages, timeStamp=shared.dt()):
+    _ = shared.executeQuery(
         cursor, 'UPDATE "discussion" SET "end" = ? WHERE "dID" = ?', (timeStamp, dID)
     )
     # Executemany is optimised in such a way that it can't return the lastrowid.
@@ -305,7 +231,7 @@ def endDiscussion(cursor, dID, messages, timeStamp=dt()):
     msg = messages.astuple(
         ["cID", "isBot", "timeStamp", "content", "pCode", "pMessage"]
     )
-    mID = executeQuery(
+    mID = shared.executeQuery(
         cursor,
         'INSERT INTO "message"("dID","cID","isBot","timestamp","message","progressCode","progressMessage") '
         f"VALUES({dID}, ?, ?, ?, ?, ?, ?)",
@@ -314,11 +240,11 @@ def endDiscussion(cursor, dID, messages, timeStamp=dt()):
     )
     # If a chat issue was submitted, update the temp IDs to the real ones
     idShift = int(mID) - messages.id + 1
-    _ = executeQuery(
+    _ = shared.executeQuery(
         cursor, 'SELECT "fcID" FROM "feedback_chat" WHERE "dID" = ?', (dID,)
     )
     if cursor.fetchone():
-        _ = executeQuery(
+        _ = shared.executeQuery(
             cursor,
             'UPDATE "feedback_chat_msg" SET "mID" = "mID" + ? WHERE "fcID" IN '
             '(SELECT "fcID" FROM "feedback_chat" WHERE "dID" = ?)',
@@ -353,7 +279,7 @@ class Conversation:
         pMessage: str = None,
         timeStamp: str = None,
     ):
-        timeStamp = timeStamp if timeStamp else dt()
+        timeStamp = timeStamp if timeStamp else shared.dt()
         self.messages = pd.concat(
             [
                 self.messages,
