@@ -16,15 +16,13 @@ import warnings
 from regex import search as re_search
 
 # Llamaindex
-from llama_index.core import VectorStoreIndex
 from llama_index.llms.openai import OpenAI
-from llama_index.vector_stores.duckdb import DuckDBVectorStore
-
-from shared import shared
 
 # --- VARIABLES ---
 
-with open("shared/shared_config.toml", "r") as f:
+curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+
+with open(os.path.join(curDir, "shared_config.toml"), "r") as f:
     config = toml.load(f)
 
 remoteAppDB = any(
@@ -48,7 +46,7 @@ os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
 gptModel = config["LLM"]["gptModel"]
 llm = OpenAI(model=gptModel)
 
-if not os.path.exists(vectorDB) and not shared.remoteAppDB:
+if not os.path.exists(vectorDB) and not remoteAppDB:
     raise ConnectionError("The vector database was not found. Please run ACCORNS first")
 
 if os.environ["OPENAI_API_KEY"] is None:
@@ -97,7 +95,7 @@ def checkRemoteDB():
         )
     
 if remoteAppDB:
-    print(shared.checkRemoteDB())
+    print(checkRemoteDB())
 
 def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB):
     query = query.replace("?", "%s") if remoteAppDB else query

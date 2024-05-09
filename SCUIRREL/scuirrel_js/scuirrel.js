@@ -1,6 +1,6 @@
-// ----------------------------------------------
-// ------ CUSTOM JS FUNCTIONS FOR SCUIRREL ------
-// ----------------------------------------------
+// -----------------------------------
+// ------ SCUIRREL JS FUNCTIONS ------
+// ----------------------------------- 
 
 // Shift + enter will send a message
 $(document).keyup(function(event) {

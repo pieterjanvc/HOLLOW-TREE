@@ -10,6 +10,7 @@ import ACCORNS.accorns_shared as accorns_shared
 import shared.shared as shared
 
 # -- General
+import os
 import duckdb
 import pandas as pd
 import json
@@ -22,7 +23,7 @@ from llama_index.vector_stores.duckdb import DuckDBVectorStore
 
 # -- Shiny
 from shiny import reactive
-from shiny.express import input, render, ui, session, output
+from shiny.express import input, render, ui, session
 from htmltools import HTML, div
 
 # The following is needed to prevent async issues when inserting new data in vector DB
@@ -60,12 +61,15 @@ uiUploadFile = div(
 # --- RENDERING UI ---
 # ********************
 
+curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+os.path.join(curDir, "ACCORNS")
+
 ui.page_opts(fillable=True, window_title="ACCORNS")
 ui.head_content(
-    ui.include_css("shared/www/shared_styles.css"),
-    ui.include_css("ACCORNS/www/accorns_styles.css"),     
-    ui.include_js("ACCORNS/www/accorns_custom.js", method="inline"), 
-    ui.include_js("shared/www/shared_custom.js", method="inline")
+    ui.include_css(os.path.join(curDir, "shared", "shared_css","shared.css")),
+    ui.include_css(os.path.join(curDir, "ACCORNS", "accorns_css","accorns.css")),     
+    ui.include_js(os.path.join(curDir, "ACCORNS", "accorns_js","accorns.js")), 
+    ui.include_js(os.path.join(curDir, "shared", "shared_js","shared.js"))
 )
 # --- CUSTOM JS FUNCTIONS (Python side) ---
 

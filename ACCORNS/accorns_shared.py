@@ -32,14 +32,15 @@ nest_asyncio.apply()
 
 # --- Global variables
 
-with open("ACCORNS/accorns_config.toml", "r") as f:
+curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+appDBDir = os.path.join(curDir, "appDB")
+
+with open(os.path.join(curDir,"accorns_config.toml"), "r") as f:
     config = toml.load(f)
 
 addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
 tempFolder = os.path.join(config["localStorage"]["tempFolder"], "")
 storageFolder = os.path.join(config["localStorage"]["storageFolder"], "")
-appDBFolder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "appDB")
-
 
 # ----------- FUNCTIONS -----------
 # *********************************
@@ -50,7 +51,7 @@ def createSQLiteAppDB(DBpath, addDemo=False):
         return (2, "Database already exists. Skipping")
 
     # Create a new database from the SQL file
-    with open(os.path.join(appDBFolder,"appDB_sqlite.sql"), "r") as file:
+    with open(os.path.join(appDBDir,"appDB_sqlite.sql"), "r") as file:
         query = file.read().replace("\n", " ").replace("\t", "").split(";")
 
     conn = sqlite3.connect(DBpath)
@@ -64,7 +65,7 @@ def createSQLiteAppDB(DBpath, addDemo=False):
         conn.close()
         return (0, "DB created - No demo added")
 
-    with open(os.path.join(appDBFolder,"appDB_sqlite_demo.sql"), "r") as file:
+    with open(os.path.join(appDBDir,"appDB_sqlite_demo.sql"), "r") as file:
         query = file.read().replace("\n", " ").replace("\t", "").split(";")
 
     for x in query:
@@ -135,7 +136,7 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
             transformations=[TitleExtractor(), KeywordExtractor()],
         )        
 
-        with open(os.path.join(appDBFolder,"expandVectorDB.sql"), "r") as file:
+        with open(os.path.join(appDBDir,"expandVectorDB.sql"), "r") as file:
             query = file.read().replace("\n", " ").replace("\t", "").split(";")
 
         conn = duckdb.connect(vectorDB)

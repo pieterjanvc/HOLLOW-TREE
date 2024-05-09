@@ -1,5 +1,5 @@
 // ---------------------------------
-// ------ CUSTOM JS FUNCTIONS ------
+// ------ SHARED JS FUNCTIONS ------
 // --------------------------------- 
 
 // Function to hide/show/enable/disable elements

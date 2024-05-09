@@ -10,6 +10,7 @@ import SCUIRREL.scuirrel_shared as scuirrel_shared
 import shared.shared as shared
 
 # General
+import os
 from html import escape
 import json
 
@@ -38,12 +39,15 @@ conn.close()
 # --- RENDERING UI ---
 # ********************
 
-ui.page_opts(fillable=True)
+curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+os.path.join(curDir, "SCUIRREL")
+
+ui.page_opts(fillable=True, window_title="SCUIRREL")
 ui.head_content(
-    ui.include_css("shared/www/shared_styles.css"),
-    ui.include_css("SCUIRREL/www/scuirrel_styles.css"),     
-    ui.include_js("SCUIRREL/www/scuirrel_custom.js", method="inline"), 
-    ui.include_js("shared/www/shared_custom.js", method="inline")
+    ui.include_css(os.path.join(curDir, "shared", "shared_css","shared.css")),
+    ui.include_css(os.path.join(curDir, "SCUIRREL","scuirrel_css","scuirrel.css")),     
+    ui.include_js(os.path.join(curDir, "SCUIRREL", "scuirrel_js","scuirrel.js")), 
+    ui.include_js(os.path.join(curDir, "shared", "shared_js","shared.js"))
 )
 
 # --- CUSTOM JS FUNCTIONS (Python side) ---

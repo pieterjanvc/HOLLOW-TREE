@@ -8,16 +8,20 @@
 from shared import shared
 
 # General
+import os
 import pandas as pd
 import toml
 
 # Llamaindex
-from llama_index.core import ChatPromptTemplate
+from llama_index.core import VectorStoreIndex, ChatPromptTemplate
 from llama_index.core.llms import ChatMessage, MessageRole
+from llama_index.vector_stores.duckdb import DuckDBVectorStore
 
 # --- VARIABLES ---
 
-with open("SCUIRREL/scuirrel_config.toml", "r") as f:
+curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+
+with open(os.path.join(curDir,"scuirrel_config.toml"), "r") as f:
     config = toml.load(f)
 
 allowMultiGuess = any(
@@ -39,6 +43,9 @@ if topics.shape[0] == 0:
     )
 conn.close()
 
+# Load the vector index from storage
+vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
+index = VectorStoreIndex.from_vector_store(vector_store)
 
 # Adapt the chat engine to the topic
 def chatEngine(topic, concepts, cIndex, eval):
@@ -138,7 +145,7 @@ interesting
     ]
     refine_template = ChatPromptTemplate(chat_refine_msgs)
 
-    return shared.index.as_query_engine(
+    return index.as_query_engine(
         text_qa_template=text_qa_template,
         refine_template=refine_template,
         llm=shared.llm,
@@ -207,7 +214,7 @@ Please output your score in the following format:"""
     ]
     refine_template = ChatPromptTemplate(chat_refine_msgs)
 
-    return shared.index.as_query_engine(
+    return index.as_query_engine(
         text_qa_template=text_qa_template,
         refine_template=refine_template,
         llm=shared.llm,

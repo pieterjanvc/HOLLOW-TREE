@@ -46,13 +46,17 @@ copyfile(os.path.join(baseFolder, "shared","shared.py"),
 copyfile(os.path.join(baseFolder, toGenerate.lower(),f"{toGenerate.lower()}_shared.py"), 
          os.path.join(newFolder, f"{toGenerate.lower()}_shared.py"))
 
-# Copy the shared/www directory to the publish directory
-copytree(os.path.join(baseFolder, "shared","www"), 
-         os.path.join(newFolder, "www"), dirs_exist_ok=True)
+# Copy the shared css and js directory to the publish directory
+copytree(os.path.join(baseFolder, "shared","shared_css"), 
+         os.path.join(newFolder, "shared_css"), dirs_exist_ok=True)
+copytree(os.path.join(baseFolder, "shared","shared_js"), 
+         os.path.join(newFolder, "shared_js"), dirs_exist_ok=True)
 
-# Copy the files in SCUIRREL or ACCORNS www directory to the existing www publish directory
-copytree(os.path.join(baseFolder, toGenerate.lower(), "www"), 
-         os.path.join(newFolder, "www"), dirs_exist_ok=True)
+# Copy the files in SCUIRREL or ACCORNS css and js directory to the publish directory
+copytree(os.path.join(baseFolder, toGenerate,f"{toGenerate.lower()}_css"), 
+         os.path.join(newFolder, f"{toGenerate.lower()}_css"), dirs_exist_ok=True)
+copytree(os.path.join(baseFolder, toGenerate,f"{toGenerate.lower()}_js"), 
+         os.path.join(newFolder, f"{toGenerate.lower()}_js"), dirs_exist_ok=True)
 
 # Copy the shared/shared-config.toml file to the publish directory
 copyfile(os.path.join(baseFolder,"shared","shared_config.toml"), 
@@ -75,29 +79,21 @@ if toGenerate == "ACCORNS":
 # In the new app.py file, replace import SCUIRREL.scuirrel_shared as scuirrel_shared with import shared as shared
 # and replace import SCUIRREL.scuirrel_shared as scuirrel_shared with import shared as shared
 with open(os.path.join(newFolder, "app.py"), "r") as f:
-    app_py = f.read()
-    app_py = app_py.replace(f"import {toGenerate}.{toGenerate.lower()}_shared as {toGenerate.lower()}_shared",
+    toEdit = f.read()
+    toEdit = toEdit.replace(f"import {toGenerate}.{toGenerate.lower()}_shared as {toGenerate.lower()}_shared",
                             f"import {toGenerate.lower()}_shared")
-    app_py = app_py.replace("import shared.shared as shared", "import shared")
-    app_py = app_py.replace(f"{toGenerate}/www/", "www/")
-    app_py = app_py.replace("shared/www/", "www/")
+    toEdit = toEdit.replace("import shared.shared as shared", "import shared")
+    toEdit = toEdit.replace('"shared",', '')
+    toEdit = toEdit.replace(f'"{toGenerate}",', '')
 
 with open(os.path.join(newFolder, "app.py"), "w") as f:
-    f.write(app_py)
+    f.write(toEdit)
 
-with open(os.path.join(newFolder, "shared.py"), "r") as f:
-    shared_py = f.read()
-    shared_py = shared_py.replace("from shared import shared","import shared")
-    shared_py = shared_py.replace("shared/shared_config.toml","shared_config.toml")
+with open(os.path.join(newFolder, f"{toGenerate}_shared.py"), "r") as f:
+    toEdit = f.read()
+    toEdit = toEdit.replace("from shared import shared","import shared")
 
-with open(os.path.join(newFolder, "shared.py"), "w") as f:
-    f.write(shared_py)
-
-with open(os.path.join(newFolder, f"{toGenerate.lower()}_shared.py"), "r") as f:
-    shared_py = f.read()
-    shared_py = shared_py.replace(f"{toGenerate}/{toGenerate.lower()}_config.toml",f"{toGenerate.lower()}_config.toml")
-
-with open(os.path.join(newFolder, f"{toGenerate.lower()}_shared.py"), "w") as f:
-    f.write(shared_py)
+with open(os.path.join(newFolder, f"{toGenerate}_shared.py"), "w") as f:
+    f.write(toEdit)
 
 print(f"Publishing directory generated successfully at {os.path.join(publishDir, toGenerate)}")
