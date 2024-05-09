@@ -15,12 +15,14 @@ import json
 from shutil import move
 import toml
 from urllib.request import urlretrieve
+import psycopg2
 
 # -- Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
 from llama_index.core.extractors import TitleExtractor, KeywordExtractor
 from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
+from llama_index.vector_stores.postgres import PGVectorStore
 
 # -- Shiny
 from shiny.express import ui
@@ -116,9 +118,16 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
     if (storageFolder is None) & isURL:
         os.remove(newFile)
 
-    # Add file to vector store https://docs.llamaindex.ai/en/stable/examples/vector_stores/DuckDBDemo/?h=duckdb
-    if os.path.exists(vectorDB):
-        vector_store = DuckDBVectorStore.from_local(vectorDB)
+    if shared.remoteAppDB:
+        vector_store = PGVectorStore.from_params(
+                database="vector_db",
+                host="localhost",
+                password="accorns",
+                port=5432,
+                user="accorns",
+                table_name="document",
+                embed_dim=1536,  # openai embedding dimension
+            )
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
         index = VectorStoreIndex.from_documents(
             newData,
@@ -126,37 +135,57 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
             transformations=[TitleExtractor(), KeywordExtractor()],
         )
     else:
-        vector_store = DuckDBVectorStore(
-            os.path.basename(vectorDB), persist_dir=os.path.dirname(vectorDB)
+
+        # Add file to vector store https://docs.llamaindex.ai/en/stable/examples/vector_stores/DuckDBDemo/?h=duckdb
+        if os.path.exists(vectorDB):
+            vector_store = DuckDBVectorStore.from_local(vectorDB)
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+            index = VectorStoreIndex.from_documents(
+                newData,
+                storage_context=storage_context,
+                transformations=[TitleExtractor(), KeywordExtractor()],
         )
-        storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        index = VectorStoreIndex.from_documents(
-            newData,
-            storage_context=storage_context,
-            transformations=[TitleExtractor(), KeywordExtractor()],
-        )        
+        else:
+            vector_store = DuckDBVectorStore(
+                os.path.basename(vectorDB), persist_dir=os.path.dirname(vectorDB)
+            )
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+            index = VectorStoreIndex.from_documents(
+                newData,
+                storage_context=storage_context,
+                transformations=[TitleExtractor(), KeywordExtractor()],
+            )        
 
-        with open(os.path.join(appDBDir,"expandVectorDB.sql"), "r") as file:
-            query = file.read().replace("\n", " ").replace("\t", "").split(";")
+            with open(os.path.join(appDBDir,"expandVectorDB.sql"), "r") as file:
+                query = file.read().replace("\n", " ").replace("\t", "").split(";")
 
-        conn = duckdb.connect(vectorDB)
-        cursor = conn.cursor()
+            conn = duckdb.connect(vectorDB)
+            cursor = conn.cursor()
 
-        for x in query:
-            _ = cursor.execute(x)
+            for x in query:
+                _ = cursor.execute(x)
 
-        cursor.commit()
-        conn.close()
+            cursor.commit()
+            conn.close()
 
     # Get the metadata out of the DB excerpt_keywords document_title
     fileName = newData[0].metadata["file_name"]
     # vectorDB = "appData/vectorstore.duckdb"
-    con = duckdb.connect(vectorDB)
+    if shared.remoteAppDB:
+        conn = psycopg2.connect(
+            host="localhost",
+            user="accorns",
+            password="accorns",
+            database="vector_db",
+        )        
+    else:
+        conn = duckdb.connect(vectorDB)
     # con.query("SELECT metadata_ FROM documents").fetchall()
-    x = con.query(
-        f"SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = '\"{fileName}\"'"
+     # f"SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = '\"{fileName}\"'"
+    cursor = conn.cursor()
+    x = cursor.execute(       
+        f"SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y FROM data_document WHERE metadata_ ->> 'file_name' = '{fileName}'"
     ).fetchall()
-    con.close()
 
     chunkTitles = "* " + "\n* ".join(set([y[0][0] for y in x]))
     chunkKeywords = ", ".join(set((", ".join([y[0][1] for y in x])).split(", ")))
@@ -174,16 +203,15 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
     )
     docSum = json.loads(str(index.as_query_engine().query(docSum)))
 
-    conn = duckdb.connect(vectorDB)
     cursor = conn.cursor()
-    _ = cursor.execute(
-            'INSERT INTO file(fID, fileName, title, subtitle, created) '
+    _ = shared.executeQuery(cursor,
+            'INSERT INTO "file"("fID", "fileName", "title", "subtitle", "created") '
             "VALUES(nextval('seq_fID'), ?, ?, ?, ?)",
             (fileName,docSum['title'],docSum['subtitle'], shared.dt())
-    )
-    fID = cursor.execute("SELECT currval('seq_fID')").fetchall()[0][0]
-    _ = cursor.executemany(
-        'INSERT INTO keyword(kID, fID, keyword) '
+                         )
+    fID = shared.executeQuery(cursor, "SELECT currval('seq_fID')").fetchall()[0][0]
+    _ = shared.executeQuery(cursor,
+        'INSERT INTO "keyword"("kID", "fID", "keyword") '
         f"VALUES(nextval('seq_kID'),{int(fID)}, ?)",
         [(item,) for item in docSum["keywords"]],
     )
@@ -200,7 +228,18 @@ if addDemo & (not os.path.exists(shared.vectorDB)):
     addFileToDB(newFile, shared.vectorDB)
 
 # Load the vector index from storage
-vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
+if shared.remoteAppDB:
+    vector_store = PGVectorStore.from_params(
+        database="accorns",
+        host="localhost",
+        password="accorns",
+        port=5432,
+        user="accorns",
+        table_name="document",
+        embed_dim=1536,  # openai embedding dimension
+    )
+else:
+    vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
 index = VectorStoreIndex.from_vector_store(vector_store)
 
 def backupQuery(cursor, sID, table, rowID, attribute, isBot=None, timeStamp=shared.dt()):

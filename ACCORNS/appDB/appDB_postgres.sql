@@ -199,3 +199,65 @@ CREATE ROLE scuirrel WITH LOGIN PASSWORD :'appPass';
 GRANT CONNECT ON DATABASE :dbName TO scuirrel;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO scuirrel;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO scuirrel;
+
+-- Check if the database already exists and if overWrite is set to false
+CREATE OR REPLACE FUNCTION check_overwrite(overWrite boolean)
+RETURNS void AS $$
+BEGIN
+  IF NOT overWrite THEN
+    IF EXISTS (SELECT 1 FROM pg_database WHERE datname = 'vector_db') THEN
+        RAISE EXCEPTION 'Database vector_db already exists and overWrite is set to false';
+    END IF;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT check_overwrite('True');
+
+
+
+-- Drop and create the database
+DROP DATABASE IF EXISTS vector_db;
+CREATE DATABASE vector_db;
+
+\c "vector_db";
+
+CREATE EXTENSION vector;
+
+CREATE SEQUENCE seq_fID START 1;
+CREATE TABLE file (
+  "fID" SERIAL PRIMARY KEY,
+  "fileName" TEXT,
+  "title" TEXT,
+  "subtitle" TEXT,
+  "created" TEXT,
+  "modified" TEXT
+);
+
+CREATE SEQUENCE seq_kID START 1;
+CREATE TABLE keyword (
+  "kID" SERIAL PRIMARY KEY,
+  "fID" INTEGER,
+  "keyword" TEXT,
+  FOREIGN KEY("fID") REFERENCES "file"("fID") 
+);
+
+DO
+$$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'accorns') THEN
+        REASSIGN OWNED BY accorns TO CURRENT_USER;
+        DROP OWNED BY accorns;
+        DROP ROLE accorns;
+    END IF;
+END
+$$;
+
+CREATE ROLE accorns WITH LOGIN PASSWORD 'accorns';
+GRANT CONNECT ON DATABASE vector_db TO accorns;
+GRANT all privileges ON DATABASE vector_db to accorns;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO accorns;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO accorns;
+GRANT CREATE ON SCHEMA public TO accorns;
+
+

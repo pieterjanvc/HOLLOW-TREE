@@ -12,6 +12,7 @@ import shared.shared as shared
 # -- General
 import os
 import duckdb
+import psycopg2
 import pandas as pd
 import json
 import warnings
@@ -20,6 +21,7 @@ import warnings
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
+from llama_index.vector_stores.postgres import PGVectorStore
 
 # -- Shiny
 from shiny import reactive
@@ -232,8 +234,17 @@ ui.input_action_button("feedback", "Provide Feedback")
 
 sessionID = reactive.value(0)
 
-conn = duckdb.connect(shared.vectorDB)
-files = shared.pandasQuery(conn, 'SELECT * FROM "file"')
+if shared.remoteAppDB:
+    conn = psycopg2.connect(
+            host="localhost",
+            user="accorns",
+            password="accorns",
+            database="vector_db",
+        )
+else:    
+    conn = duckdb.connect(shared.vectorDB)
+
+files = shared.pandasQuery(conn, query = 'SELECT * FROM "file"')
 conn.close()
 
 # Hide the topic and question tab if the vector database is empty and show welcome message
@@ -681,13 +692,37 @@ def _():
         else "A file with the same name already exists. Skipping upload"
     )
     ui.modal_show(ui.modal(msg, title="Success" if insertionResult == 0 else "Issue"))
-    conn = duckdb.connect(shared.vectorDB)
+    
+    if shared.remoteAppDB:
+        conn = psycopg2.connect(
+            host="localhost",
+            user="accorns",
+            password="accorns",
+            database="vector_db",
+        )
+    else:        
+        conn = duckdb.connect(shared.vectorDB)
+    
     getFiles = shared.pandasQuery(conn, 'SELECT * FROM "file"')
     files.set(getFiles)
     conn.close()
+
+    if shared.remoteAppDB:
+        vectorStore = PGVectorStore.from_params(
+            database="vector_db",
+            host="localhost",
+            password="accorns",
+            port=5432,
+            user="accorns",
+            table_name="document",
+            embed_dim=1536,  # openai embedding dimension
+        )
+    else:
+        vectorStore = DuckDBVectorStore.from_local(shared.vectorDB)
+    
     index.set(
         VectorStoreIndex.from_vector_store(
-            DuckDBVectorStore.from_local(shared.vectorDB)
+            vectorStore
         )
     )
     elementDisplay("blankDBMsg", "h")
@@ -707,7 +742,17 @@ def fileInfo():
     info = files().iloc[filesTable.data_view(selected=True).index[0]]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        conn = duckdb.connect(shared.vectorDB)
+
+        if shared.remoteAppDB:
+            conn = psycopg2.connect(
+                host="localhost",
+                user="accorns",
+                password="accorns",
+                database="vector_db",
+            )
+        else:            
+            conn = duckdb.connect(shared.vectorDB)
+        
         keywords = shared.pandasQuery(
             conn, f'SELECT "keyword" FROM "keyword" WHERE "fID" = {int(info.fID)}'
         )
