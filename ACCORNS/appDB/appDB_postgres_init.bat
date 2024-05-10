@@ -12,7 +12,6 @@ SET "postgresAdmin=postgres"
 SET "postgresBin=psql"
 SET "appDBFolder=%~dp0"
 SET "addDemo=True"
-SET "dbName=scuirrel"
 SET "overWrite=True"
 
 SET "sqlFile=%appDBFolder%\appDB_postgres.sql" 
@@ -40,12 +39,16 @@ IF "%addDemo%"=="True" (
         exit /b 1
     )
     "%postgresBin%" -U %postgresAdmin% -f %sqlFile% -f %sqlDemo% ^
-        -v dbName="%dbName%" -v overWrite=%overWrite% ^
-        -v appPass=%POSTGRES_PASS_SCUIRREL% > nul 2> "%errorFile%"
+        -v overWrite=%overWrite% ^
+        -v scuirrelPass=%POSTGRES_PASS_SCUIRREL% ^
+        -v accornsPass=%POSTGRES_PASS_ACCORNS% ^
+         > nul 2> "%errorFile%"
 ) ELSE (
     "%postgresBin%" -U %postgresAdmin% -f %sqlFile% ^
-        -v dbName="%dbName%" -v overWrite=%overWrite% ^
-        -v appPass=%POSTGRES_PASS_SCUIRREL% > nul 2> "%errorFile%"
+        -v overWrite=%overWrite% ^
+        -v scuirrelPass=%POSTGRES_PASS_SCUIRREL% ^
+        -v accornsPass=%POSTGRES_PASS_ACCORNS% ^
+         > nul 2> "%errorFile%"
 )
 
 @REM check if erorr file is empty otherwise print error

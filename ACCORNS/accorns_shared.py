@@ -177,18 +177,26 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
             user="accorns",
             password="accorns",
             database="vector_db",
-        )        
+        )      
+        cursor = conn.cursor()
+        x = cursor.execute(       
+            "SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y "
+            f"FROM data_document WHERE metadata_ ->> 'file_name' = '{fileName}'"
+        ).fetchall()
+
+        chunkTitles = "* " + "\n* ".join(set([y[0] for y in x]))
+        chunkKeywords = ", ".join(set((", ".join([y[1] for y in x])).split(", "))) 
     else:
         conn = duckdb.connect(vectorDB)
-    # con.query("SELECT metadata_ FROM documents").fetchall()
-     # f"SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = '\"{fileName}\"'"
-    cursor = conn.cursor()
-    x = cursor.execute(       
-        f"SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y FROM data_document WHERE metadata_ ->> 'file_name' = '{fileName}'"
-    ).fetchall()
+        cursor = conn.cursor()
+        _ = cursor.execute(       
+            "SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE "
+            f"CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = '\"{fileName}\"'"
+        )
+        x = cursor.fetchall()
 
-    chunkTitles = "* " + "\n* ".join(set([y[0][0] for y in x]))
-    chunkKeywords = ", ".join(set((", ".join([y[0][1] for y in x])).split(", ")))
+        chunkTitles = "* " + "\n* ".join(set([y[0][0] for y in x]))
+        chunkKeywords = ", ".join(set((", ".join([y[0][1] for y in x])).split(", ")))
 
     # Summarise everything using the LLM and add it to the appDB
     docSum = (

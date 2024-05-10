@@ -879,8 +879,6 @@ The question should center around the following concept:
 {focusConcept}\n
 {prevQuestions}"""
 
-    print(info)
-
     botResponse(quizEngine(), info, cID)
 
 

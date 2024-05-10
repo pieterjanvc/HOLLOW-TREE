@@ -16,10 +16,10 @@ $$ LANGUAGE plpgsql;
 SELECT check_overwrite(:overWrite);
 
 -- Drop and create the database
-DROP DATABASE IF EXISTS :dbName;
-CREATE DATABASE :dbName;
+DROP DATABASE IF EXISTS scuirrel;
+CREATE DATABASE scuirrel;
 
-\c :dbName;
+\c scuirrel;
 
 CREATE TABLE "user" (
 	"uID" SERIAL PRIMARY KEY,
@@ -184,22 +184,6 @@ VALUES ('anonymous', 0, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 
 
 
 
-DO
-$$
-BEGIN
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scuirrel') THEN
-        REASSIGN OWNED BY scuirrel TO CURRENT_USER;
-        DROP OWNED BY scuirrel;
-        DROP ROLE scuirrel;
-    END IF;
-END
-$$;
-
-CREATE ROLE scuirrel WITH LOGIN PASSWORD :'appPass';
-GRANT CONNECT ON DATABASE :dbName TO scuirrel;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO scuirrel;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO scuirrel;
-
 -- Check if the database already exists and if overWrite is set to false
 CREATE OR REPLACE FUNCTION check_overwrite(overWrite boolean)
 RETURNS void AS $$
@@ -212,9 +196,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-SELECT check_overwrite('True');
-
-
+SELECT check_overwrite(:overWrite);
 
 -- Drop and create the database
 DROP DATABASE IF EXISTS vector_db;
@@ -242,22 +224,38 @@ CREATE TABLE keyword (
   FOREIGN KEY("fID") REFERENCES "file"("fID") 
 );
 
+-- CREATE scuirrel and accorns USERS
+
+\c postgres;
+
 DO
 $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'accorns') THEN
-        REASSIGN OWNED BY accorns TO CURRENT_USER;
-        DROP OWNED BY accorns;
-        DROP ROLE accorns;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scuirrel') THEN
+        CREATE ROLE scuirrel WITH LOGIN PASSWORD :'scuirrelPass';
+        
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'accorns') THEN
+        CREATE ROLE accorns WITH WITH LOGIN PASSWORD :'accornsPass';       
     END IF;
 END
 $$;
 
-CREATE ROLE accorns WITH LOGIN PASSWORD 'accorns';
+\c scuirrel;
+
+GRANT CONNECT ON DATABASE scuirrel TO scuirrel;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO scuirrel;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO scuirrel;
+
+GRANT CONNECT ON DATABASE scuirrel TO accorns;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO accorns;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO accorns;
+
+\c accorns;
+
 GRANT CONNECT ON DATABASE vector_db TO accorns;
 GRANT all privileges ON DATABASE vector_db to accorns;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO accorns;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO accorns;
 GRANT CREATE ON SCHEMA public TO accorns;
-
-
