@@ -16,6 +16,7 @@ import toml
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
+from llama_index.vector_stores.postgres import PGVectorStore
 
 # --- VARIABLES ---
 postgresUser = "scuirrel" # Used by shared.appDBConn 
@@ -29,6 +30,9 @@ allowMultiGuess = any(
     config["general"]["allowMultiGuess"] == x for x in ["True", "true", "T", 1]
 )
 
+if not os.path.exists(shared.vectorDB) and not shared.remoteAppDB:
+    raise ConnectionError("The vector database was not found. Please run ACCORNS first")
+
 # Check if there are topics to discuss before proceeding
 conn = shared.appDBConn(postgresUser)
 topics = shared.pandasQuery(
@@ -40,12 +44,24 @@ topics = shared.pandasQuery(
 if topics.shape[0] == 0:
     raise ValueError(
         "There are no active topics with at least one concept in the database."
-        " Please run the admin app first"
+        " Please run the ACCORNS app first"
     )
 conn.close()
 
 # Load the vector index from storage
-vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
+if shared.remoteAppDB:
+    vector_store = PGVectorStore.from_params(
+                host=shared.postgresHost, 
+                port = shared.postgresPort,
+                user=postgresUser, 
+                password=os.environ.get("POSTGRES_PASS_SCUIRREL"),
+                database="vector_db",
+                table_name="document",
+                embed_dim=1536,  # openai embedding dimension
+    )
+else:
+    vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
+
 index = VectorStoreIndex.from_vector_store(vector_store)
 
 # Adapt the chat engine to the topic

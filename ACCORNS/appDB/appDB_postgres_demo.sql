@@ -1,5 +1,3 @@
-\c accorns;
-
 -- INSERT DEMO DATA
 INSERT INTO topic("topic", "created", "modified")
 VALUES('The central dogma of molecular biology', to_char(now(), 

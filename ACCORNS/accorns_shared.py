@@ -10,17 +10,15 @@ from shared import shared
 # -- General
 import os
 import sqlite3
-import duckdb
+from sqlparse import split as sql_split
 import json
 from shutil import move
 import toml
 from urllib.request import urlretrieve
-import psycopg2
 
 # -- Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
 from llama_index.core.extractors import TitleExtractor, KeywordExtractor
-from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
 from llama_index.vector_stores.postgres import PGVectorStore
 
@@ -55,7 +53,7 @@ def createSQLiteAppDB(DBpath, addDemo=False):
         return (2, "Database already exists. Skipping")
 
     # Create a new database from the SQL file
-    with open(os.path.join(appDBDir,"appDB_sqlite.sql"), "r") as file:
+    with open(os.path.join(appDBDir,"appDB_sqlite_accorns.sql"), "r") as file:
         query = file.read().replace("\n", " ").replace("\t", "").split(";")
 
     conn = sqlite3.connect(DBpath)
@@ -70,7 +68,7 @@ def createSQLiteAppDB(DBpath, addDemo=False):
         return (0, "DB created - No demo added")
 
     with open(os.path.join(appDBDir,"appDB_sqlite_demo.sql"), "r") as file:
-        query = file.read().replace("\n", " ").replace("\t", "").split(";")
+        query = sql_split(file.read())
 
     for x in query:
         _ = cursor.execute(x)
@@ -123,11 +121,11 @@ def addFileToDB(newFile, vectorDB = None, remoteAppDB = shared.remoteAppDB, stor
 
     if remoteAppDB:
         vector_store = PGVectorStore.from_params(
+                host=shared.postgresHost, 
+                port = shared.postgresPort,
+                user=postgresUser, 
+                password=os.environ.get("POSTGRES_PASS_ACCORNS"),
                 database="vector_db",
-                host="localhost",
-                password="accorns",
-                port=5432,
-                user="accorns",
                 table_name="document",
                 embed_dim=1536,  # openai embedding dimension
             )
@@ -136,11 +134,13 @@ def addFileToDB(newFile, vectorDB = None, remoteAppDB = shared.remoteAppDB, stor
             newData,
             storage_context=storage_context,
             transformations=[TitleExtractor(), KeywordExtractor()],
-        )
+        )        
     else:
-
         # Add file to vector store https://docs.llamaindex.ai/en/stable/examples/vector_stores/DuckDBDemo/?h=duckdb
-        if os.path.exists(vectorDB):
+        conn = shared.vectorDBConn(vectorDB = vectorDB)
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM information_schema.tables WHERE table_name =\'keyword\';')
+        if cursor.fetchone() is not None:
             vector_store = DuckDBVectorStore.from_local(vectorDB)
             storage_context = StorageContext.from_defaults(vector_store=vector_store)
             index = VectorStoreIndex.from_documents(
@@ -159,28 +159,21 @@ def addFileToDB(newFile, vectorDB = None, remoteAppDB = shared.remoteAppDB, stor
                 transformations=[TitleExtractor(), KeywordExtractor()],
             )        
 
-            with open(os.path.join(appDBDir,"expandVectorDB.sql"), "r") as file:
-                query = file.read().replace("\n", " ").replace("\t", "").split(";")
-
-            conn = duckdb.connect(vectorDB)
-            cursor = conn.cursor()
+            with open(os.path.join(appDBDir,"appDB_duckdb_vectordb.sql"), "r") as file:
+                query = sql_split(file.read())
 
             for x in query:
                 _ = cursor.execute(x)
 
             cursor.commit()
-            conn.close()
+        
+        conn.close()
 
     # Get the metadata out of the DB excerpt_keywords document_title
     fileName = newData[0].metadata["file_name"]
     # vectorDB = "appData/vectorstore.duckdb"
     if remoteAppDB:
-        conn = psycopg2.connect(
-            host="localhost",
-            user="accorns",
-            password="accorns",
-            database="vector_db",
-        )      
+        conn = shared.vectorDBConn(postgresUser)   
         cursor = conn.cursor()
         _ = cursor.execute(       
             "SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y "
@@ -188,12 +181,15 @@ def addFileToDB(newFile, vectorDB = None, remoteAppDB = shared.remoteAppDB, stor
         )
         
         q = cursor.fetchall()
+        # When we create the document table we need to grant access to the scuirrel user
+        _ = cursor.execute("GRANT SELECT ON TABLE data_document TO scuirrel")
+        conn.commit()
         conn.close()
 
         chunkTitles = "* " + "\n* ".join(set([x[0] for x in q]))
         chunkKeywords = ", ".join(set((", ".join([x[1] for x in q])).split(", "))) 
     else:
-        conn = duckdb.connect(vectorDB)
+        conn = shared.vectorDBConn(vectorDB=vectorDB)
         cursor = conn.cursor()
         _ = cursor.execute(       
             "SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE "
@@ -218,16 +214,7 @@ def addFileToDB(newFile, vectorDB = None, remoteAppDB = shared.remoteAppDB, stor
     )
     docSum = json.loads(str(index.as_query_engine().query(docSum)))
 
-    if remoteAppDB:
-        conn = psycopg2.connect(
-            host="localhost",
-            user="accorns",
-            password="accorns",
-            database="vector_db",
-        )  
-    else:
-        conn = duckdb.connect(vectorDB)
-    
+    conn = shared.vectorDBConn(postgresUser, vectorDB=vectorDB)    
     cursor = conn.cursor()
     _ = shared.executeQuery(cursor,
             'INSERT INTO "file"("fID", "fileName", "title", "subtitle", "created") '
@@ -246,34 +233,42 @@ def addFileToDB(newFile, vectorDB = None, remoteAppDB = shared.remoteAppDB, stor
 
     return (0, "Completed")
 
+# Add demo file if needed
+conn = shared.vectorDBConn(postgresUser)
+cursor = conn.cursor()
 
-# When demo data is to be added use a file stored in a GitHub issue
-# TODO Replace URL once public!
-if shared.remoteAppDB:
-    conn = psycopg2.connect(
-            host="localhost",
-            user="accorns",
-            password="accorns",
-            database="vector_db",
-    )     
-    cursor = conn.cursor()
-    cursor.execute("SELECT 1 FROM   information_schema.tables WHERE  table_name = 'data_document';")
+if shared.remoteAppDB:    
+    cursor.execute('SELECT * FROM "keyword" LIMIT 1')    
+else:
+    cursor.execute('SELECT * FROM information_schema.tables WHERE table_name =\'keyword\';')
 
-    if (cursor.fetchone() is None) & addDemo:
-        addFileToDB(demoFile)
-elif addDemo & (not os.path.exists(shared.vectorDB)):    
-        addFileToDB(demoFile, shared.vectorDB)
+newDB = True if cursor.fetchone() is None else False
+conn.close()
+
+if newDB & addDemo:
+    addFileToDB(demoFile, shared.vectorDB)
+
+    if shared.remoteAppDB:
+        conn = shared.appDBConn(postgresUser)
+        cursor = conn.cursor()
+
+        with open(os.path.join(appDBDir,"appDB_postgres_demo.sql"), "r") as file:
+            query = file.read()
+
+        _ = cursor.execute(query)
+        conn.commit()
+        conn.close()
 
 # Load the vector index from storage
 if shared.remoteAppDB:
     vector_store = PGVectorStore.from_params(
-        database="accorns",
-        host="localhost",
-        password="accorns",
-        port=5432,
-        user="accorns",
-        table_name="document",
-        embed_dim=1536,  # openai embedding dimension
+                host=shared.postgresHost, 
+                port = shared.postgresPort,
+                user=postgresUser, 
+                password=os.environ.get("POSTGRES_PASS_ACCORNS"),
+                database="vector_db",
+                table_name="document",
+                embed_dim=1536,  # openai embedding dimension
     )
 else:
     vector_store = DuckDBVectorStore.from_local(shared.vectorDB)

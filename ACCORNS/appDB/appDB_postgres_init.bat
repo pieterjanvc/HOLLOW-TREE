@@ -12,13 +12,11 @@ SET "postgresAdmin=postgres"
 SET "postgresBin=psql"
 @REM Create "accorns" or "vector_db" or "both"
 SET "toCreate=both" 
-SET "addDemo=True"
 SET "overWrite=True"
 
 SET "appDBFolder=%~dp0"
 SET "sqlAccorns=%appDBFolder%\appDB_postgres_accorns.sql" 
 SET "sqlVectordb=%appDBFolder%\appDB_postgres_vectordb.sql" 
-SET "sqlDemo=%appDBFolder%\appDB_postgres_demo.sql" 
 
 @REM Check if postgres is installed
 
@@ -34,10 +32,6 @@ IF NOT EXIST "%sqlAccorns%" (
 )
 IF NOT EXIST "%sqlVectordb%" (
     echo ERROR %sqlVectordb% does not exist.
-    exit /b 1
-)
-IF NOT EXIST "%sqlDemo%" (
-    echo ERROR %sqlDemo% does not exist.
     exit /b 1
 )
 
@@ -67,11 +61,6 @@ IF "%toCreate%"=="both" (
     SET "toRun=-f %sqlAccorns%"
 ) ELSE (
     SET "toRun=-f %sqlVectordb%"
-)
-
- @REM only add demo to toRun if true and toCreate is not just vector_db
-IF "%addDemo%"=="True" IF NOT "%toCreate%"=="vector_db" (
-    SET "toRun=%toRun% -f %sqlDemo%"
 )
 
 "%postgresBin%" -U %postgresAdmin% %toRun% ^

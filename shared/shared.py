@@ -8,6 +8,7 @@
 # General
 import os
 import sqlite3
+import duckdb
 import psycopg2
 from datetime import datetime
 import pandas as pd
@@ -28,6 +29,8 @@ with open(os.path.join(curDir, "shared_config.toml"), "r") as f:
 remoteAppDB = any(
     config["general"]["remoteAppDB"] == x for x in ["True", "true", "T", 1]
 )
+postgresHost = config["postgres"]["host"]
+postgresPort = int(config["postgres"]["port"])
 vectorDB = config["localStorage"]["duckDB"]
 sqliteDB = config["localStorage"]["sqliteDB"]
 postgresUser = None # Each app will set this variable to the correct user
@@ -46,9 +49,6 @@ os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
 os.environ["OPENAI_ORGANIZATION"] = os.environ.get("OPENAI_ORGANIZATION")
 gptModel = config["LLM"]["gptModel"]
 llm = OpenAI(model=gptModel)
-
-if not os.path.exists(vectorDB) and not remoteAppDB:
-    raise ConnectionError("The vector database was not found. Please run ACCORNS first")
 
 if os.environ["OPENAI_API_KEY"] is None:
     raise ValueError(
@@ -69,7 +69,7 @@ def inputCheck(input):
 def appDBConn(postgresUser=postgresUser, remoteAppDB=remoteAppDB):
     if remoteAppDB:
         return psycopg2.connect(
-            host=config["postgres"]["host"],
+            host=postgresHost,
             user=postgresUser,
             password=os.environ.get("POSTGRES_PASS_" + ("SCUIRREL" if postgresUser == "scuirrel" else "ACCORNS")),
             database="accorns",
@@ -82,21 +82,19 @@ def appDBConn(postgresUser=postgresUser, remoteAppDB=remoteAppDB):
             )
         return sqlite3.connect(config["localStorage"]["sqliteDB"])
 
-# Check if the postgres scuirrel database is available when remoteAppDB is set to True
-def checkRemoteDB():
-    try:
-        conn = appDBConn("accorns")
-        conn.close()
-        return "Connection to postgres accorns database successful"
-    except psycopg2.OperationalError as e:
-        raise psycopg2.OperationalError(
-            str(e) + "\n\n POSTGRESQL connection error: "
-            "Please check the postgres connection settings in config.toml "
-            "and make sure POSTGRES_PASS_SCUIRREL is set as an environment variable."
-        )
+def vectorDBConn(postgresUser=postgresUser, remoteAppDB = remoteAppDB, vectorDB = vectorDB):
+    if remoteAppDB:
+        conn = psycopg2.connect(
+                host=postgresHost,
+                port=postgresPort,
+                user=postgresUser,
+                password=os.environ.get("POSTGRES_PASS_" + ("SCUIRREL" if postgresUser == "scuirrel" else "ACCORNS")),
+                database="vector_db",
+            )
+    else:    
+        conn = duckdb.connect(vectorDB)
     
-if remoteAppDB:
-    print(checkRemoteDB())
+    return conn
 
 def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB):
     query = query.replace("?", "%s") if remoteAppDB else query
@@ -121,8 +119,32 @@ def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB
 
     return
 
-
 def pandasQuery(conn, query):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         return pd.read_sql_query(query, conn)
+
+# Check if the postgres scuirrel database is available when remoteAppDB is set to True
+def checkRemoteDB():
+    try:
+        conn = appDBConn("accorns")
+        cursor = conn.cursor()
+        _ = executeQuery(cursor, 'SELECT 1 FROM "session"')
+        conn.close()
+
+        conn = vectorDBConn("accorns")
+        cursor = conn.cursor()
+        _ = executeQuery(cursor, 'SELECT 1 FROM "file"')
+        conn.close()
+
+        return "Connections to postgres accorns and vector database successful"
+    
+    except psycopg2.OperationalError as e:
+        raise psycopg2.OperationalError(
+            str(e) + "\n\n POSTGRESQL connection error: "
+            "Please check the postgres connection settings in config.toml "
+            "and make sure POSTGRES_PASS_SCUIRREL and POSTGRES_PASS_SCUIRREL are set as an environment variables."
+        )
+    
+if remoteAppDB:
+    print(checkRemoteDB())

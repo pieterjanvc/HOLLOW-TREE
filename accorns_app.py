@@ -11,8 +11,6 @@ import ACCORNS.accorns_shared as accorns_shared
 
 # -- General
 import os
-import duckdb
-import psycopg2
 import pandas as pd
 import json
 import warnings
@@ -234,16 +232,7 @@ ui.input_action_button("feedback", "Provide Feedback")
 
 sessionID = reactive.value(0)
 
-if shared.remoteAppDB:
-    conn = psycopg2.connect(
-            host="localhost",
-            user="accorns",
-            password="accorns",
-            database="vector_db",
-        )
-else:    
-    conn = duckdb.connect(shared.vectorDB)
-
+conn = shared.vectorDBConn(accorns_shared.postgresUser)
 files = shared.pandasQuery(conn, query = 'SELECT * FROM "file"')
 conn.close()
 
@@ -693,38 +682,30 @@ def _():
     )
     ui.modal_show(ui.modal(msg, title="Success" if insertionResult == 0 else "Issue"))
     
-    if shared.remoteAppDB:
-        conn = psycopg2.connect(
-            host="localhost",
-            user="accorns",
-            password="accorns",
-            database="vector_db",
-        )
-    else:        
-        conn = duckdb.connect(shared.vectorDB)
+    conn = shared.vectorDBConn(accorns_shared.postgresUser)
     
     getFiles = shared.pandasQuery(conn, 'SELECT * FROM "file"')
     files.set(getFiles)
-    conn.close()
+    
 
     if shared.remoteAppDB:
         vectorStore = PGVectorStore.from_params(
+            host=shared.postgresHost, user=accorns_shared.postgresUser, password=os.environ.get("POSTGRES_PASS_ACCORNS"),
             database="vector_db",
-            host="localhost",
-            password="accorns",
-            port=5432,
-            user="accorns",
             table_name="document",
             embed_dim=1536,  # openai embedding dimension
         )
     else:
         vectorStore = DuckDBVectorStore.from_local(shared.vectorDB)
     
+    conn.close()
+
     index.set(
         VectorStoreIndex.from_vector_store(
             vectorStore
         )
     )
+
     elementDisplay("blankDBMsg", "h")
     elementDisplay("tTab", "s")
     elementDisplay("qTab", "s")
@@ -743,22 +724,12 @@ def fileInfo():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
-        if shared.remoteAppDB:
-            conn = psycopg2.connect(
-                host="localhost",
-                user="accorns",
-                password="accorns",
-                database="vector_db",
-            )
-        else:            
-            conn = duckdb.connect(shared.vectorDB)
-        
+        conn = shared.vectorDBConn(accorns_shared.postgresUser)        
         keywords = shared.pandasQuery(
             conn, f'SELECT "keyword" FROM "keyword" WHERE "fID" = {int(info.fID)}'
         )
         conn.close()
     keywords = "; ".join(keywords["keyword"])
-    # elementDisplay("fileInfoCard", "s")
 
     return HTML(
         f"<h4>{info.fileName}</h4><ul>"
@@ -768,7 +739,6 @@ def fileInfo():
         "<p><b>Top-10 keywords extracted from document</b> <i>(AI generated)</i></p>"
         f"{keywords}"
     )
-
 
 # ---- QUIZ QUESTIONS ----
 

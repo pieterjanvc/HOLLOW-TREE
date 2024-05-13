@@ -7,6 +7,7 @@ duckDB = "appData/vectordb.duckdb"
 
 [postgres]
 host = "localhost"
+port = 5432
 # Usernames scuirrel and accorns were created during setup
 # Password retrieved from POSTGRES_PASS_SCUIRREL and POSTGRES_PASS_ACCORNS environment variables
 
