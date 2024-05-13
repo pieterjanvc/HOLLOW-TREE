@@ -6,12 +6,11 @@
 # Admin Control Center Overseeing RAG Needed for SCUIRREL
 
 # See app_shared.py for variables and functions shared across sessions
-import ACCORNS.accorns_shared as accorns_shared
 import shared.shared as shared
+import ACCORNS.accorns_shared as accorns_shared
 
 # -- General
 import os
-import duckdb
 import pandas as pd
 import json
 import warnings
@@ -20,6 +19,7 @@ import warnings
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
+from llama_index.vector_stores.postgres import PGVectorStore
 
 # -- Shiny
 from shiny import reactive
@@ -66,10 +66,10 @@ os.path.join(curDir, "ACCORNS")
 
 ui.page_opts(fillable=True, window_title="ACCORNS")
 ui.head_content(
-    ui.include_css(os.path.join(curDir, "shared", "shared_css","shared.css")),
-    ui.include_css(os.path.join(curDir, "ACCORNS", "accorns_css","accorns.css")),     
-    ui.include_js(os.path.join(curDir, "ACCORNS", "accorns_js","accorns.js")), 
-    ui.include_js(os.path.join(curDir, "shared", "shared_js","shared.js"))
+    ui.include_css(os.path.join(curDir, "shared", "shared_css", "shared.css")),
+    ui.include_css(os.path.join(curDir, "ACCORNS", "accorns_css", "accorns.css")),
+    ui.include_js(os.path.join(curDir, "ACCORNS", "accorns_js", "accorns.js")),
+    ui.include_js(os.path.join(curDir, "shared", "shared_js", "shared.js")),
 )
 # --- CUSTOM JS FUNCTIONS (Python side) ---
 
@@ -232,8 +232,8 @@ ui.input_action_button("feedback", "Provide Feedback")
 
 sessionID = reactive.value(0)
 
-conn = duckdb.connect(shared.vectorDB)
-files = shared.pandasQuery(conn, 'SELECT * FROM "file"')
+conn = shared.vectorDBConn(accorns_shared.postgresUser)
+files = shared.pandasQuery(conn, query='SELECT * FROM "file"')
 conn.close()
 
 # Hide the topic and question tab if the vector database is empty and show welcome message
@@ -263,7 +263,7 @@ files = reactive.value(files)
 # Stuff to run once when the session has loaded
 if hasattr(session, "_process_ui"):
     # Register the session start in the DB
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(accorns_shared.postgresUser)
     cursor = conn.cursor()
     # For now we only have anonymous users (appID 1 -> ACCORNS)
     sID = shared.executeQuery(
@@ -293,7 +293,7 @@ def theEnd():
     with reactive.isolate():
         # Add logs to the database after user exits
         sID = sessionID.get()
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(accorns_shared.postgresUser)
         cursor = conn.cursor()
         _ = shared.executeQuery(
             cursor, 'UPDATE "session" SET "end" = ? WHERE "sID" = ?', (shared.dt(), sID)
@@ -345,7 +345,7 @@ def addNewTopic():
         return
 
     # Add new topic to DB
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(accorns_shared.postgresUser)
     cursor = conn.cursor()
     tID = shared.executeQuery(
         cursor,
@@ -420,10 +420,12 @@ def _():
         return
 
     # Update the DB
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(accorns_shared.postgresUser)
     cursor = conn.cursor()
     # Backup old value
-    accorns_shared.backupQuery(cursor, sessionID.get(), "topic", input.tID(), "topic", False)
+    accorns_shared.backupQuery(
+        cursor, sessionID.get(), "topic", input.tID(), "topic", False
+    )
     # Update to new
     _ = shared.executeQuery(
         cursor,
@@ -453,7 +455,7 @@ def _():
     if input.tID() is None:
         return
 
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(accorns_shared.postgresUser)
     cursor = conn.cursor()
     _ = shared.executeQuery(
         cursor,
@@ -520,7 +522,7 @@ def _():
         return
 
     # Add new topic to DB
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(accorns_shared.postgresUser)
     cursor = conn.cursor()
     _ = shared.executeQuery(
         cursor,
@@ -567,7 +569,7 @@ def _():
     # Only proceed if the input is valid
     if not shared.inputCheck(input.ecInput()):
         ui.remove_ui("#noGoodConcept")
-        ui.insert_ui( 
+        ui.insert_ui(
             HTML(
                 "<div id=noGoodConcept style='color: red'>A concept must be at least 6 characters</div>"
             ),
@@ -587,10 +589,12 @@ def _():
 
     # Update the DB
     cID = concepts.get().iloc[conceptsTable.data_view(selected=True).index[0]]["cID"]
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(accorns_shared.postgresUser)
     cursor = conn.cursor()
     # Backup old value
-    accorns_shared.backupQuery(cursor, sessionID.get(), "concept", int(cID), "concept", False)
+    accorns_shared.backupQuery(
+        cursor, sessionID.get(), "concept", int(cID), "concept", False
+    )
     # Update to new
     _ = shared.executeQuery(
         cursor,
@@ -615,7 +619,7 @@ def _():
         return
 
     cID = concepts.get().iloc[conceptsTable.data_view(selected=True).index[0]]["cID"]
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(accorns_shared.postgresUser)
     cursor = conn.cursor()
     _ = shared.executeQuery(
         cursor,
@@ -635,7 +639,7 @@ def _():
 @reactive.event(input.tID)
 def _():
     tID = input.tID() if input.tID() else 0
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(accorns_shared.postgresUser)
     conceptList = shared.pandasQuery(
         conn, f'SELECT * FROM "concept" WHERE "tID" = {tID} AND "archived" = 0'
     )
@@ -681,15 +685,28 @@ def _():
         else "A file with the same name already exists. Skipping upload"
     )
     ui.modal_show(ui.modal(msg, title="Success" if insertionResult == 0 else "Issue"))
-    conn = duckdb.connect(shared.vectorDB)
+
+    conn = shared.vectorDBConn(accorns_shared.postgresUser)
+
     getFiles = shared.pandasQuery(conn, 'SELECT * FROM "file"')
     files.set(getFiles)
-    conn.close()
-    index.set(
-        VectorStoreIndex.from_vector_store(
-            DuckDBVectorStore.from_local(shared.vectorDB)
+
+    if shared.remoteAppDB:
+        vectorStore = PGVectorStore.from_params(
+            host=shared.postgresHost,
+            user=accorns_shared.postgresUser,
+            password=os.environ.get("POSTGRES_PASS_ACCORNS"),
+            database="vector_db",
+            table_name="document",
+            embed_dim=1536,  # openai embedding dimension
         )
-    )
+    else:
+        vectorStore = DuckDBVectorStore.from_local(shared.vectorDB)
+
+    conn.close()
+
+    index.set(VectorStoreIndex.from_vector_store(vectorStore))
+
     elementDisplay("blankDBMsg", "h")
     elementDisplay("tTab", "s")
     elementDisplay("qTab", "s")
@@ -707,13 +724,13 @@ def fileInfo():
     info = files().iloc[filesTable.data_view(selected=True).index[0]]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        conn = duckdb.connect(shared.vectorDB)
+
+        conn = shared.vectorDBConn(accorns_shared.postgresUser)
         keywords = shared.pandasQuery(
             conn, f'SELECT "keyword" FROM "keyword" WHERE "fID" = {int(info.fID)}'
         )
         conn.close()
     keywords = "; ".join(keywords["keyword"])
-    # elementDisplay("fileInfoCard", "s")
 
     return HTML(
         f"<h4>{info.fileName}</h4><ul>"
@@ -798,7 +815,7 @@ def _():
     elementDisplay("qBusyMsg", "s")
     elementDisplay("qBtnSet", "h")
 
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(accorns_shared.postgresUser)
     topic = shared.pandasQuery(
         conn, f'SELECT "topic" FROM "topic" WHERE "tID" = {input.qtID()}'
     )
@@ -833,8 +850,6 @@ The following concepts were covered in this topic:
 The question should center around the following concept:
 {focusConcept}\n
 {prevQuestions}"""
-
-    print(info)
 
     botResponse(quizEngine(), info, cID)
 
@@ -876,7 +891,7 @@ def _():
     with reactive.isolate():
         q = resp["resp"].iloc[0]  # For now only processing one
         # Save the questions in the appAB
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(accorns_shared.postgresUser)
         cursor = conn.cursor()
         # Insert question
         qID = shared.executeQuery(
@@ -919,7 +934,7 @@ def _():
 @reactive.event(input.qtID)
 def _():
     # Get the question info from the DB
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(accorns_shared.postgresUser)
     q = shared.pandasQuery(
         conn,
         f'SELECT "qID", "question" FROM "question" WHERE "tID" = {input.qtID()} AND "archived" = 0',
@@ -933,7 +948,7 @@ def _():
 @reactive.event(input.qID, input.qDiscardChanges)
 def _():
     # Get the question info from the DB
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(accorns_shared.postgresUser)
     q = shared.pandasQuery(
         conn, f'SELECT * FROM "question" WHERE "qID" = {input.qID()}'
     ).iloc[0]
@@ -956,7 +971,7 @@ def _():
 @reactive.event(input.qSaveChanges)
 def _():
     # Get the original question
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(accorns_shared.postgresUser)
     cursor = conn.cursor()
     q = shared.pandasQuery(
         conn,
@@ -1044,7 +1059,7 @@ def _():
 @reactive.effect
 @reactive.event(input.feedbackSubmit)
 def _():
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(accorns_shared.postgresUser)
     cursor = conn.cursor()
     _ = shared.executeQuery(
         cursor,

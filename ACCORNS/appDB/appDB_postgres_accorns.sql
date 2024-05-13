@@ -1,25 +1,25 @@
 
 \set ON_ERROR_STOP on
 
--- Check if the database already exists and if overWrite is set to false
-CREATE OR REPLACE FUNCTION check_overwrite(overWrite boolean)
+-- Check if the databases already exist if overWrite is set to false
+CREATE OR REPLACE FUNCTION check_overwrite(overWrite boolean, db TEXT)
 RETURNS void AS $$
 BEGIN
   IF NOT overWrite THEN
-    IF EXISTS (SELECT 1 FROM pg_database WHERE datname = 'scuirrel') THEN
-        RAISE EXCEPTION 'Database scuirrel already exists and overWrite is set to false';
+    IF EXISTS (SELECT 1 FROM pg_database WHERE datname = db) THEN
+        RAISE EXCEPTION 'Database % already exists and overWrite is set to false', db;
     END IF;
   END IF;
 END;
 $$ LANGUAGE plpgsql;
 
-SELECT check_overwrite(:overWrite);
+SELECT check_overwrite(:overWrite, 'accorns');
 
 -- Drop and create the database
-DROP DATABASE IF EXISTS :dbName;
-CREATE DATABASE :dbName;
+DROP DATABASE IF EXISTS accorns;
+CREATE DATABASE accorns;
 
-\c :dbName;
+\c accorns;
 
 CREATE TABLE "user" (
 	"uID" SERIAL PRIMARY KEY,
@@ -182,20 +182,24 @@ INSERT INTO "user" ("username", "isAdmin", "created", "modified")
 VALUES ('anonymous', 0, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS')), 
 ('admin', 1, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
 
+\c accorns;
 
-
-DO
-$$
+CREATE OR REPLACE FUNCTION add_user(uName TEXT, uPass TEXT)
+RETURNS void AS $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scuirrel') THEN
-        REASSIGN OWNED BY scuirrel TO CURRENT_USER;
-        DROP OWNED BY scuirrel;
-        DROP ROLE scuirrel;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = uName) THEN
+        EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD %L', uName, uPass);
     END IF;
-END
-$$;
+END;
+$$ LANGUAGE plpgsql;
 
-CREATE ROLE scuirrel WITH LOGIN PASSWORD :'appPass';
-GRANT CONNECT ON DATABASE :dbName TO scuirrel;
+SELECT add_user('scuirrel', :'scuirrelPass');
+SELECT add_user('accorns', :'accornsPass');
+
+GRANT CONNECT ON DATABASE accorns TO scuirrel;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO scuirrel;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO scuirrel;
+
+GRANT CONNECT ON DATABASE accorns TO accorns;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO accorns;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO accorns;

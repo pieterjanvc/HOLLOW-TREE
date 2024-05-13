@@ -1,22 +1,22 @@
 @echo off
 
 @REM This script should be executed only once to setup or reset the postgres database
+@REM You will need to provide your postgres super user password interactively
 
-@REM Make sure POSTGRES_PASS_SCUIRREL is set as an environment variable
-@REM which will be used as the password for the 'scuirrel' database and is 
-@REM also needed by both apps to connect to the database
+@REM Make sure POSTGRES_PASS_SCUIRREL and POSTGRES_PASS_ACCORNS are set as an environment variables
+@REM which will be used as the password for the 'scuirrel' and 'accorns' app to access the databases
 
 @REM VARIABLES TO SET BEFORE RUNNING
 @REM Note that if postgres bin is not in the PATH to put in the full path
 SET "postgresAdmin=postgres"
 SET "postgresBin=psql"
-SET "appDBFolder=%~dp0"
-SET "addDemo=True"
-SET "dbName=scuirrel"
+@REM Create "accorns" or "vector_db" or "both"
+SET "toCreate=both" 
 SET "overWrite=True"
 
-SET "sqlFile=%appDBFolder%\appDB_postgres.sql" 
-SET "sqlDemo=%appDBFolder%\appDB_postgres_demo.sql" 
+SET "appDBFolder=%~dp0"
+SET "sqlAccorns=%appDBFolder%\appDB_postgres_accorns.sql" 
+SET "sqlVectordb=%appDBFolder%\appDB_postgres_vectordb.sql" 
 
 @REM Check if postgres is installed
 
@@ -25,28 +25,49 @@ where %postgresBin% >nul 2>nul || (
     exit /b 1
 ) 
 
-@REM Check if sqlFile exists
-IF NOT EXIST "%sqlFile%" (
-    echo ERROR SQL file does not exist.
+@REM Check if sqlAccorns, sqlVectordb and sqlDemo exist
+IF NOT EXIST "%sqlAccorns%" (
+    echo ERROR %sqlAccorns% does not exist.
+    exit /b 1
+)
+IF NOT EXIST "%sqlVectordb%" (
+    echo ERROR %sqlVectordb% does not exist.
+    exit /b 1
+)
+
+@REM check if %POSTGRES_PASS_SCUIRREL% and %POSTGRES_PASS_ACCORNS% are set environment variables
+IF "%POSTGRES_PASS_SCUIRREL%"=="" (
+    echo ERROR POSTGRES_PASS_SCUIRREL environment variable is not set.
+    exit /b 1
+)
+
+IF "%POSTGRES_PASS_ACCORNS%"=="" (
+    echo ERROR POSTGRES_PASS_ACCORNS environment variable is not set.
+    exit /b 1
+)
+
+@REM check if toCreate is valid
+IF NOT "%toCreate%"=="both" IF NOT "%toCreate%"=="accorns" IF NOT "%toCreate%"=="vector_db" (
+    echo ERROR Invalid value for toCreate. Must be 'both', 'accorns' or 'vector_db'.
     exit /b 1
 )
 
 SET "errorFile=%TEMP%\error.txt"
 
-@REM Initialize the database based on settings
-IF "%addDemo%"=="True" (
-    IF NOT EXIST "%sqlDemo%" (
-        echo ERROR Demo SQL file does not exist.
-        exit /b 1
-    )
-    "%postgresBin%" -U %postgresAdmin% -f %sqlFile% -f %sqlDemo% ^
-        -v dbName="%dbName%" -v overWrite=%overWrite% ^
-        -v appPass=%POSTGRES_PASS_SCUIRREL% > nul 2> "%errorFile%"
+@REM variable toRun contains -f flags depending on sqlDemo and toCreate
+IF "%toCreate%"=="both" (
+    SET "toRun=-f %sqlAccorns% -f %sqlVectordb%"
+) ELSE IF "%toCreate%"=="accorns" (
+    SET "toRun=-f %sqlAccorns%"
 ) ELSE (
-    "%postgresBin%" -U %postgresAdmin% -f %sqlFile% ^
-        -v dbName="%dbName%" -v overWrite=%overWrite% ^
-        -v appPass=%POSTGRES_PASS_SCUIRREL% > nul 2> "%errorFile%"
+    SET "toRun=-f %sqlVectordb%"
 )
+
+"%postgresBin%" -U %postgresAdmin% %toRun% ^
+        -v overWrite=%overWrite% ^
+        -v scuirrelPass="%POSTGRES_PASS_SCUIRREL%" ^
+        -v accornsPass="%POSTGRES_PASS_ACCORNS%" ^
+         > nul 2> "%errorFile%"
 
 @REM check if erorr file is empty otherwise print error
 FOR %%i IN ("%errorFile%") DO IF %%~zi EQU 0 (
@@ -59,5 +80,11 @@ FOR %%i IN ("%errorFile%") DO IF %%~zi EQU 0 (
     exit /b 1
 )
 
+@REM Print success message with database name(s) and users
+IF "%toCreate%"=="both" (
+    SET "dbName=accorns and vector_db"
+) ELSE (
+    SET "dbName=%toCreate%"
+)
 echo.
-echo SUCCESS: Database %dbName% was successfully created and the user 'scuirrel' was added
+echo SUCCESS: %dbName% created and the users 'scuirrel' and 'accorns' added

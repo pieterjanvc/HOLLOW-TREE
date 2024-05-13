@@ -7,9 +7,9 @@ duckDB = "appData/vectordb.duckdb"
 
 [postgres]
 host = "localhost"
-db = "scuirrel"
-username = "scuirrel"
-# Password retrieved from POSTGRES_PASS_SCUIRREL environment variable
+port = 5432
+# Usernames scuirrel and accorns were created during setup
+# Password retrieved from POSTGRES_PASS_SCUIRREL and POSTGRES_PASS_ACCORNS environment variables
 
 [LLM]
 gptModel = "gpt-3.5-turbo-0125"  # use gpt-3.5-turbo-0125 or gpt-4
