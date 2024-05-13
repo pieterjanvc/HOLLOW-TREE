@@ -19,11 +19,11 @@ from llama_index.vector_stores.duckdb import DuckDBVectorStore
 from llama_index.vector_stores.postgres import PGVectorStore
 
 # --- VARIABLES ---
-postgresUser = "scuirrel" # Used by shared.appDBConn 
+postgresUser = "scuirrel"  # Used by shared.appDBConn
 
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 
-with open(os.path.join(curDir,"scuirrel_config.toml"), "r") as f:
+with open(os.path.join(curDir, "scuirrel_config.toml"), "r") as f:
     config = toml.load(f)
 
 allowMultiGuess = any(
@@ -51,18 +51,19 @@ conn.close()
 # Load the vector index from storage
 if shared.remoteAppDB:
     vector_store = PGVectorStore.from_params(
-                host=shared.postgresHost, 
-                port = shared.postgresPort,
-                user=postgresUser, 
-                password=os.environ.get("POSTGRES_PASS_SCUIRREL"),
-                database="vector_db",
-                table_name="document",
-                embed_dim=1536,  # openai embedding dimension
+        host=shared.postgresHost,
+        port=shared.postgresPort,
+        user=postgresUser,
+        password=os.environ.get("POSTGRES_PASS_SCUIRREL"),
+        database="vector_db",
+        table_name="document",
+        embed_dim=1536,  # openai embedding dimension
     )
 else:
     vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
 
 index = VectorStoreIndex.from_vector_store(vector_store)
+
 
 # Adapt the chat engine to the topic
 def chatEngine(topic, concepts, cIndex, eval):

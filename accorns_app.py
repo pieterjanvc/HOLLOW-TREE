@@ -66,10 +66,10 @@ os.path.join(curDir, "ACCORNS")
 
 ui.page_opts(fillable=True, window_title="ACCORNS")
 ui.head_content(
-    ui.include_css(os.path.join(curDir, "shared", "shared_css","shared.css")),
-    ui.include_css(os.path.join(curDir, "ACCORNS", "accorns_css","accorns.css")),     
-    ui.include_js(os.path.join(curDir, "ACCORNS", "accorns_js","accorns.js")), 
-    ui.include_js(os.path.join(curDir, "shared", "shared_js","shared.js"))
+    ui.include_css(os.path.join(curDir, "shared", "shared_css", "shared.css")),
+    ui.include_css(os.path.join(curDir, "ACCORNS", "accorns_css", "accorns.css")),
+    ui.include_js(os.path.join(curDir, "ACCORNS", "accorns_js", "accorns.js")),
+    ui.include_js(os.path.join(curDir, "shared", "shared_js", "shared.js")),
 )
 # --- CUSTOM JS FUNCTIONS (Python side) ---
 
@@ -233,7 +233,7 @@ ui.input_action_button("feedback", "Provide Feedback")
 sessionID = reactive.value(0)
 
 conn = shared.vectorDBConn(accorns_shared.postgresUser)
-files = shared.pandasQuery(conn, query = 'SELECT * FROM "file"')
+files = shared.pandasQuery(conn, query='SELECT * FROM "file"')
 conn.close()
 
 # Hide the topic and question tab if the vector database is empty and show welcome message
@@ -423,7 +423,9 @@ def _():
     conn = shared.appDBConn(accorns_shared.postgresUser)
     cursor = conn.cursor()
     # Backup old value
-    accorns_shared.backupQuery(cursor, sessionID.get(), "topic", input.tID(), "topic", False)
+    accorns_shared.backupQuery(
+        cursor, sessionID.get(), "topic", input.tID(), "topic", False
+    )
     # Update to new
     _ = shared.executeQuery(
         cursor,
@@ -567,7 +569,7 @@ def _():
     # Only proceed if the input is valid
     if not shared.inputCheck(input.ecInput()):
         ui.remove_ui("#noGoodConcept")
-        ui.insert_ui( 
+        ui.insert_ui(
             HTML(
                 "<div id=noGoodConcept style='color: red'>A concept must be at least 6 characters</div>"
             ),
@@ -590,7 +592,9 @@ def _():
     conn = shared.appDBConn(accorns_shared.postgresUser)
     cursor = conn.cursor()
     # Backup old value
-    accorns_shared.backupQuery(cursor, sessionID.get(), "concept", int(cID), "concept", False)
+    accorns_shared.backupQuery(
+        cursor, sessionID.get(), "concept", int(cID), "concept", False
+    )
     # Update to new
     _ = shared.executeQuery(
         cursor,
@@ -681,30 +685,27 @@ def _():
         else "A file with the same name already exists. Skipping upload"
     )
     ui.modal_show(ui.modal(msg, title="Success" if insertionResult == 0 else "Issue"))
-    
+
     conn = shared.vectorDBConn(accorns_shared.postgresUser)
-    
+
     getFiles = shared.pandasQuery(conn, 'SELECT * FROM "file"')
     files.set(getFiles)
-    
 
     if shared.remoteAppDB:
         vectorStore = PGVectorStore.from_params(
-            host=shared.postgresHost, user=accorns_shared.postgresUser, password=os.environ.get("POSTGRES_PASS_ACCORNS"),
+            host=shared.postgresHost,
+            user=accorns_shared.postgresUser,
+            password=os.environ.get("POSTGRES_PASS_ACCORNS"),
             database="vector_db",
             table_name="document",
             embed_dim=1536,  # openai embedding dimension
         )
     else:
         vectorStore = DuckDBVectorStore.from_local(shared.vectorDB)
-    
+
     conn.close()
 
-    index.set(
-        VectorStoreIndex.from_vector_store(
-            vectorStore
-        )
-    )
+    index.set(VectorStoreIndex.from_vector_store(vectorStore))
 
     elementDisplay("blankDBMsg", "h")
     elementDisplay("tTab", "s")
@@ -724,7 +725,7 @@ def fileInfo():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
-        conn = shared.vectorDBConn(accorns_shared.postgresUser)        
+        conn = shared.vectorDBConn(accorns_shared.postgresUser)
         keywords = shared.pandasQuery(
             conn, f'SELECT "keyword" FROM "keyword" WHERE "fID" = {int(info.fID)}'
         )
@@ -739,6 +740,7 @@ def fileInfo():
         "<p><b>Top-10 keywords extracted from document</b> <i>(AI generated)</i></p>"
         f"{keywords}"
     )
+
 
 # ---- QUIZ QUESTIONS ----
 
