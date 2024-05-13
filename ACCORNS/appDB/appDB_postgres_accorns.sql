@@ -1,25 +1,25 @@
 
 \set ON_ERROR_STOP on
 
--- Check if the database already exists and if overWrite is set to false
-CREATE OR REPLACE FUNCTION check_overwrite(overWrite boolean)
+-- Check if the databases already exist if overWrite is set to false
+CREATE OR REPLACE FUNCTION check_overwrite(overWrite boolean, db TEXT)
 RETURNS void AS $$
 BEGIN
   IF NOT overWrite THEN
-    IF EXISTS (SELECT 1 FROM pg_database WHERE datname = 'scuirrel') THEN
-        RAISE EXCEPTION 'Database scuirrel already exists and overWrite is set to false';
+    IF EXISTS (SELECT 1 FROM pg_database WHERE datname = db) THEN
+        RAISE EXCEPTION 'Database % already exists and overWrite is set to false', db;
     END IF;
   END IF;
 END;
 $$ LANGUAGE plpgsql;
 
-SELECT check_overwrite(:overWrite);
+SELECT check_overwrite(:overWrite, 'accorns');
 
 -- Drop and create the database
-DROP DATABASE IF EXISTS scuirrel;
-CREATE DATABASE scuirrel;
+DROP DATABASE IF EXISTS accorns;
+CREATE DATABASE accorns;
 
-\c scuirrel;
+\c accorns;
 
 CREATE TABLE "user" (
 	"uID" SERIAL PRIMARY KEY,
@@ -182,80 +182,24 @@ INSERT INTO "user" ("username", "isAdmin", "created", "modified")
 VALUES ('anonymous', 0, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS')), 
 ('admin', 1, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
 
+\c accorns;
 
-
--- Check if the database already exists and if overWrite is set to false
-CREATE OR REPLACE FUNCTION check_overwrite(overWrite boolean)
+CREATE OR REPLACE FUNCTION add_user(uName TEXT, uPass TEXT)
 RETURNS void AS $$
 BEGIN
-  IF NOT overWrite THEN
-    IF EXISTS (SELECT 1 FROM pg_database WHERE datname = 'vector_db') THEN
-        RAISE EXCEPTION 'Database vector_db already exists and overWrite is set to false';
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = uName) THEN
+        EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD %L', uName, uPass);
     END IF;
-  END IF;
 END;
 $$ LANGUAGE plpgsql;
 
-SELECT check_overwrite(:overWrite);
+SELECT add_user('scuirrel', :'scuirrelPass');
+SELECT add_user('accorns', :'accornsPass');
 
--- Drop and create the database
-DROP DATABASE IF EXISTS vector_db;
-CREATE DATABASE vector_db;
-
-\c "vector_db";
-
-CREATE EXTENSION vector;
-
-CREATE SEQUENCE seq_fID START 1;
-CREATE TABLE file (
-  "fID" SERIAL PRIMARY KEY,
-  "fileName" TEXT,
-  "title" TEXT,
-  "subtitle" TEXT,
-  "created" TEXT,
-  "modified" TEXT
-);
-
-CREATE SEQUENCE seq_kID START 1;
-CREATE TABLE keyword (
-  "kID" SERIAL PRIMARY KEY,
-  "fID" INTEGER,
-  "keyword" TEXT,
-  FOREIGN KEY("fID") REFERENCES "file"("fID") 
-);
-
--- CREATE scuirrel and accorns USERS
-
-\c postgres;
-
-DO
-$$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scuirrel') THEN
-        CREATE ROLE scuirrel WITH LOGIN PASSWORD :'scuirrelPass';
-        
-    END IF;
-
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'accorns') THEN
-        CREATE ROLE accorns WITH WITH LOGIN PASSWORD :'accornsPass';       
-    END IF;
-END
-$$;
-
-\c scuirrel;
-
-GRANT CONNECT ON DATABASE scuirrel TO scuirrel;
+GRANT CONNECT ON DATABASE accorns TO scuirrel;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO scuirrel;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO scuirrel;
 
-GRANT CONNECT ON DATABASE scuirrel TO accorns;
+GRANT CONNECT ON DATABASE accorns TO accorns;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO accorns;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO accorns;
-
-\c accorns;
-
-GRANT CONNECT ON DATABASE vector_db TO accorns;
-GRANT all privileges ON DATABASE vector_db to accorns;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO accorns;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO accorns;
-GRANT CREATE ON SCHEMA public TO accorns;

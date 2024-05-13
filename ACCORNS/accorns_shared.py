@@ -33,6 +33,7 @@ import nest_asyncio
 nest_asyncio.apply()
 
 # --- Global variables
+postgresUser = "accorns" # Used by shared.appDBConn 
 
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 appDBDir = os.path.join(curDir, "appDB")
@@ -43,6 +44,7 @@ with open(os.path.join(curDir,"accorns_config.toml"), "r") as f:
 addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
 tempFolder = os.path.join(config["localStorage"]["tempFolder"], "")
 storageFolder = os.path.join(config["localStorage"]["storageFolder"], "")
+demoFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
 
 # ----------- FUNCTIONS -----------
 # *********************************
@@ -80,11 +82,12 @@ def createSQLiteAppDB(DBpath, addDemo=False):
 
 
 # Make new app DB if needed
-print(createSQLiteAppDB(shared.sqliteDB, addDemo=addDemo))
+if not(shared.remoteAppDB):
+    print(createSQLiteAppDB(shared.sqliteDB, addDemo=addDemo))
 
 
-# Create DuckDB vector database and add files
-def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
+# Create vector database and add files
+def addFileToDB(newFile, vectorDB = None, remoteAppDB = shared.remoteAppDB, storageFolder=None, newFileName=None):
     # In case the file is a URL download it first
     isURL = False
     if newFile.startswith("http://") or newFile.startswith("https://"):
@@ -118,7 +121,7 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
     if (storageFolder is None) & isURL:
         os.remove(newFile)
 
-    if shared.remoteAppDB:
+    if remoteAppDB:
         vector_store = PGVectorStore.from_params(
                 database="vector_db",
                 host="localhost",
@@ -171,7 +174,7 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
     # Get the metadata out of the DB excerpt_keywords document_title
     fileName = newData[0].metadata["file_name"]
     # vectorDB = "appData/vectorstore.duckdb"
-    if shared.remoteAppDB:
+    if remoteAppDB:
         conn = psycopg2.connect(
             host="localhost",
             user="accorns",
@@ -179,13 +182,16 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
             database="vector_db",
         )      
         cursor = conn.cursor()
-        x = cursor.execute(       
+        _ = cursor.execute(       
             "SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y "
             f"FROM data_document WHERE metadata_ ->> 'file_name' = '{fileName}'"
-        ).fetchall()
+        )
+        
+        q = cursor.fetchall()
+        conn.close()
 
-        chunkTitles = "* " + "\n* ".join(set([y[0] for y in x]))
-        chunkKeywords = ", ".join(set((", ".join([y[1] for y in x])).split(", "))) 
+        chunkTitles = "* " + "\n* ".join(set([x[0] for x in q]))
+        chunkKeywords = ", ".join(set((", ".join([x[1] for x in q])).split(", "))) 
     else:
         conn = duckdb.connect(vectorDB)
         cursor = conn.cursor()
@@ -193,10 +199,11 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
             "SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE "
             f"CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = '\"{fileName}\"'"
         )
-        x = cursor.fetchall()
+        q = cursor.fetchall()
+        conn.close()
 
-        chunkTitles = "* " + "\n* ".join(set([y[0][0] for y in x]))
-        chunkKeywords = ", ".join(set((", ".join([y[0][1] for y in x])).split(", ")))
+        chunkTitles = "* " + "\n* ".join(set([x[0][0] for x in q]))
+        chunkKeywords = ", ".join(set((", ".join([x[0][1] for x in q])).split(", ")))
 
     # Summarise everything using the LLM and add it to the appDB
     docSum = (
@@ -211,13 +218,24 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
     )
     docSum = json.loads(str(index.as_query_engine().query(docSum)))
 
+    if remoteAppDB:
+        conn = psycopg2.connect(
+            host="localhost",
+            user="accorns",
+            password="accorns",
+            database="vector_db",
+        )  
+    else:
+        conn = duckdb.connect(vectorDB)
+    
     cursor = conn.cursor()
     _ = shared.executeQuery(cursor,
             'INSERT INTO "file"("fID", "fileName", "title", "subtitle", "created") '
             "VALUES(nextval('seq_fID'), ?, ?, ?, ?)",
             (fileName,docSum['title'],docSum['subtitle'], shared.dt())
                          )
-    fID = shared.executeQuery(cursor, "SELECT currval('seq_fID')").fetchall()[0][0]
+    shared.executeQuery(cursor, "SELECT currval('seq_fID')")
+    fID = cursor.fetchone()[0]
     _ = shared.executeQuery(cursor,
         'INSERT INTO "keyword"("kID", "fID", "keyword") '
         f"VALUES(nextval('seq_kID'),{int(fID)}, ?)",
@@ -231,9 +249,20 @@ def addFileToDB(newFile, vectorDB, storageFolder=None, newFileName=None):
 
 # When demo data is to be added use a file stored in a GitHub issue
 # TODO Replace URL once public!
-if addDemo & (not os.path.exists(shared.vectorDB)):
-    newFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
-    addFileToDB(newFile, shared.vectorDB)
+if shared.remoteAppDB:
+    conn = psycopg2.connect(
+            host="localhost",
+            user="accorns",
+            password="accorns",
+            database="vector_db",
+    )     
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM   information_schema.tables WHERE  table_name = 'data_document';")
+
+    if (cursor.fetchone() is None) & addDemo:
+        addFileToDB(demoFile)
+elif addDemo & (not os.path.exists(shared.vectorDB)):    
+        addFileToDB(demoFile, shared.vectorDB)
 
 # Load the vector index from storage
 if shared.remoteAppDB:

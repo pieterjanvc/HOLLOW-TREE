@@ -6,8 +6,8 @@
 # Science Concept Understanding with Interactive Research RAG Educational LLM
 
 # See app_shared.py for variables and functions shared across sessions
-import SCUIRREL.scuirrel_shared as scuirrel_shared
 import shared.shared as shared
+import SCUIRREL.scuirrel_shared as scuirrel_shared
 
 # General
 import os
@@ -30,7 +30,7 @@ if shared.remoteAppDB:
     _ = shared.checkRemoteDB()
 
 
-conn = shared.appDBConn()
+conn = shared.appDBConn(scuirrel_shared.postgresUser)
 topics = shared.pandasQuery(
     conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
 )
@@ -144,7 +144,7 @@ botLog = reactive.value(None)  # Chat sent to the LLM
 # Stuff to run once when the session has loaded
 if hasattr(session, "_process_ui"):
     # Register the session start in the DB
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(scuirrel_shared.postgresUser)
     cursor = conn.cursor()
     # For now we only have anonymous users (appID 0 -> SCUIRREL)
     sID = shared.executeQuery(
@@ -172,7 +172,7 @@ def theEnd():
         msg = messages.get()
         sID = sessionID.get()
         # AUpdate the database
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(scuirrel_shared.postgresUser)
         cursor = conn.cursor()
         # Log current discussion
         scuirrel_shared.endDiscussion(cursor, dID, msg)
@@ -188,7 +188,7 @@ def theEnd():
 @reactive.event(input.selTopic)
 def _():
     tID = int(topics[topics["tID"] == int(input.selTopic())].iloc[0]["tID"])
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(scuirrel_shared.postgresUser)
     cursor = conn.cursor()
     # Save the logs for the previous discussion (if any)
     if messages.get():
@@ -243,7 +243,7 @@ def _():
 # Get the concepts related to the topic
 @reactive.calc
 def concepts():
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(scuirrel_shared.postgresUser)
     concepts = shared.pandasQuery(
         conn,
         f'SELECT * FROM "concept" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0',
@@ -356,7 +356,7 @@ quizQuestion = reactive.value()
 @reactive.event(input.quiz)
 def _():
     # Get a random question on the topic from the DB
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(scuirrel_shared.postgresUser)
     q = shared.pandasQuery(
         conn,
         f'SELECT * FROM "question" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0',
@@ -440,7 +440,7 @@ def _():
         q["correct"] = None
 
     # Add the response to the DB
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(scuirrel_shared.postgresUser)
     cursor = conn.cursor()
     _ = shared.executeQuery(
         cursor,
@@ -506,7 +506,7 @@ def _():
     # Because multiple issues can be submitted for a single conversation, we have to commit to the
     # DB immediately or it would become harder to keep track of TODO
     # This means we add a temp mID which will be updated in the end
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(scuirrel_shared.postgresUser)
     cursor = conn.cursor()
     fcID = shared.executeQuery(
         cursor,
@@ -582,7 +582,7 @@ def _():
 @reactive.effect
 @reactive.event(input.feedbackSubmit)
 def _():
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(scuirrel_shared.postgresUser)
     cursor = conn.cursor()
     _ = shared.executeQuery(
         cursor,

@@ -30,6 +30,7 @@ remoteAppDB = any(
 )
 vectorDB = config["localStorage"]["duckDB"]
 sqliteDB = config["localStorage"]["sqliteDB"]
+postgresUser = None # Each app will set this variable to the correct user
 
 # Create the parent directory for the sqliteDB if it does not exist
 if not os.path.exists(os.path.dirname(sqliteDB)):
@@ -65,13 +66,13 @@ def inputCheck(input):
         False
 
 # Get a local or remote DB connection (depending on config)
-def appDBConn(remoteAppDB=remoteAppDB):
+def appDBConn(postgresUser=postgresUser, remoteAppDB=remoteAppDB):
     if remoteAppDB:
         return psycopg2.connect(
             host=config["postgres"]["host"],
-            user=config["postgres"]["username"],
-            password=os.environ.get("POSTGRES_PASS_SCUIRREL"),
-            database=config["postgres"]["db"],
+            user=postgresUser,
+            password=os.environ.get("POSTGRES_PASS_" + ("SCUIRREL" if postgresUser == "scuirrel" else "ACCORNS")),
+            database="accorns",
         )
 
     else:
@@ -84,9 +85,9 @@ def appDBConn(remoteAppDB=remoteAppDB):
 # Check if the postgres scuirrel database is available when remoteAppDB is set to True
 def checkRemoteDB():
     try:
-        conn = appDBConn()
+        conn = appDBConn("accorns")
         conn.close()
-        return "Connection to postgres scuirrel database successful"
+        return "Connection to postgres accorns database successful"
     except psycopg2.OperationalError as e:
         raise psycopg2.OperationalError(
             str(e) + "\n\n POSTGRESQL connection error: "

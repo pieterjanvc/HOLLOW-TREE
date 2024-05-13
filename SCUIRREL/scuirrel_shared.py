@@ -18,6 +18,7 @@ from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
 
 # --- VARIABLES ---
+postgresUser = "scuirrel" # Used by shared.appDBConn 
 
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 
@@ -29,7 +30,7 @@ allowMultiGuess = any(
 )
 
 # Check if there are topics to discuss before proceeding
-conn = shared.appDBConn()
+conn = shared.appDBConn(postgresUser)
 topics = shared.pandasQuery(
     conn,
     'SELECT * FROM "topic" WHERE "archived" = 0 AND "tID" IN'
