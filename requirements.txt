@@ -9,4 +9,5 @@ llama-index-vector-stores-postgres
 nest_asyncio
 duckdb
 toml
-psycopg2
+psycopg2-binary
+sqlparse

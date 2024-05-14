@@ -245,9 +245,20 @@ if files.shape[0] == 0:
 if files.shape[0] == 0:
     index = None
 else:
-    index = VectorStoreIndex.from_vector_store(
-        DuckDBVectorStore.from_local(shared.vectorDB)
-    )
+    if shared.remoteAppDB:
+        vectorStore = PGVectorStore.from_params(
+            host=shared.postgresHost,
+            user=accorns_shared.postgresUser,
+            password=os.environ.get("POSTGRES_PASS_ACCORNS"),
+            database="vector_db",
+            table_name="document",
+            embed_dim=1536,  # openai embedding dimension
+        )
+        index = VectorStoreIndex.from_vector_store(vectorStore)
+    else:
+        index = VectorStoreIndex.from_vector_store(
+            DuckDBVectorStore.from_local(shared.vectorDB)
+        )
 
 # Some of these could become reactive calls in future but for now we use
 # reactive var until issue with reactive.calls is resolved
