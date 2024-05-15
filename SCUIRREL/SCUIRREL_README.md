@@ -1,20 +1,14 @@
-# SCUIRREL - Science Concept Understanding with Interactive Research RAG Educational LLM 
+# SCUIRREL - Science Concept Understanding with Interactive Research RAG Educational LLM
 
-## About
-This is the main application through which student will interact with the LLM. 
-Configuring and monitoring is done through the additional [ACCORNS](../ACCORNS/) app
+This is the main application through which students will interact with the LLM (i.e.
+SCUIRREL) on topics created and configured by instructors.
 
-* Students can select a topic to check their knowledge on
-* Interact with the LLM in conversation led by the topic and concepts set by the instructor
-* The LLM should adapt the conversation to the student's answers and keep them engaged and on topic
+For more information on how to ...
 
-## Installation and Setup
-
-* See the main [README](../README.md) file for details on setting up the environment
-* Make sure to set all paths and specific ACCORNS settings in the [config.toml](config.toml) file
-
-## Files and Folders
-
-* [app.py](app.py): Main app file
-* [app_shared.py](app_shared.py): Shared variables and functions across different session 
-* [config.toml](config.toml): App wide settings
+- ... interact with SCUIRREL, please read the [student](../docs/student.md) guide
+- ... setup SCUIRREL as an instructor, please read the
+  [instructor](../docs/instructor.md) guide
+- ... deploy SCUIRREL, please read the [IT admin](../docs/ITadmin.md) guide
+- ... develop SCUIRREL, please read the [developer](../docs/developer.md) guide
+- ... analyse data collected by SCUIRREL, please read the
+  [researcher](../docs/researcher.md) guide
