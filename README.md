@@ -1,154 +1,70 @@
-# SCUIRREL: Science Concept Understanding with Interactive Research RAG Educational LLM
+# The HOLLOW TREE project
 
-This applications aims to provide students with an LLM-based knowledge check on specific topics relevant to their coursework. Admins can set the topic and add sub-concepts to guide the conversation. By uploading specific and relevant files to a vector database, the app will use Retrieval Augmented Generation (RAG) to ensure the quality and accuracy of the LLM responses is high and on topic.
+## **H**arnessing **O**nline **L**earning with **L**LM **O**riented **W**eb-apps for **T**eaching, **R**esearch, **E**valuation, and **E**ngagement
 
-# Apps and Data
+This project aims to explore the use of large language models (LLMS, e.g. ChatGPT) in
+the higher-education classroom by providing students a way of checking their knowledge
+on specific topics by interacting with a chatbot that has been configured and scoped by
+course instructors to fit the course content.
 
-## Software and Libraries
+This repository holds the source code for two web-based Python Shiny apps that will help
+accomplish this goal:
 
-The apps are written in Python and use the following important libraries:
+## SCUIRREL - Student facing app
 
-* The [Llamaindex](https://www.llamaindex.ai/) framework is a wrapper for working with 
-various LLMs (e.g. ChatGPT) and implement Retrieval Augmented Generation for increasing
-accuracy
-* The [Shiny framework](https://shiny.posit.co/py/) is used for generating the 
-apps' UI and Server components
-* For a list of all dependencies, see the [requirements.txt](./requirements.txt) file
+### Science Concept Understanding with Interactive Research RAG Educational LLM
 
-## The LLM
-The app is currently configured to run with OpenAI's GPT models. This requires
-your own active API key. If your are part of an organization, you will also need the 
-organization ID. Make sure the keys are available to Python as environment
-variables with the following names:
+This is the student facing application where users will interact with the LLM (i.e.
+SCUIRREL) to explore the concepts of a specific topic by means of a guided conversation.
+In addition to the conversation, students can take instructor verified quiz-questions to
+test their knowledge
 
-* OPENAI_API_KEY
-* OPENAI_ORGANIZATION
+## ACCORNS - Instructor facing app
 
-They will be accessed in the code like this
-```
-os.environ["OPENAI_ORGANIZATION"]
-os.environ.get("OPENAI_ORGANIZATION")
-```
-*You can read this [online guide](https://chlee.co/how-to-setup-environment-variables-for-windows-mac-and-linux/) 
-for more info on how to set these up*
+### Admin Control Center Overseeing RAG Needed for SCUIRREL
 
-## Data storage
+This application is the backend to SCUIRREL where instructors can set-up, manage and
+monitor the topics and concepts that SCUIRREL will be able to discuss with students.
 
-Data is stored in two separate databases
+## Want to jump right in ?
 
-* The vector database used for RAG is implemented with DuckDB (note that original files uploaded to the app can be stored as well depending on the settings)
-* All app data and logs are stored in a custom app database (schema below).
-This data is used for app operation, monitoring and research
-* IMPORTANT: Edit the config.toml for SCUIRREL and ACCORNS before running the apps
+Read more about this project based on your role and interests:
 
-### Local app database (SQLite)
+- I'm a [student](docs/student.md) wanting to know how I can use SCUIRREL to help me in
+  my learning
+- I'm an [instructor](docs/instructor.md) interested in exploring a use for an app like
+  this my classroom and how to set it up
+- I'm an [IT admin](docs/ITadmin.md) assisting in hosting and deploying these apps
+- I'm a [developer](docs/developer.md) interested in how these app were built and play
+  around with the code
+- I'm a [researcher](docs/researcher.md) looking to analyse any of the data collected by
+  the apps
 
-* This is the default and useful during app development or testing, but would likely not scale well
-once many users need concurrent DB access. 
-* Given this DB is shared between SCUIRREL and ACCORNS, you need to configure
-the Shiny server or Posit connect to allow file access outside the app directory
-* If the databases do not exist when the app is run, they will be created.
-Note that the admin app needs to be run before the student app the first time.
+## A bit more about the project and the motivation behind it
 
-### Remote app database (PostgreSQL)
+The idea for this project came from the observation that in many higher education
+courses students come in with very diverse backgrounds and have different levels of
+understanding of the topics being discussed in the classroom. Instructors often need to
+spend valuable class time getting everyone on the same page, which can be frustrating
+for both the students who are already familiar with the material and the ones who are
+struggling to keep up.
 
-This is the preferred option when the apps are deployed for production. 
-However, it requires an additional Postgres server to be hosted somewhere.
-Once the server has been setup and a database created, you can use the [createAppDB.sql](ACCORNS/appDB/createAppDB.sql) 
-file (used for SQLite) with the following small modification:
+The goal of this project is to provide a tool that can help students check their
+understanding of the material outside of class time, and to provide instructors with a
+way to monitor and guide this process. The hope is that this will help to level the
+playing field for students with different levels of background knowledge, and to free up
+more class time for discussion and activities that can help students deepen their
+understanding of the material.
 
-Replace all `INTEGER PRIMARY KEY AUTOINCREMENT` with `SERIAL PRIMARY KEY`
+## Disclaimer
 
-Now this SQL can be used to initialise the PostgreSQL app DB.
-Make sure to edit the 
+SCUIRREL and ACCORNS are experimental applications built as part of an ongoing research
+project. They are not intended to be used as a replacement for traditional teaching
+methods, but rather as a supplement to explore the potential of LLMs in the classroom
+and collect data on the experience from both students and instructors.
 
-
-![App DB Schema](https://drive.usercontent.google.com/download?id=1kOzuVdI-p1K5Ej6EaRh4dJZuxyCATCfT)
-
-## Source code of the apps
-
-The apps are written with the Shiny Express syntax. 
-
-*Note: For scoping reasons, functions and variables that are shared between sessions
-are in a separate file so they only have to be loaded once. All code put in the
-main app files is run for each new session*
-
-## SCUIRREL ([SCUIRREL/app.py](SCUIRREL/app.py))
-
-SCUIRREL or Science Concept Understanding with Interactive Research RAG Educational LLM 
-is the main application. In this app, users will interact  with the LLM exploring the 
-topics and concepts setup in ACCORNS (admin app, see below)
-
-Details can be found in the [SCUIRREL README](SCUIRREL/README.md)
-
-## ACCORNS: Admin App ([ACCORNS/app.py](ACCORNS/app.py))
-
-ACCORNS or Admin Control Center Overseeing RAG Needed for SCUIRREL, is a secondary
-applications where instructors can set-up, manage and monitor SCUIRREL
-
-Details can be found in the [ACCORNS README](ACCORNS/README.md)
-
-# Set-up and deployment
-
-## Setting up the project in a virtual Python environment 
-
-### Windows
-
-Tutorial for setting up Shiny within a virtual environment found on 
-[website](https://shiny.posit.co/py/docs/install-create-run.html#install)
-
-The command below should be run on the CMD on Windows (*not* PowerShell)
-
-Move to the app root folder and run
-```
-python -m venv .venv
-.venv\Scripts\activate.bat
-```
-*You should see (.venv) appear before the prompt*
-
-To install any project dependencies run
-```
-py -m pip install -r requirements.txt
-```
-
-To run Shiny fir navigate to the SCUIRREL or ACCORNS folder (otherwise PATH errors) then run
-```
-shiny run --reload --launch-browser app.py
-```
-*Note: See below on how to run / debug Shiny from within VS code*
-
-To deactivate the virtual environment run
-```
-deactivate
-```
-*You should see (.venv) disappear from the prompt*
-
-## Working with Shiny apps in VS code
-
-To easily run / debug the apps from within VS code and make use of the integrated 
-[Shiny extensenion](https://marketplace.visualstudio.com/items?itemName=Posit.shiny-python) 
-do the following:
-
-### Create workspaces and add folders
-1) Create a new workspace (save to the root project folder)
-2) Add the following folders (File-> Add folder to workspace):
-    * SCUIRREL (Main project folder)
-    * SCUIRREL\SCUIRREL (Subfolder)
-    * SCUIRREL\ACCORNS  (Subfolder)
-This is needed because using the sub-folders it will change the working directory when running the Shiny apps
-from within VS code
-3) Install the Python and Shiny extensions
-4) Set the default Python interpreter to be the one from the virtual environment.
-In case of errors or not found, set it manually: 
-`Python: Select interpreter -> Select at workspace level -> Enter interpreter Path -> find .venv\Scripts\python.exe`
-
-### Run / Debug your Shiny apps
-
-1) Open the app.py file in the SCUIRREL\SCUIRREL or SCUIRREL\ACCORNS folder in your environment
-(Do *not* open it via the main SCUIRREL folder or the working directory will be incorrect)
-2) You will see a 'Run Shiny App' button appear on the top-right 
-3) Clicking the button should start the app in an integrated browser. 
-Alternatively, choose the dropdown and choose 'Debug Shiny App' to run in debug mode
-
-## Hosting the apps
-*add details here ...*
+The applications are still in the early stages of development, and there may be bugs or
+other issues that might interfere with student learning (either because of the app code
+itself or the inherent limitations of LLMs in this context). We encourage instructors to
+use these apps with caution and to provide feedback on their experience so that we can
+continue to improve upon this idea.
