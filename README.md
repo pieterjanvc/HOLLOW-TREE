@@ -21,7 +21,7 @@ test their knowledge
 
 ## ACCORNS - Instructor facing app
 
-### Admin Control Center Overseeing RAG Needed for SCUIRREL, is a secondary
+### Admin Control Center Overseeing RAG Needed for SCUIRREL
 
 This application is the backend to SCUIRREL where instructors can set-up, manage and
 monitor the topics and concepts that SCUIRREL will be able to discuss with students.
