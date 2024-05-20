@@ -2,6 +2,7 @@ appData/uploadedFiles/*
 *.pyc
 *.db
 backup/*
+local/*
 *.svg
 *.duckdb
 .venv/*

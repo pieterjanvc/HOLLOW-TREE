@@ -22,6 +22,8 @@ on Linux or MacOS.
 ```
 python -m venv .venv
 ```
+_Depending on your PositConnect server, you might need to use a specific python version
+in which case you use for example `path/to/python/python -m venv .venv`_
 
 2. Activate the environment
 
