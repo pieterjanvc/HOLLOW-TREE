@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS "session" (
   "start" TEXT,
   "end" TEXT,
   "shinyToken" TEXT,
+  "error" TEXT,
 	FOREIGN KEY("uID") REFERENCES "user"("uID") 
 		ON DELETE CASCADE ON UPDATE CASCADE
 );

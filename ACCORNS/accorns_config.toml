@@ -3,4 +3,3 @@ addDemo = "True"
 
 [localStorage]
 storageFolder = "appData/uploadedFiles"
-tempFolder = "temp"

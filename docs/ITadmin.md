@@ -14,7 +14,7 @@ front-end is automatically built using HTML, CSS and JavaScript. The apps are de
 to be run in a web browser and can be accessed from any device with a web browser.
 
 Python version 3.9 or higher is required to run the apps and the list of all Python
-dependencies can be found in the [requirements.txt](requirements.txt) file.
+dependencies can be found in the [requirements.txt](../requirements.txt) file.
 
 ## PostgreSQL
 
@@ -56,13 +56,8 @@ To create the databases:
   services have this pre-installed).
 - On Windows, you can run the
   [appDB_postgres_init.bat](../ACCORNS/appDB/appDB_postgres_init.bat) file to create and
-  setup the databases. Alternatively:
-  - Run the [appDB_postgres_accorns.sql](../ACCORNS/appDB/appDB_postgres_accorns.sql)
-    script to create the ACCORNS database / users (providing the passwords and other
-    variables to the script)
-  - Run the [appDB_postgres_vector.sql](../ACCORNS/appDB/appDB_postgres_vector.sql)
-    script to create the vector database / users (providing the passwords and other
-    variables to the script)
+  setup the databases. On Linux / MacOS, you can run
+  [appDB_postgres_init.sh](../ACCORNS/appDB/appDB_postgres_init.sh)
 
 ## Posit Connect / Shiny Server
 
@@ -86,8 +81,8 @@ The Git repository file structure is setup to build and test the apps locally. I
 to deploy the apps to a server, separate folders for each app (SCUIRREL and ACCORNS)
 should be generated using the following steps:
 
-1. Run the [generate_publishing_dir.py](publish/generate_publishing_dir.py) script with
-   either ACCORNS or SCUIRREL argument
+1. Run the [generate_publishing_dir.py](../publish/generate_publishing_dir.py) script
+   with either ACCORNS or SCUIRREL argument
 
 ```
 python generate_publishing_dir.py ACCORNS
@@ -138,3 +133,11 @@ To fix this, log into the server and set the following environment variables:
   in case your default organization does not match the one used by the API key)
 
 6. Reload your apps / restart the server to apply the changes
+
+## Monitoring the apps
+
+By accessing the accorns database, you can monitor the usage of the SCUIRREL and ACCORNS
+apps. The most useful table for this purpose is 'sessions' table, which logs whenever
+someone starts / ends a session. The error column will also record any session that
+ended because of an app crash, with a traceback of the error for debugging purposes
+(though these should also be logged by PositConnect / Shiny Server).

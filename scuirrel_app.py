@@ -13,6 +13,7 @@ import SCUIRREL.scuirrel_shared as scuirrel_shared
 import os
 from html import escape
 import json
+import traceback
 
 # Shiny
 from shiny import reactive
@@ -176,12 +177,20 @@ def theEnd():
         cursor = conn.cursor()
         # Log current discussion
         scuirrel_shared.endDiscussion(cursor, dID, msg)
-        # Register the end of the session
-        _ = shared.executeQuery(
-            cursor, 'UPDATE "session" SET "end" = ? WHERE "sID" = ?', (shared.dt(), sID)
-        )
+        # Register the end of the session and if an error occurred, log it
+        errMsg = traceback.format_exc().strip()
+        
+        if errMsg == 'NoneType: None':            
+            _ = shared.executeQuery(
+                cursor, 'UPDATE "session" SET "end" = ? WHERE "sID" = ?', (shared.dt(), sID)
+            )
+        else:
+            _ = shared.executeQuery(
+                cursor, 'UPDATE "session" SET "end" = ?, "error" = ? WHERE "sID" = ?', (shared.dt(), errMsg, sID)
+            )
+        
         conn.commit()
-        conn.close()
+        conn.close()       
 
 
 @reactive.effect
@@ -260,7 +269,7 @@ def _():
     # Ignore empty chat
     if (newChat == "") | (newChat.isspace()):
         return
-
+    
     # Prevent new chat whilst LLM is working and show waiting message
     elementDisplay("waitResp", "s")
     elementDisplay("chatIn", "h")

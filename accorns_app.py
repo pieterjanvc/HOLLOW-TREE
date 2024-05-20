@@ -14,6 +14,7 @@ import os
 import pandas as pd
 import json
 import warnings
+import traceback
 
 # -- Llamaindex
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate
@@ -131,31 +132,35 @@ with ui.navset_pill(id="tab"):
                     ),
                 )
             # Table of concepts per topic with option to add, edit or archive
-            with ui.card():
-                ui.card_header("Concepts related to the topic")
+            with ui.panel_conditional("input.tID"):
+                with ui.card():
+                    ui.card_header("Concepts related to the topic")
 
-                @render.data_frame
-                def conceptsTable():
-                    return render.DataTable(
-                        concepts.get()[["concept"]],
-                        width="100%",
-                        selection_mode="row",
+                    @render.data_frame
+                    def conceptsTable():
+                        if concepts.get() is None:
+                            return
+                        return render.DataTable(
+                            concepts.get()[["concept"]],
+                            width="100%",
+                            selection_mode="row",
+                        )
+
+                    div(
+                        ui.input_action_button("cAdd", "Add new", width="180px"),
+                        ui.input_action_button("cEdit", "Edit selected", width="180px"),
+                        ui.input_action_button(
+                            "cArchive", "Archive selected", width="180px"
+                        ),
+                        style="display:inline",
                     )
-
-                div(
-                    ui.input_action_button("cAdd", "Add new", width="180px"),
-                    ui.input_action_button("cEdit", "Edit selected", width="180px"),
-                    ui.input_action_button(
-                        "cArchive", "Archive selected", width="180px"
-                    ),
-                    style="display:inline",
-                )
-                HTML(
-                    "<i>Concepts are specific facts or pieces of information you want SCUIRREL to check with your students. "
-                    "You can be very brief, as all context will be retrieved from the database of documents. "
-                    "Don't be too broad, split into multiple topics if needed. "
-                    "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"
-                )
+                    HTML(
+                        "<i>Concepts are specific facts or pieces of information you want SCUIRREL to check with your students. "
+                        "You can be very brief, as all context will be retrieved from the database of documents. "
+                        "Don't be too broad, split into multiple topics if needed. "
+                        "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"
+                    )
+            
     # TAB 3 - QUIZ QUESTIONS
     with ui.nav_panel("Quiz Questions", value="qTab"):
         # Select a topic and a question with options to add or archive
@@ -306,9 +311,17 @@ def theEnd():
         sID = sessionID.get()
         conn = shared.appDBConn(accorns_shared.postgresUser)
         cursor = conn.cursor()
-        _ = shared.executeQuery(
-            cursor, 'UPDATE "session" SET "end" = ? WHERE "sID" = ?', (shared.dt(), sID)
-        )
+         # Register the end of the session and if an error occurred, log it
+        errMsg = traceback.format_exc().strip()
+        
+        if errMsg == 'NoneType: None':            
+            _ = shared.executeQuery(
+                cursor, 'UPDATE "session" SET "end" = ? WHERE "sID" = ?', (shared.dt(), sID)
+            )
+        else:
+            _ = shared.executeQuery(
+                cursor, 'UPDATE "session" SET "end" = ?, "error" = ? WHERE "sID" = ?', (shared.dt(), errMsg, sID)
+            )
         conn.commit()
         conn.close()
 
@@ -684,7 +697,8 @@ def _():
 @reactive.extended_task
 async def updateVectorDB(newFile, vectorDB, storageFolder, newFileName):
     print("Start adding file...")
-    return accorns_shared.addFileToDB(newFile, vectorDB, storageFolder, newFileName)
+    return accorns_shared.addFileToDB(newFile = newFile, vectorDB = vectorDB, 
+                                      storageFolder = storageFolder, newFileName = newFileName)
 
 
 @reactive.effect

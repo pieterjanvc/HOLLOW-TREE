@@ -2,6 +2,10 @@
 
 ## **H**arnessing **O**nline **L**earning with **L**LM **O**riented **W**eb-apps for **T**eaching, **R**esearch, **E**valuation, and **E**ngagement
 
+Some actually imporant acronyms
+- LLM: Large Language Model
+
+
 This project aims to explore the use of large language models (LLMS, e.g. ChatGPT) in
 the higher-education classroom by providing students a way of checking their knowledge
 on specific topics by interacting with a chatbot that has been configured and scoped by

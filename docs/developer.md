@@ -13,7 +13,7 @@ libraries:
   increasing query accuracy
 - The [Shiny framework](https://shiny.posit.co/py/) is used for generating the apps' UI
   and Server components (Shiny Express syntax is used)
-- For a list of all other dependencies, see the [requirements.txt](./requirements.txt)
+- For a list of all other dependencies, see the [requirements.txt](../requirements.txt)
   file
 
 ## Accessing Large Language Models (LLM) in Python
@@ -60,7 +60,8 @@ data for the apps:
 - Local PostgreSQL server: [Install PostgreSQL](https://www.postgresql.org/) on your
   machine and create the necessary databases using the
   [appDB_postgres_init.bat](../ACCORNS/appDB/appDB_postgres_init.bat) script on Windows
-  (Linux/Mac users can run the commands in the script manually for now)
+  or the [appDB_postgres_init.sh](../ACCORNS/appDB/appDB_postgres_init.sh) script on
+  Linux / MacOS
 - Remote PostgreSQL server: Set up a remote PostgreSQL server and configure the
   connection details in the [shared/shared_config.py](../shared/shared_config.toml) file
 - In either case, you will need to set `remoteAppDB = "True"` in the
@@ -110,7 +111,7 @@ The ACCORNS, SCUIRREL, and shared folders all have a similar structure:
 
 Note that this file structure only works for _local development_. When deploying the
 apps, separate folders for each app need to be created containing all the necessary
-files inside it. For more details, see the [IT admin guide](docs/extra/ITadmin.md)
+files inside it. For more details, see the [IT admin guide](ITadmin.md)
 
 ## Notes on specific coding implementations
 

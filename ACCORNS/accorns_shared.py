@@ -40,8 +40,7 @@ with open(os.path.join(curDir, "accorns_config.toml"), "r") as f:
     config = toml.load(f)
 
 addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
-tempFolder = os.path.join(config["localStorage"]["tempFolder"], "")
-storageFolder = os.path.join(config["localStorage"]["storageFolder"], "")
+storageFolder = os.path.join(os.path.normpath(config["localStorage"]["storageFolder"]), "")
 demoFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
 
 # ----------- FUNCTIONS -----------
@@ -96,12 +95,8 @@ def addFileToDB(
     # In case the file is a URL download it first
     isURL = False
     if newFile.startswith("http://") or newFile.startswith("https://"):
-        if not os.path.exists(tempFolder):
-            os.makedirs(tempFolder)
-
         isURL = True
-        urlretrieve(newFile, tempFolder + os.path.basename(newFile))
-        newFile = tempFolder + os.path.basename(newFile)
+        newFile = urlretrieve(newFile)[0]
 
     if not os.path.exists(newFile):
         raise ConnectionError(f"The newFile was not found at {newFile}")
@@ -245,7 +240,7 @@ def addFileToDB(
     return (0, "Completed")
 
 
-# Add demo file if needed
+# Add demo file to vector DB if in settings
 conn = shared.vectorDBConn(postgresUser)
 cursor = conn.cursor()
 
@@ -256,22 +251,28 @@ else:
         "SELECT * FROM information_schema.tables WHERE table_name ='keyword';"
     )
 
-newDB = True if cursor.fetchone() is None else False
+newVectorDB = True if cursor.fetchone() is None else False
 conn.close()
 
-if newDB & addDemo:
+if newVectorDB & addDemo:
     addFileToDB(demoFile, shared.vectorDB)
 
-    if shared.remoteAppDB:
-        conn = shared.appDBConn(postgresUser)
-        cursor = conn.cursor()
+# Add demo topic / concepts to accorns if in settings
+conn = shared.appDBConn(postgresUser)
+cursor = conn.cursor()
+cursor.execute('SELECT * FROM topic LIMIT 1')
+newAppDB = True if cursor.fetchone() is None else False
 
-        with open(os.path.join(appDBDir, "appDB_postgres_demo.sql"), "r") as file:
-            query = file.read()
+# Adding to duckDB is handled in the createSQLiteAppDB function
+if newAppDB & addDemo & shared.remoteAppDB:
 
-        _ = cursor.execute(query)
-        conn.commit()
-        conn.close()
+    with open(os.path.join(appDBDir, "appDB_postgres_demo.sql"), "r") as file:
+        query = file.read()
+
+    _ = cursor.execute(query)
+
+conn.commit()
+conn.close()
 
 # Load the vector index from storage
 if shared.remoteAppDB:
@@ -286,6 +287,7 @@ if shared.remoteAppDB:
     )
 else:
     vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
+
 index = VectorStoreIndex.from_vector_store(vector_store)
 
 
