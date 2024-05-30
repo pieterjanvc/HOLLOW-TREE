@@ -15,6 +15,7 @@ import json
 from shutil import move
 import toml
 from urllib.request import urlretrieve
+from tempfile import TemporaryDirectory
 
 # -- Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
@@ -96,7 +97,15 @@ def addFileToDB(
     isURL = False
     if newFile.startswith("http://") or newFile.startswith("https://"):
         isURL = True
-        newFile = urlretrieve(newFile)[0]
+        newFileName = os.path.basename(newFile)
+        _, ext = os.path.splitext('newFile')
+
+        if ext not in [".pdf", ".docx", ".txt", "pptx", ".md", ".epub", ".ipynb", ".ppt"]:
+            return (2, "Not a valid file")
+        
+        tempDir = TemporaryDirectory()
+        newFileName = os.path.join(tempDir.name, "") + newFileName
+        newFile = urlretrieve(newFile, newFileName)[0]
 
     if not os.path.exists(newFile):
         raise ConnectionError(f"The newFile was not found at {newFile}")

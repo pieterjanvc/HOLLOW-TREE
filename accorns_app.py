@@ -704,11 +704,14 @@ async def updateVectorDB(newFile, vectorDB, storageFolder, newFileName):
 @reactive.effect
 def _():
     insertionResult = updateVectorDB.result()[0]
-    msg = (
-        "File succesfully added to the vector database"
-        if insertionResult == 0
-        else "A file with the same name already exists. Skipping upload"
-    )
+    
+    if insertionResult == 0:
+        msg = "File successfully added to the vector database"
+    elif insertionResult == 1:
+        msg = "A file with the same name already exists. Skipping upload"
+    else:
+        msg = "Not a valid file type. Please upload a .csv, .pdf, .docx, .txt, .md, .epub, .ipynb, .ppt or .pptx file"
+
     ui.modal_show(ui.modal(msg, title="Success" if insertionResult == 0 else "Issue"))
 
     conn = shared.vectorDBConn(accorns_shared.postgresUser)
