@@ -61,6 +61,7 @@ shiny run --reload --launch-browser accorns_app.py
 ```
 
 _Note: If you get a PostgreSQL connection error, make sure to set
+
 `remoteAppDB = "False"` in [shared/shared_config.py](../../shared/shared_config.toml)_
 
 5. To deactivate the virtual environment run
