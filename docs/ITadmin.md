@@ -13,13 +13,17 @@ library for Python. This means the apps were created and run in Python, but the
 front-end is automatically built using HTML, CSS and JavaScript. The apps are designed
 to be run in a web browser and can be accessed from any device with a web browser.
 
-Python version 3.9 or higher is required to run the apps and the list of all Python
-dependencies can be found in the [requirements.txt](../requirements.txt) file.
+### Shiny Setup
+
+- Python version 3.9 or higher (developed with 3.11)
+- A list of all dependencies can be found in the [requirements.txt](../requirements.txt)
+  file.
 
 ## PostgreSQL
 
-There are two PostgreSQL databases that store all data for the SCUIRREL and ACCORNS
-applications and two users (accorns and scuirrel) that will access the DB from the apps.
+Two PostgreSQL databases are needed to store all data for the SCUIRREL and ACCORNS
+applications and two users (accorns and scuirrel) will access the DB from within the
+apps.
 
 - ACCORNS database (accorns): This relational database stores all the data that is used
   to run, monitor and manage the SCUIRREL apps (read-write).
@@ -28,36 +32,15 @@ applications and two users (accorns and scuirrel) that will access the DB from t
   conversation and by ACCORNS to generate quiz questions (read-only).
 
 _NOTE: Developers or people wanting to run the apps locally can use an SQLite database
-(accorns) and DuckDB (vector_db) instead, omitting the need to setup a (local)
-PostgreSQL instance. The schema for both PostgreSQL or file-based databases is
-identical. For more information details, please refer to the
-[developer guide](developer.md). Note that trying to deploy the apps using file based
-databases will likely fail as the they need to be shared between the apps and handle
-concurrent reading / writing._
+(accorns) and DuckDB (vector_db) instead, omitting the need to setup a PostgreSQL
+instance. For more details, please refer to the [developer guide](developer.md). Note
+that trying to deploy the apps using file based databases will likely fail as the they
+need to be shared between the apps and handle concurrent reading / writing._
 
-### Setup
+### PostgreSQL Setup
 
-Both PostgreSQL databases are accessed by the scuirrel and accorns users. These users
-are created automatically when running the script for the first time, but the passwords
-need to be present as environment variables in order for this to work (not hard-coded).
-
-- POSTGRES_PASS_SCUIRREL this environment variable should be set to the password for the
-  scuirrel user
-- POSTGRES_PASS_ACCORNS this environment variable should be set to the password for the
-  accorns user
-
-_NOTE: these environment variables should also be accessible in the environment where
-the apps are run (details at the end)_
-
-To create the databases:
-
-- Host a PostgreSQL server (or use one like Amazon RDS, Google Cloud SQL, etc.)
-- Install the [pgvector](https://github.com/pgvector/pgvector) extension (many cloud
-  services have this pre-installed).
-- On Windows, you can run the
-  [appDB_postgres_init.bat](../ACCORNS/appDB/appDB_postgres_init.bat) file to create and
-  setup the databases. On Linux / MacOS, you can run
-  [appDB_postgres_init.sh](../ACCORNS/appDB/appDB_postgres_init.sh)
+See the [PostgreSQL setup guide](extra/postgres_setup.md) for more details on how to
+setup the PostgreSQL databases on a remote server and connect them to the apps.
 
 ## Posit Connect / Shiny Server
 
@@ -81,30 +64,32 @@ The Git repository file structure is setup to build and test the apps locally. I
 to deploy the apps to a server, separate folders for each app (SCUIRREL and ACCORNS)
 should be generated using the following steps:
 
-1. Run the [generate_publishing_dir.py](../publish/generate_publishing_dir.py) script
-   with either ACCORNS or SCUIRREL argument
+### 1. Run the [generate_publishing_dir.py](../publish/generate_publishing_dir.py) script
 
-```
+You can set the first argument to `ACCORNS` or `SCUIRREL` to generate the respective
+deployment folder
+
+```bash
 python generate_publishing_dir.py ACCORNS
 python generate_publishing_dir.py SCUIRREL
 ```
 
-This will generate or overwrite a SCUIRREL / ACCORNS folder in the publish directory
+_This will generate or overwrite the SCUIRREL / ACCORNS folder in the publish directory_
 
-2. Make sure to check shared_config.toml file
+### 2. Check the shared_config.toml file in publishing folder
 
-   - remoteAppDB should be set to True to ensure PostgreSQL is used
-   - The postgres host / port should be set to match your PostgreSQL server
-   - Other settings in the shared_config.toml, accorns_config.toml and
-     scuirrel_config.toml files should be set to match your preferred setup (details in
-     the [developer guide](developer.md))
+- remoteAppDB should be set to True to ensure PostgreSQL is used
+- The postgres host / port should be set to match your PostgreSQL server
+- Other settings in the shared_config.toml, accorns_config.toml and scuirrel_config.toml
+  files should be set to match your preferred setup (details in the
+  [developer guide](developer.md))
 
-3. (OPTION 1) Publish the app with Posit Connect
+### 3. (OPTION 1) Publish the app with Posit Connect
 
 Navigate to the publish/SCUIRREL or publish/ACCORNS folder and run the following
 command:
 
-```
+```bash
 rsconnect deploy shiny --server <server URL> --api-key <API key> ./
 ```
 
@@ -113,7 +98,7 @@ dependencies.
 
 For more info visit https://docs.posit.co/connect/admin/
 
-4. (OPTION 2) Deploy the app to a Shiny server.
+### 3. (OPTION 2) Deploy the app to a Shiny server.
 
 This is done manually by copying the contents of the SCUIRREL or ACCORNS folder to the
 correct location on the server. The server should be configured to run Python Shiny apps
@@ -121,10 +106,13 @@ and have the necessary dependencies installed.
 
 For more info visit https://rstudio.github.io/shiny-server/os/latest/
 
-5. Setup the necessary environment variables
+### 4. Setup the necessary remote environment variables
 
-The first deployment of the apps will fail as the environment variables are not set yet.
-To fix this, log into the server and set the following environment variables:
+NOTE: On Posit Connect you can add environment variables _after_ the apps are deployed
+in the online app's settings page. This means that the first deployment of the apps will
+fail as the environment variables are not set yet.
+
+The following environment variables need to be accessible by _both_ apps on the server:
 
 - POSTGRES_PASS_SCUIRREL : The password for the scuirrel user
 - POSTGRES_PASS_ACCORNS : The password for the accorns user
@@ -132,7 +120,7 @@ To fix this, log into the server and set the following environment variables:
 - OPENAI_ORGANIZATION : The organization ID for accessing the OpenAI API (is this needed
   in case your default organization does not match the one used by the API key)
 
-6. Reload your apps / restart the server to apply the changes
+### 6. Reload your apps / restart the server to apply the changes
 
 ## Monitoring the apps
 
