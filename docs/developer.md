@@ -26,7 +26,9 @@ Python as environment variables with the following names:
 - OPENAI_API_KEY
 - OPENAI_ORGANIZATION
 
-They will be accessed in the code like this
+_If you don't have an organization ID create an empty variable_
+
+The variables will be accessed in python like this:
 
 ```
 os.environ.get("OPENAI_API_KEY")
@@ -69,6 +71,16 @@ Below is an overview of the accorns database schema
 ![App DB Schema](https://drive.usercontent.google.com/download?id=1kOzuVdI-p1K5Ej6EaRh4dJZuxyCATCfT)
 
 _Alternatively, look for the SQL files in the ACCORNS [appDB folder](../ACCORNS/appDB/)_
+
+## Other settings
+
+The following setting are relevant to check before running the apps for the first time:
+
+- In the [accorns_config.toml](../ACCORNS/accorns_config.toml) file, set
+  `addDemo = "False"` if you want to start without the demo data
+- In the [accorns_config.toml](../ACCORNS/accorns_config.toml) file, set
+  `saveFileCopy = "True"` if you would like to keep a copy of each uploaded file. You
+  can also change the location where these files are saved
 
 ## Repo organization
 

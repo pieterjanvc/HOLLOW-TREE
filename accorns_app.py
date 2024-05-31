@@ -160,7 +160,7 @@ with ui.navset_pill(id="tab"):
                         "Don't be too broad, split into multiple topics if needed. "
                         "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"
                     )
-            
+
     # TAB 3 - QUIZ QUESTIONS
     with ui.nav_panel("Quiz Questions", value="qTab"):
         # Select a topic and a question with options to add or archive
@@ -311,16 +311,20 @@ def theEnd():
         sID = sessionID.get()
         conn = shared.appDBConn(accorns_shared.postgresUser)
         cursor = conn.cursor()
-         # Register the end of the session and if an error occurred, log it
+        # Register the end of the session and if an error occurred, log it
         errMsg = traceback.format_exc().strip()
-        
-        if errMsg == 'NoneType: None':            
+
+        if errMsg == "NoneType: None":
             _ = shared.executeQuery(
-                cursor, 'UPDATE "session" SET "end" = ? WHERE "sID" = ?', (shared.dt(), sID)
+                cursor,
+                'UPDATE "session" SET "end" = ? WHERE "sID" = ?',
+                (shared.dt(), sID),
             )
         else:
             _ = shared.executeQuery(
-                cursor, 'UPDATE "session" SET "end" = ?, "error" = ? WHERE "sID" = ?', (shared.dt(), errMsg, sID)
+                cursor,
+                'UPDATE "session" SET "end" = ?, "error" = ? WHERE "sID" = ?',
+                (shared.dt(), errMsg, sID),
             )
         conn.commit()
         conn.close()
@@ -697,14 +701,18 @@ def _():
 @reactive.extended_task
 async def updateVectorDB(newFile, vectorDB, storageFolder, newFileName):
     print("Start adding file...")
-    return accorns_shared.addFileToDB(newFile = newFile, vectorDB = vectorDB, 
-                                      storageFolder = storageFolder, newFileName = newFileName)
+    return accorns_shared.addFileToDB(
+        newFile=newFile,
+        vectorDB=vectorDB,
+        storageFolder=storageFolder,
+        newFileName=newFileName,
+    )
 
 
 @reactive.effect
 def _():
     insertionResult = updateVectorDB.result()[0]
-    
+
     if insertionResult == 0:
         msg = "File successfully added to the vector database"
     elif insertionResult == 1:
@@ -853,7 +861,9 @@ def _():
         f'(SELECT "cID", "concept" FROM "concept" WHERE "tID" = {input.qtID()} '
         f'UNION ALL SELECT "cID", \'\' as concept FROM "question" where "tID" = {input.qtID()}) GROUP BY "cID"',
     )
-    cID = int(conceptList[conceptList["n"] == min(conceptList["n"])].sample(1)["cID"])
+    cID = int(
+        conceptList[conceptList["n"] == min(conceptList["n"])].sample(1)["cID"].iloc[0]
+    )
     prevQuestions = shared.pandasQuery(
         conn,
         f'SELECT "question" FROM "question" WHERE "cID" = {cID} AND "archived" = 0',
