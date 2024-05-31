@@ -42,12 +42,16 @@ with open(os.path.join(curDir, "accorns_config.toml"), "r") as f:
 
 addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
 
-saveFileCopy = any(config["localStorage"]["saveFileCopy"] == x for x in ["True", "true", "T", 1])
+saveFileCopy = any(
+    config["localStorage"]["saveFileCopy"] == x for x in ["True", "true", "T", 1]
+)
 
 if not saveFileCopy:
     storageFolder = None
 else:
-    storageFolder = os.path.join(os.path.normpath(config["localStorage"]["storageFolder"]), "")
+    storageFolder = os.path.join(
+        os.path.normpath(config["localStorage"]["storageFolder"]), ""
+    )
 
 demoFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
 
@@ -107,9 +111,18 @@ def addFileToDB(
         newFileName = os.path.basename(newFile)
         _, ext = os.path.splitext(newFile)
 
-        if ext not in [".pdf", ".docx", ".txt", "pptx", ".md", ".epub", ".ipynb", ".ppt"]:
+        if ext not in [
+            ".pdf",
+            ".docx",
+            ".txt",
+            "pptx",
+            ".md",
+            ".epub",
+            ".ipynb",
+            ".ppt",
+        ]:
             return (2, "Not a valid file")
-        
+
         tempDir = TemporaryDirectory()
         newFileName = os.path.join(tempDir.name, "") + newFileName
         newFile = urlretrieve(newFile, newFileName)[0]
@@ -119,11 +132,11 @@ def addFileToDB(
 
     # Move the file to permanent storage if requested
     newFileName = os.path.basename(newFile) if newFileName is None else newFileName
-    
+
     if (storageFolder is not None) & (not isURL):
         if not os.path.exists(storageFolder):
             os.makedirs(storageFolder)
-        
+
         newFilePath = os.path.join(storageFolder, "") + newFileName
 
         if os.path.exists(newFilePath):
@@ -278,9 +291,11 @@ if newVectorDB and not addDemo:
     # Create a blank DuckDB vector database
     with open(os.path.join(appDBDir, "appDB_duckdb_vectordb.sql"), "r") as file:
         query = sql_split(file.read())
-        
+
         cursor = conn.cursor()
-        query.append('CREATE TABLE documents(node_id VARCHAR, "text" VARCHAR, embedding FLOAT[], metadata_ JSON);')
+        query.append(
+            'CREATE TABLE documents(node_id VARCHAR, "text" VARCHAR, embedding FLOAT[], metadata_ JSON);'
+        )
 
         for x in query:
             _ = cursor.execute(x)
@@ -295,12 +310,11 @@ if newVectorDB and addDemo:
 # Add demo topic / concepts to accorns if in settings
 conn = shared.appDBConn(postgresUser)
 cursor = conn.cursor()
-cursor.execute('SELECT * FROM topic LIMIT 1')
+cursor.execute("SELECT * FROM topic LIMIT 1")
 newAppDB = True if cursor.fetchone() is None else False
 
 # Adding to duckDB is handled in the createSQLiteAppDB function
 if newAppDB & addDemo & shared.remoteAppDB:
-
     with open(os.path.join(appDBDir, "appDB_postgres_demo.sql"), "r") as file:
         query = file.read()
 
@@ -324,6 +338,7 @@ else:
     vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
 
 index = VectorStoreIndex.from_vector_store(vector_store)
+
 
 def backupQuery(
     cursor, sID, table, rowID, attribute, isBot=None, timeStamp=shared.dt()
