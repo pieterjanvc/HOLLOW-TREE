@@ -13,14 +13,14 @@ libraries:
   increasing query accuracy
 - The [Shiny framework](https://shiny.posit.co/py/) is used for generating the apps' UI
   and Server components (Shiny Express syntax is used)
-- For a list of all other dependencies, see the [requirements.txt](./requirements.txt)
+- For a list of all other dependencies, see the [requirements.txt](../requirements.txt)
   file
 
 ## Accessing Large Language Models (LLM) in Python
 
 The app is currently configured to run with OpenAI's GPT models. This requires your own
 active [OPENAI API key](https://openai.com/index/openai-api/). If your are part of an
-organization, you will also need the organization ID. Make sure both are available to
+organization, you will also need the organization ID. Make sure both are accessible in
 Python as environment variables with the following names:
 
 - OPENAI_API_KEY
@@ -42,32 +42,27 @@ the repository or hardcoding them anywhere in the code is a serious security ris
 
 ## App databases
 
-In you local development environment, you have two options for storing an accessing the
-data for the apps:
+In your local development environment, you have two options for storing an accessing the
+data for the apps, file based database or a (local) PostgreSQL server. Note that once
+you deploy apps you need a remote PostgreSQL server.
 
-1. **File-based storage**: SQLite / DuckDB databases will be created in the appDB folder
-   by default.
+### OPTION 1: File-based storage
 
+_This is the easiest way to set up the repo as everything is created automatically the
+first time you run the ACCORNS app._
+
+- Make sure the `remoteAppDB = "False"` in the
+  [shared/shared_config.py](../shared/shared_config.toml) file
+- The databases will be created in the appDB folder by default (location can be changed
+  in the [shared/shared_config.py](../shared/shared_config.toml) file
 - SQLite is used for storing the ACCORNS / SCUIRREL app data and logs
 - DuckDB is used for storing the vectors used for the LLM retrieval augmented generation
-- Both databases are created via the python scripts and do not require any additional
-  setup
 
-2. **PostgreSQL server**: This will be needed once you want to deploy the app to a
-   server as it ensures correct handling of concurrent requests and data consistency.
-   For local development, you can set up PostgreSQL databases in two ways:
+### OPTION 2: PostgreSQL server:
 
-- Local PostgreSQL server: [Install PostgreSQL](https://www.postgresql.org/) on your
-  machine and create the necessary databases using the
-  [appDB_postgres_init.bat](../ACCORNS/appDB/appDB_postgres_init.bat) script on Windows
-  (Linux/Mac users can run the commands in the script manually for now)
-- Remote PostgreSQL server: Set up a remote PostgreSQL server and configure the
-  connection details in the [shared/shared_config.py](../shared/shared_config.toml) file
-- In either case, you will need to set `remoteAppDB = "True"` in the
-  [shared/shared_config.py](../shared/shared_config.toml) file and **make sure the
-  following environment variables are set**:
-  - POSTGRES_PASS_SCUIRREL : The password for the scuirrel user
-  - POSTGRES_PASS_ACCORNS : The password for the accorns user
+_PostgreSQL needs additional setup and configuration before you can use it in the apps_
+
+See the [PostgreSQL setup guide](extra/postgres_setup.md) for more details
 
 Below is an overview of the accorns database schema
 
@@ -110,7 +105,7 @@ The ACCORNS, SCUIRREL, and shared folders all have a similar structure:
 
 Note that this file structure only works for _local development_. When deploying the
 apps, separate folders for each app need to be created containing all the necessary
-files inside it. For more details, see the [IT admin guide](docs/extra/ITadmin.md)
+files inside it. For more details, see the [IT admin guide](ITadmin.md)
 
 ## Notes on specific coding implementations
 

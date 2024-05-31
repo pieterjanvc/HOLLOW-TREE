@@ -5,7 +5,8 @@ instructor-facing backend application to SCUIRREL. Here you can set-up, manage a
 monitor SCUIRREL and the students' interactions with it.
 
 _If you are looking for more details on how to analyse the data collected by SCUIRREL or
-ACCORNS, please read the [researcher guide](docs/researcher.md)_
+
+ACCORNS, please read the [researcher guide](researcher.md)_
 
 ## Uploading relevant course materials
 
@@ -72,7 +73,8 @@ _Given this is a more summative type of assessment we opted to have the instruct
 validate each question instead of having the LLM directly generate them for the student.
 This is also useful from a monitoring / research perspective to compare the conversation
 with SCUIRREL to the performance on the quiz questions. For more info, we refer to the
-[researcher documentation](docs/researcher.md)_
+
+[researcher documentation](researcher.md)_
 
 _This project was designed to help student gauge their background on this topic before
 they come into class, or revisit it after class. For this reason, we do not recommend

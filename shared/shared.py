@@ -31,8 +31,8 @@ remoteAppDB = any(
 )
 postgresHost = config["postgres"]["host"]
 postgresPort = int(config["postgres"]["port"])
-vectorDB = config["localStorage"]["duckDB"]
-sqliteDB = config["localStorage"]["sqliteDB"]
+vectorDB = os.path.normpath(config["localStorage"]["duckDB"])
+sqliteDB = os.path.normpath(config["localStorage"]["sqliteDB"])
 postgresUser = None  # Each app will set this variable to the correct user
 
 # Create the parent directory for the sqliteDB if it does not exist

@@ -6,13 +6,14 @@
 @REM Make sure POSTGRES_PASS_SCUIRREL and POSTGRES_PASS_ACCORNS are set as an environment variables
 @REM which will be used as the password for the 'scuirrel' and 'accorns' app to access the databases
 
-@REM VARIABLES TO SET BEFORE RUNNING
+@REM ----- VARIABLES TO SET BEFORE RUNNING -----
 @REM Note that if postgres bin is not in the PATH to put in the full path
 SET "postgresAdmin=postgres"
 SET "postgresBin=psql"
 @REM Create "accorns" or "vector_db" or "both"
 SET "toCreate=both" 
 SET "overWrite=True"
+@REM -------------------------------------------
 
 SET "appDBFolder=%~dp0"
 SET "sqlAccorns=%appDBFolder%\appDB_postgres_accorns.sql" 
