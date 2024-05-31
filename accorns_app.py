@@ -853,7 +853,7 @@ def _():
         f'(SELECT "cID", "concept" FROM "concept" WHERE "tID" = {input.qtID()} '
         f'UNION ALL SELECT "cID", \'\' as concept FROM "question" where "tID" = {input.qtID()}) GROUP BY "cID"',
     )
-    cID = int(conceptList[conceptList["n"] == min(conceptList["n"])].sample(1)["cID"])
+    cID = int(conceptList[conceptList["n"] == min(conceptList["n"])].sample(1)["cID"].iloc[0])
     prevQuestions = shared.pandasQuery(
         conn,
         f'SELECT "question" FROM "question" WHERE "cID" = {cID} AND "archived" = 0',

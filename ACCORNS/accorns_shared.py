@@ -41,7 +41,14 @@ with open(os.path.join(curDir, "accorns_config.toml"), "r") as f:
     config = toml.load(f)
 
 addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
-storageFolder = os.path.join(os.path.normpath(config["localStorage"]["storageFolder"]), "")
+
+saveFileCopy = any(config["localStorage"]["saveFileCopy"] == x for x in ["True", "true", "T", 1])
+
+if not saveFileCopy:
+    storageFolder = None
+else:
+    storageFolder = os.path.join(os.path.normpath(config["localStorage"]["storageFolder"]), "")
+
 demoFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
 
 # ----------- FUNCTIONS -----------
@@ -98,7 +105,7 @@ def addFileToDB(
     if newFile.startswith("http://") or newFile.startswith("https://"):
         isURL = True
         newFileName = os.path.basename(newFile)
-        _, ext = os.path.splitext('newFile')
+        _, ext = os.path.splitext(newFile)
 
         if ext not in [".pdf", ".docx", ".txt", "pptx", ".md", ".epub", ".ipynb", ".ppt"]:
             return (2, "Not a valid file")
@@ -111,16 +118,21 @@ def addFileToDB(
         raise ConnectionError(f"The newFile was not found at {newFile}")
 
     # Move the file to permanent storage if requested
+    newFileName = os.path.basename(newFile) if newFileName is None else newFileName
+    
     if (storageFolder is not None) & (not isURL):
         if not os.path.exists(storageFolder):
             os.makedirs(storageFolder)
-
-        newFileName = os.path.basename(newFile) if newFileName is None else newFileName
+        
         newFilePath = os.path.join(storageFolder, "") + newFileName
 
         if os.path.exists(newFilePath):
             return (1, "A file with this name already exists. Skipping")
 
+        move(newFile, newFilePath)
+        newFile = newFilePath
+    elif not isURL:
+        newFilePath = os.path.join(os.path.dirname(newFile), newFileName)
         move(newFile, newFilePath)
         newFile = newFilePath
 
@@ -183,7 +195,7 @@ def addFileToDB(
         conn.close()
 
     # Get the metadata out of the DB excerpt_keywords document_title
-    fileName = newData[0].metadata["file_name"]
+    fileName = os.path.basename(newFileName)
     # vectorDB = "appData/vectorstore.duckdb"
     if remoteAppDB:
         conn = shared.vectorDBConn(postgresUser)
@@ -261,9 +273,23 @@ else:
     )
 
 newVectorDB = True if cursor.fetchone() is None else False
+
+if newVectorDB and not addDemo:
+    # Create a blank DuckDB vector database
+    with open(os.path.join(appDBDir, "appDB_duckdb_vectordb.sql"), "r") as file:
+        query = sql_split(file.read())
+        
+        cursor = conn.cursor()
+        query.append('CREATE TABLE documents(node_id VARCHAR, "text" VARCHAR, embedding FLOAT[], metadata_ JSON);')
+
+        for x in query:
+            _ = cursor.execute(x)
+
+        cursor.commit()
+
 conn.close()
 
-if newVectorDB & addDemo:
+if newVectorDB and addDemo:
     addFileToDB(demoFile, shared.vectorDB)
 
 # Add demo topic / concepts to accorns if in settings
@@ -298,7 +324,6 @@ else:
     vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
 
 index = VectorStoreIndex.from_vector_store(vector_store)
-
 
 def backupQuery(
     cursor, sID, table, rowID, attribute, isBot=None, timeStamp=shared.dt()
