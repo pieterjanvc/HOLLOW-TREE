@@ -1,7 +1,7 @@
 # PostgreSQL Setup Guide
 
 Set `remoteAppDB = "True"` in the
-[shared/shared_config.py](../shared/shared_config.toml) file and update any other
+[shared/shared_config.py](../../shared/shared_config.toml) file and update any other
 necessary configuration settings.
 
 ## Local PostgreSQL server _(local development only)_
@@ -17,9 +17,9 @@ necessary configuration settings.
   - If the `psql` command is not in your PATH or the default PostgreSQL superuser
     account is not `postgres`, you need to edit the variables at the top of the init
     scripts before running them
-  - Windows: Run the [appDB_postgres_init.bat](../ACCORNS/appDB/appDB_postgres_init.bat)
+  - Windows: Run the [appDB_postgres_init.bat](../../ACCORNS/appDB/appDB_postgres_init.bat)
     script
-  - Linux / MacOS: [appDB_postgres_init.sh](../ACCORNS/appDB/appDB_postgres_init.sh)
+  - Linux / MacOS: [appDB_postgres_init.sh](../../ACCORNS/appDB/appDB_postgres_init.sh)
     script on
 
 ## Remote PostgreSQL server _(production deployment)_
@@ -36,13 +36,13 @@ necessary configuration settings.
   - If the `psql` command is not in your PATH or the default PostgreSQL superuser
     account is not `postgres`, you need to edit the variables at the top of the init
     scripts before running them
-  - Windows: Run the [appDB_postgres_init.bat](../ACCORNS/appDB/appDB_postgres_init.bat)
+  - Windows: Run the [appDB_postgres_init.bat](../../ACCORNS/appDB/appDB_postgres_init.bat)
     script
-  - Linux / MacOS: [appDB_postgres_init.sh](../ACCORNS/appDB/appDB_postgres_init.sh)
+  - Linux / MacOS: [appDB_postgres_init.sh](../../ACCORNS/appDB/appDB_postgres_init.sh)
     script on
 - Test if the server is accessible from your local machine
 - Update the connection details in the
-  [shared/shared_config.py](../shared/shared_config.toml) file
+  [shared/shared_config.py](../../shared/shared_config.toml) file
 - Create the following environment variables on your deployment server (or Posit Connect
   app):
   - POSTGRES_PASS_SCUIRREL
@@ -53,8 +53,8 @@ necessary configuration settings.
 
 In case you are not able to run the init scripts, you can manually create the databases
 by copying the SQL commands from the following scripts:
-- [appDB_postgres_accorns.sql](../ACCORNS/appDB/appDB_postgres_accorns.sql)
-- [appDB_postgres_vectors.sql](../ACCORNS/appDB/appDB_postgres_vectors.sql)
+- [appDB_postgres_accorns.sql](../../ACCORNS/appDB/appDB_postgres_accorns.sql)
+- [appDB_postgres_vectordb.sql](../../ACCORNS/appDB/appDB_postgres_vectordb.sql)
 - Note that you will have to replace the following SQL variables with actual values:
     - :'scuirrelPass' -> the password for the SCUIRREL user
     - :'accornsPass' -> the password for the ACCORNS user
