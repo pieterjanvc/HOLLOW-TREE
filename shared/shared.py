@@ -29,6 +29,10 @@ with open(os.path.join(curDir, "shared_config.toml"), "r") as f:
 remoteAppDB = any(
     config["general"]["remoteAppDB"] == x for x in ["True", "true", "T", 1]
 )
+addDemo = any(
+    config["general"]["addDemo"] == x for x in ["True", "true", "T", 1]
+)
+demoFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
 postgresHost = config["postgres"]["host"]
 postgresPort = int(config["postgres"]["port"])
 vectorDB = os.path.normpath(config["localStorage"]["duckDB"])

@@ -10,6 +10,7 @@ from shared import shared
 # -- General
 import os
 import sqlite3
+import duckdb
 from sqlparse import split as sql_split
 import json
 from shutil import move
@@ -40,8 +41,6 @@ appDBDir = os.path.join(curDir, "appDB")
 with open(os.path.join(curDir, "accorns_config.toml"), "r") as f:
     config = toml.load(f)
 
-addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
-
 saveFileCopy = any(
     config["localStorage"]["saveFileCopy"] == x for x in ["True", "true", "T", 1]
 )
@@ -53,19 +52,16 @@ else:
         os.path.normpath(config["localStorage"]["storageFolder"]), ""
     )
 
-demoFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
-
 # ----------- FUNCTIONS -----------
 # *********************************
 
-
 # Database to store app data (this is not the vector database!)
-def createSQLiteAppDB(DBpath, addDemo=False):
+def createLocalAccornsDB(DBpath, sqlFile):
     if os.path.exists(DBpath):
-        return (2, "Database already exists. Skipping")
+        return (1, "Accorns database already exists. Skipping")
 
     # Create a new database from the SQL file
-    with open(os.path.join(appDBDir, "appDB_sqlite_accorns.sql"), "r") as file:
+    with open(sqlFile, "r") as file:
         query = file.read().replace("\n", " ").replace("\t", "").split(";")
 
     conn = sqlite3.connect(DBpath)
@@ -73,28 +69,37 @@ def createSQLiteAppDB(DBpath, addDemo=False):
 
     for x in query:
         _ = cursor.execute(x)
-
-    if not addDemo:
-        conn.commit()
-        conn.close()
-        return (0, "DB created - No demo added")
-
-    with open(os.path.join(appDBDir, "appDB_sqlite_demo.sql"), "r") as file:
-        query = sql_split(file.read())
-
-    for x in query:
-        _ = cursor.execute(x)
-
+    
     conn.commit()
     conn.close()
+    return (0, "Accorns database created")
 
-    return (1, "DB created - Demo added")
+def createLocalVectorDB(DBpath, sqlFile):
+    conn = duckdb.connect(DBpath)
+    cursor = conn.cursor()
+    # Check if the documents, file and keyword tables exist
+    cursor.execute("SELECT count(*) FROM information_schema.tables WHERE table_name IN('documents', 'file', 'keyword');")
+    # Check there are three tables
+    if cursor.fetchone()[0] == 3:
+        conn.close()
+        return (1, "Vector database already exists. Skipping")
+    
+    with open(sqlFile, "r") as file:
+        query = sql_split(file.read())
+        
+        for x in query:
+            _ = cursor.execute(x)
+
+    cursor.commit()
+    conn.close()
+    
+    return (0, "Local DuckDB vector database created")
 
 
-# Make new app DB if needed
+# Generate local databases if needed
 if not (shared.remoteAppDB):
-    print(createSQLiteAppDB(shared.sqliteDB, addDemo=addDemo))
-
+    print(createLocalAccornsDB(shared.sqliteDB, os.path.join(appDBDir, "appDB_sqlite_accorns.sql")))
+    print(createLocalVectorDB(shared.vectorDB, os.path.join(appDBDir, "appDB_duckdb_vectordb.sql")))
 
 # Create vector database and add files
 def addFileToDB(
@@ -173,43 +178,17 @@ def addFileToDB(
         )
     else:
         # Add file to vector store https://docs.llamaindex.ai/en/stable/examples/vector_stores/DuckDBDemo/?h=duckdb
-        conn = shared.vectorDBConn(vectorDB=vectorDB)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT * FROM information_schema.tables WHERE table_name ='keyword';"
+        vector_store = DuckDBVectorStore.from_local(vectorDB)
+        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+        index = VectorStoreIndex.from_documents(
+            newData,
+            storage_context=storage_context,
+            transformations=[TitleExtractor(), KeywordExtractor()],
         )
-        if cursor.fetchone() is not None:
-            vector_store = DuckDBVectorStore.from_local(vectorDB)
-            storage_context = StorageContext.from_defaults(vector_store=vector_store)
-            index = VectorStoreIndex.from_documents(
-                newData,
-                storage_context=storage_context,
-                transformations=[TitleExtractor(), KeywordExtractor()],
-            )
-        else:
-            vector_store = DuckDBVectorStore(
-                os.path.basename(vectorDB), persist_dir=os.path.dirname(vectorDB)
-            )
-            storage_context = StorageContext.from_defaults(vector_store=vector_store)
-            index = VectorStoreIndex.from_documents(
-                newData,
-                storage_context=storage_context,
-                transformations=[TitleExtractor(), KeywordExtractor()],
-            )
-
-            with open(os.path.join(appDBDir, "appDB_duckdb_vectordb.sql"), "r") as file:
-                query = sql_split(file.read())
-
-            for x in query:
-                _ = cursor.execute(x)
-
-            cursor.commit()
-
-        conn.close()
 
     # Get the metadata out of the DB excerpt_keywords document_title
     fileName = os.path.basename(newFileName)
-    # vectorDB = "appData/vectorstore.duckdb"
+
     if remoteAppDB:
         conn = shared.vectorDBConn(postgresUser)
         cursor = conn.cursor()
@@ -273,55 +252,40 @@ def addFileToDB(
 
     return (0, "Completed")
 
+def addDemo():    
+    conn = shared.appDBConn(postgresUser)    
+    cursor = conn.cursor()    
+    
+    # Check if the demo has already been added  
+    cursor.execute("SELECT * FROM topic LIMIT 1")  
+    if cursor.fetchone() is not None:
+        return (1, "Demo already present")
+    
+    # Check if the conn is to duckdb or postgres
+    if "sqlite" in str(conn):
+                        
+            with open(os.path.join(appDBDir, "appDB_sqlite_demo.sql"), "r") as file:
+                query = sql_split(file.read())
 
-# Add demo file to vector DB if in settings
-conn = shared.vectorDBConn(postgresUser)
-cursor = conn.cursor()
+            for x in query:
+                _ = cursor.execute(x)
+                            
+    else:
+        with open(os.path.join(appDBDir, "appDB_postgres_demo.sql"), "r") as file:
+            query = file.read()
+            _ = cursor.execute(query)
+        
+    conn.commit()
+    conn.close()
+    
+    # Add the demo file to the vector database
+    addFileToDB(shared.demoFile, shared.vectorDB)
+    
+    return (0, "Demo added")
 
-if shared.remoteAppDB:
-    cursor.execute('SELECT * FROM "keyword" LIMIT 1')
-else:
-    cursor.execute(
-        "SELECT * FROM information_schema.tables WHERE table_name ='keyword';"
-    )
-
-newVectorDB = True if cursor.fetchone() is None else False
-
-if newVectorDB and not addDemo:
-    # Create a blank DuckDB vector database
-    with open(os.path.join(appDBDir, "appDB_duckdb_vectordb.sql"), "r") as file:
-        query = sql_split(file.read())
-
-        cursor = conn.cursor()
-        query.append(
-            'CREATE TABLE documents(node_id VARCHAR, "text" VARCHAR, embedding FLOAT[], metadata_ JSON);'
-        )
-
-        for x in query:
-            _ = cursor.execute(x)
-
-        cursor.commit()
-
-conn.close()
-
-if newVectorDB and addDemo:
-    addFileToDB(demoFile, shared.vectorDB)
-
-# Add demo topic / concepts to accorns if in settings
-conn = shared.appDBConn(postgresUser)
-cursor = conn.cursor()
-cursor.execute("SELECT * FROM topic LIMIT 1")
-newAppDB = True if cursor.fetchone() is None else False
-
-# Adding to duckDB is handled in the createSQLiteAppDB function
-if newAppDB & addDemo & shared.remoteAppDB:
-    with open(os.path.join(appDBDir, "appDB_postgres_demo.sql"), "r") as file:
-        query = file.read()
-
-    _ = cursor.execute(query)
-
-conn.commit()
-conn.close()
+# Add the demo to the database if requested
+if shared.addDemo:
+    print(addDemo()) 
 
 # Load the vector index from storage
 if shared.remoteAppDB:
