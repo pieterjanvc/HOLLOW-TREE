@@ -1,5 +1,6 @@
 [general]
-remoteAppDB = "True" # If True use postgres otherwise localStorage
+remoteAppDB = "False" # If True use postgres otherwise localStorage
+addDemo = "True"
 
 [localStorage]
 sqliteDB = "appData/accorns.db"

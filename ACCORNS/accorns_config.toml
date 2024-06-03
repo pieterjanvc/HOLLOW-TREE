@@ -1,6 +1,3 @@
-[general]
-addDemo = "True"
-
 [localStorage]
 saveFileCopy = "False"
 storageFolder = "appData/uploadedFiles"
