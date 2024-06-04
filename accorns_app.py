@@ -253,6 +253,7 @@ else:
     if shared.remoteAppDB:
         vectorStore = PGVectorStore.from_params(
             host=shared.postgresHost,
+            port=shared.postgresPort,
             user=accorns_shared.postgresUser,
             password=os.environ.get("POSTGRES_PASS_ACCORNS"),
             database="vector_db",
