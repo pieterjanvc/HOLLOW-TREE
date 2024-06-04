@@ -24,10 +24,29 @@ CREATE DATABASE accorns;
 CREATE TABLE "user" (
 	"uID" SERIAL PRIMARY KEY,
 	"username" TEXT UNIQUE,
-  "isAdmin" INTEGER DEFAULT 0,
+  "adminLevel" INTEGER DEFAULT 0,
   "email" TEXT,
   "created" TEXT,
   "modified" TEXT
+);
+
+CREATE TABLE "group" (
+  "gID" SERIAL PRIMARY KEY,
+  "name" TEXT,
+  "created" TEXT,
+  "modified" TEXT,
+  "description" TEXT
+)
+
+CREATE TABLE group_member(
+  "gmID" SERIAL PRIMARY KEY,
+  "uID" INTEGER,
+  "gID" INTEGER,
+  "isAdmin" INTEGER DEFAULT 0,
+  FOREIGN KEY("uID") REFERENCES "user"("uID") 
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("gID") REFERENCES "group"("gID") 
+    ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE "session" (
@@ -179,9 +198,9 @@ CREATE TABLE "feedback_chat_msg" (
 );
 
 -- INSERT BASE USER AND ADMIN
-INSERT INTO "user" ("username", "isAdmin", "created", "modified") 
+INSERT INTO "user" ("username", "adminLevel", "created", "modified") 
 VALUES ('anonymous', 0, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS')), 
-('admin', 1, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
+('admin', 2, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
 
 \c accorns;
 
