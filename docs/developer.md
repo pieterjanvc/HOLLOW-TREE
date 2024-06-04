@@ -76,7 +76,7 @@ _Alternatively, look for the SQL files in the ACCORNS [appDB folder](../ACCORNS/
 
 The following setting are relevant to check before running the apps for the first time:
 
-- In the [accorns_config.toml](../ACCORNS/accorns_config.toml) file, set
+- In the [shared_config.toml](../shared/shared_config.toml) file, set
   `addDemo = "False"` if you want to start without the demo data
 - In the [accorns_config.toml](../ACCORNS/accorns_config.toml) file, set
   `saveFileCopy = "True"` if you would like to keep a copy of each uploaded file. You
