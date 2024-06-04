@@ -84,17 +84,36 @@ _This will generate or overwrite the SCUIRREL / ACCORNS folder in the publish di
   files should be set to match your preferred setup (details in the
   [developer guide](developer.md))
 
-### 3. (OPTION 1) Publish the app with Posit Connect
+### 3. (OPTION 1) Publish the app to Posit Connect
 
-Navigate to the publish/SCUIRREL or publish/ACCORNS folder and run the following
-command:
+You will need
+- The URL of a Posit Connect server
+- An API key for the Posit Connect server with publish access
+
+Navigate to the publish/SCUIRREL or publish/ACCORNS folder and run the following command
+to upload the app to the specified server, install all necessary dependencies and deploy
+it:
 
 ```bash
-rsconnect deploy shiny --server <server URL> --api-key <API key> ./
+rsconnect deploy shiny \
+  --server <server URL> \
+  --api-key <API key> \
+  --environment <POSTGRES_PASS_SCUIRREL> \
+  --environment <POSTGRES_PASS_ACCORNS> \
+  --environment <OPENAI_API_KEY> \
+  --environment <OPENAI_ORGANIZATION> \
+  ./
 ```
 
-This will deploy the app to the specified server, and install all necessary
-dependencies.
+_Replace the <...> with all your keys you have setup as environment variables (e.g.
+%POSTGRES_PASS_SCUIRREL% on Windows or $POSTGRES_PASS_SCUIRREL on Linux/MacOS). See part
+4 for more details on how to set these variables if you don't have them at the time of
+first deployment_
+
+If you already deployed the app before, you can update it with the same command but can
+let out the environment variables (they only need to be set once). It's recommended to
+add the GUID of the app to the command to ensure the correct app is updated
+`--app-id <GUID>`. You can find these IDs in the Posit Connect dashboard.
 
 For more info visit https://docs.posit.co/connect/admin/
 
@@ -108,10 +127,6 @@ For more info visit https://rstudio.github.io/shiny-server/os/latest/
 
 ### 4. Setup the necessary remote environment variables
 
-NOTE: On Posit Connect you can add environment variables _after_ the apps are deployed
-in the online app's settings page. This means that the first deployment of the apps will
-fail as the environment variables are not set yet.
-
 The following environment variables need to be accessible by _both_ apps on the server:
 
 - POSTGRES_PASS_SCUIRREL : The password for the scuirrel user
@@ -120,7 +135,11 @@ The following environment variables need to be accessible by _both_ apps on the 
 - OPENAI_ORGANIZATION : The organization ID for accessing the OpenAI API (is this needed
   in case your default organization does not match the one used by the API key)
 
-### 6. Reload your apps / restart the server to apply the changes
+NOTE: On Posit Connect you can also add environment variables _after_ the apps are
+deployed if you don't have all the necessary keys yet. Anyone with edit access can add
+them in the online app's settings page. NOTE: If they were not set when deployed with
+`rsconnect` the first deployment of the apps will fail as the environment variables are
+not set yet.
 
 ## Monitoring the apps
 
