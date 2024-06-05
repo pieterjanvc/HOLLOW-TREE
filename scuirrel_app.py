@@ -73,6 +73,25 @@ def progressBar(id, percent):
 # Add some JS so that pressing enter can send the message too
 
 with ui.navset_pill(id="tab"):
+    # HOME TAB
+    with ui.nav_panel("Home"):
+        with ui.layout_columns(col_widths=12):
+            with ui.card():
+                ui.card_header("Login")
+                ui.input_text("lUsername", "Username")
+                ui.input_password("lPassword", "Password")
+            with ui.card():
+                ui.card_header("Create an account")
+                ui.input_text("cUsername", "Username")
+                ui.input_password("cPassword", "Password")
+                ui.input_password("cPassword2", "Repeat password")
+                ui.input_text("cAccessCode", "Access code")
+            with ui.card():
+                ui.card_header("Reset password")
+                ui.input_text("rUsername", "Username")
+                ui.input_text("rPassword", "New password")
+                ui.input_text("rPassword2", "Repeat new password")
+                ui.input_text("rAccessCode", "Access code")
     # MAIN CHAT TAB
     with ui.nav_panel("SCUIRREL"):
         # Render the chat window
