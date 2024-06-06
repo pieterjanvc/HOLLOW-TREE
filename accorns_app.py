@@ -11,6 +11,7 @@ import ACCORNS.accorns_shared as accorns_shared
 
 # -- General
 import os
+from io import BytesIO
 import pandas as pd
 import json
 import warnings
@@ -229,6 +230,32 @@ with ui.navset_pill(id="tab"):
                 ui.input_text_area(
                     "rqODexpl", "Explanation D", width="100%", autoresize=True
                 )
+     # TAB 4 - USER MANAGEMENT
+    with ui.nav_panel("User Management", value="uTab"):
+        # Select a topic and a question with options to add or archive
+        with ui.card():
+            ui.card_header("Generate access codes")
+            ui.input_numeric("numCodes", "Number of codes to generate", value=1, min=1, max=500)
+            ui.input_select("role", "Role", choices={0: "User", 1: "Instructor", 2: "Admin"})
+            ui.input_action_button("generateCodes", "Generate codes", width="180px")
+            
+            # Codes table
+            @render.data_frame
+            def codesTable():
+                return render.DataTable(
+                    accessCodes(),
+                    width="100%",
+                    selection_mode="row",
+                )
+            with ui.panel_conditional("input.generateCodes > 0"):
+                #Option to export codes as CSV
+                @render.download(label = "Download as CSV", filename = "hollow-tree_accessCodes.csv")
+                def downloadCodes():
+                    with BytesIO() as buf:
+                        accessCodes().to_csv(buf, index=False)
+                        yield buf.getvalue()
+                 
+
 
 # Customised feedback button (floating at right side of screen)
 ui.input_action_button("feedback", "Provide Feedback")
@@ -1115,3 +1142,11 @@ def _():
     conn.close()
     ui.modal_remove()
     ui.notification_show("Thank you for sharing feedback", duration=3)
+
+@reactive.calc
+@reactive.event(input.generateCodes)
+def accessCodes():
+    newCodes = accorns_shared.generate_access_codes(n = input.numCodes(), uID= uID, adminLevel=int(input.role()))
+    role = ["user", "instructor", "admin"][int(input.role())]
+    # create a pandas dataframe form the dictionary
+    return pd.DataFrame({"accessCode": newCodes, "role": role})
