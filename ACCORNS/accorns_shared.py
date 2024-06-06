@@ -17,6 +17,8 @@ from shutil import move
 import toml
 from urllib.request import urlretrieve
 from tempfile import TemporaryDirectory
+import secrets
+import string
 
 # -- Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
@@ -353,3 +355,57 @@ def modalMsg(content, title="Info"):
         footer=ui.TagList(ui.modal_button("Close")),
     )
     ui.modal_show(m)
+
+def generate_hash():
+    alphanumeric_characters = string.ascii_letters + string.digits
+    hash_parts = []
+    for _ in range(3):
+        hash_part = ''.join(secrets.choice(alphanumeric_characters) for _ in range(3))
+        hash_parts.append(hash_part)
+    return '-'.join(hash_parts)
+
+
+def generate_hash_list(n = 1):
+    hash_values = []
+    for _ in range(n):
+        hash_value = generate_hash()
+        hash_values.append(hash_value)
+    
+    # CHeck if all the hash values are unique otherwise generate new hash values
+    while len(hash_values) != len(set(hash_values)):
+        # Only generate the number of hash values that are not unique
+        hash_values = list(set(hash_values)) + generate_hash_list(n - len(set(hash_values)))
+        
+
+    return hash_values
+
+def generate_access_codes(n, uID, adminLevel):
+
+    # Check if n and unID are set
+    if not n:
+        raise ValueError("Please provide the number of access codes to generate")
+    if not uID:
+        raise ValueError("Please provide the uID of the user generating the access codes")
+
+    codes = []
+    conn = shared.appDBConn()
+    cursor = conn.cursor()
+    x = n
+    while len(codes) < n:
+        codes = codes + (generate_hash_list(x))
+        # Check if the accessCode does not exist in the database
+        cursor.execute("SELECT code FROM accessCode WHERE code IN ({})".format(','.join(['?']*len(codes))), codes)
+        existing_codes = cursor.fetchall()
+        
+        if existing_codes:
+            # remove the existing codes from the list
+            codes = [code for code in codes if code not in existing_codes[0]]
+            x = n - len(codes)
+    
+    # Insert the new codes into the database
+    _ = shared.executeQuery(cursor, 'INSERT INTO "accessCode"("code", "uID_creator", "adminLevel", "created") VALUES(?, ?, ?, ?)',
+                             [(code, uID, adminLevel, shared.dt()) for code in codes])
+    conn.commit()
+    conn.close()
+
+    return codes

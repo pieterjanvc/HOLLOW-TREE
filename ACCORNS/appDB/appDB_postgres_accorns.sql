@@ -31,6 +31,17 @@ CREATE TABLE "user" (
   "modified" TEXT
 );
 
+CREATE TABLE "accessCode" (
+	"aID" SERIAL PRIMARY KEY,
+  "code" TEXT UNIQUE,
+	"uID_creator" INTEGER, 
+  "uID_user" INTEGER, 
+  "adminLevel" INTEGER DEFAULT 0,
+  "created" TEXT,
+  "used" TEXT
+);
+
+
 CREATE TABLE "group" (
   "gID" SERIAL PRIMARY KEY,
   "name" TEXT,

@@ -9,6 +9,17 @@ CREATE TABLE IF NOT EXISTS "user" (
   "modified" TEXT
 );
 
+DROP TABLE IF EXISTS "accessCode";
+CREATE TABLE IF NOT EXISTS "accessCode" (
+	"aID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "code" TEXT UNIQUE,
+	"uID_creator" INTEGER, 
+  "uID_user" INTEGER, 
+  "adminLevel" INTEGER DEFAULT 0,
+  "created" TEXT,
+  "used" TEXT
+);
+
 DROP TABLE IF EXISTS "group";
 CREATE TABLE "group" (
   "gID" INTEGER PRIMARY KEY AUTOINCREMENT,
