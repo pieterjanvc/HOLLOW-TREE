@@ -24,6 +24,7 @@ CREATE DATABASE accorns;
 CREATE TABLE "user" (
 	"uID" SERIAL PRIMARY KEY,
 	"username" TEXT UNIQUE,
+  "password" TEXT, 
   "adminLevel" INTEGER DEFAULT 0,
   "email" TEXT,
   "created" TEXT,

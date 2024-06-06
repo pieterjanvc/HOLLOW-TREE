@@ -14,6 +14,7 @@ import os
 from html import escape
 import json
 import traceback
+import bcrypt
 
 # Shiny
 from shiny import reactive
@@ -23,9 +24,6 @@ from htmltools import HTML, div
 
 # ----------- SHINY APP -----------
 # *********************************
-
-# Non-reactive session variables (loaded before session starts)
-uID = 1  # if registered users update later
 
 if shared.remoteAppDB:
     _ = shared.checkRemoteDB()
@@ -71,27 +69,41 @@ def progressBar(id, percent):
 
 # --- UI LAYOUT ---
 # Add some JS so that pressing enter can send the message too
+demoInfo = "If you don't have an account, you can still try the demo" if shared.addDemo else ""
 
 with ui.navset_pill(id="tab"):
     # HOME TAB
     with ui.nav_panel("Home"):
         with ui.layout_columns(col_widths=12):
             with ui.card():
+                ui.card_header("Welcome to SCUIRREL")
+                HTML(f"""
+<p>To access the full SCUIRREL functionality, please login first. If this is the first time you are accessing the 
+application, please use the access code provided by your administrator to create an account. {demoInfo}</p>""")
+        with ui.layout_columns(col_widths=6):
+            with ui.card():
                 ui.card_header("Login")
                 ui.input_text("lUsername", "Username")
                 ui.input_password("lPassword", "Password")
+                ui.input_action_button("login", "Login", width="200px")
+                ui.input_action_link("showReset", "Reset password", width="250px")
             with ui.card():
                 ui.card_header("Create an account")
                 ui.input_text("cUsername", "Username")
                 ui.input_password("cPassword", "Password")
                 ui.input_password("cPassword2", "Repeat password")
                 ui.input_text("cAccessCode", "Access code")
-            with ui.card():
-                ui.card_header("Reset password")
-                ui.input_text("rUsername", "Username")
-                ui.input_text("rPassword", "New password")
-                ui.input_text("rPassword2", "Repeat new password")
-                ui.input_text("rAccessCode", "Access code")
+                ui.input_action_button("create", "Create", width="200px")
+            with ui.panel_conditional("input.showReset > 0"):
+                with ui.card():
+                    ui.card_header("Reset password")
+                    HTML("""<p><i>You will need to request a new access code from your 
+                         administrator before resetting your password.</i></p>""")
+                    ui.input_text("rUsername", "Username")
+                    ui.input_password("rPassword", "New password")
+                    ui.input_password("rPassword2", "Repeat new password")
+                    ui.input_text("rAccessCode", "Access code")
+                    ui.input_action_button("reset", "Reset password", width="250px")
     # MAIN CHAT TAB
     with ui.nav_panel("SCUIRREL"):
         # Render the chat window
@@ -107,41 +119,42 @@ with ui.navset_pill(id="tab"):
                      research purposes so don't share any personal information and keep to the topic at hand.</i></p>""")
             with ui.card(id="topicSelection"):
                 ui.card_header("Pick a topic")
-                (ui.input_select("selTopic", None, choices=[], width="600px"),)
+                (ui.input_select("selTopic", None, choices=[], width="600px"),),
+                ui.input_action_button("startConversation", "Start conversation", width="200px")
                 ui.input_action_button(
                     "quiz",
                     "Give me a quiz question",
                     width="250px",
                     style="display:none;",
                 )
-
-            with ui.card(id="chatWindow", height="45vh"):
-                x = (
-                    '<div class="progress-bar"><span id="chatProgress" class="progress-bar-fill" style="width: 0%;">Topic Progress</span></div>'
-                    + str(
-                        ui.input_action_button("chatFeedback", "Provide chat feedback")
+            with ui.panel_conditional("input.startConversation > 0"):
+                with ui.card(id="chatWindow", height="45vh"):
+                    x = (
+                        '<div class="progress-bar"><span id="chatProgress" class="progress-bar-fill" style="width: 0%;">Topic Progress</span></div>'
+                        + str(
+                            ui.input_action_button("chatFeedback", "Provide chat feedback")
+                        )
                     )
-                )
-                ui.card_header(HTML(x), id="chatHeader")
-                div(id="conversation")
+                    ui.card_header(HTML(x), id="chatHeader")
+                    div(id="conversation")
 
-        # User input, send button and wait message
-        (
-            div(
-                ui.input_text_area(
-                    "newChat", "", value="", width="100%", spellcheck=True, resize=False
-                ),
-                ui.input_action_button("send", "Send"),
-                id="chatIn",
-            ),
-        )
-        div(
-            HTML(
-                "<p style='color: white'><i>Scuirrel is foraging for an answer ...</i></p>"
-            ),
-            id="waitResp",
-            style="display: none;",
-        )
+                # User input, send button and wait message
+                (
+                    div(
+                        ui.input_text_area(
+                            "newChat", "", value="", width="100%", spellcheck=True, resize=False
+                        ),
+                        ui.input_action_button("send", "Send"),
+                        id="chatIn",
+                    ),
+                )
+                div(
+                    HTML(
+                        "<p style='color: white'><i>Scuirrel is foraging for an answer ...</i></p>"
+                    ),
+                    id="waitResp",
+                    style="display: none;",
+                )
 
     # USER PROGRESS TAB
     with ui.nav_panel("Profile"):
@@ -154,7 +167,7 @@ with ui.navset_pill(id="tab"):
 ui.input_action_button("feedback", "General Feedback")
 
 # --- REACTIVE VARIABLES & FUNCTIONS ---
-
+uID = reactive.value(1)  # User ID (default is anonymous)
 sessionID = reactive.value(0)  # Current Shiny Session
 discussionID = reactive.value(0)  # Current conversation
 conceptIndex = reactive.value(0)  # Current concept index to discuss
@@ -166,12 +179,12 @@ if hasattr(session, "_process_ui"):
     # Register the session start in the DB
     conn = shared.appDBConn(scuirrel_shared.postgresUser)
     cursor = conn.cursor()
-    # For now we only have anonymous users (appID 0 -> SCUIRREL)
+    # When loading the app, we start with the anonymous user (uID 1)
     sID = shared.executeQuery(
         cursor,
         'INSERT INTO "session" ("shinyToken", "uID", "appID", "start")'
-        "VALUES(?, ?, 0, ?)",
-        (session.id, uID, shared.dt()),
+        "VALUES(?, 1, 0, ?)",
+        (session.id, shared.dt()),
         lastRowId="sID",
     )
     conn.commit()
@@ -191,11 +204,12 @@ def theEnd():
         dID = discussionID.get()
         msg = messages.get()
         sID = sessionID.get()
-        # AUpdate the database
+        # Update the database
         conn = shared.appDBConn(scuirrel_shared.postgresUser)
         cursor = conn.cursor()
-        # Log current discussion
-        scuirrel_shared.endDiscussion(cursor, dID, msg)
+        # Log current discussion if one was started
+        if dID != 0:
+            scuirrel_shared.endDiscussion(cursor, dID, msg)
         # Register the end of the session and if an error occurred, log it
         errMsg = traceback.format_exc().strip()
 
@@ -215,9 +229,40 @@ def theEnd():
         conn.commit()
         conn.close()
 
+# LOGIN AND ACCOUNT CREATION
+@reactive.effect
+@reactive.event(input.login)
+def _():
+    username = input.lUsername()
+    password = input.lPassword().encode("utf-8")
+    conn = shared.appDBConn(scuirrel_shared.postgresUser)
+    user = shared.pandasQuery(
+        conn,
+        'SELECT * FROM "user" WHERE "username" = ? AND "username" != "anonymous"',
+        (username,),
+    )
+    
+    if user.shape[0] == 1:
+        if bcrypt.checkpw(password, user.password.iloc[0].encode("utf-8")):
+            ui.notification_show("Logged in successfully")
+            cursor = conn.cursor()
+            # For now we only have anonymous users (appID 0 -> SCUIRREL)
+            _ = shared.executeQuery(
+                cursor,
+                'UPDATE "session" SET "uID" = ? WHERE sID = ?',
+                (int(user.uID.iloc[0]), sessionID.get())
+            )
+            conn.commit()
+        else:
+            ui.notification_show("Incorrect password")
+    else:
+        ui.notification_show("Invalid username")
+
+    conn.close()
+    uID.set(user.uID.iloc[0])
 
 @reactive.effect
-@reactive.event(input.selTopic)
+@reactive.event(input.startConversation)
 def _():
     tID = int(topics[topics["tID"] == int(input.selTopic())].iloc[0]["tID"])
     conn = shared.appDBConn(scuirrel_shared.postgresUser)

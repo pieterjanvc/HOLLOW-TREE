@@ -135,10 +135,10 @@ def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB
     return
 
 
-def pandasQuery(conn, query):
+def pandasQuery(conn, query, params=()):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return pd.read_sql_query(query, conn)
+        return pd.read_sql_query(sql = query, con = conn, params=params)
 
 
 # Check if the postgres scuirrel database is available when remoteAppDB is set to True
