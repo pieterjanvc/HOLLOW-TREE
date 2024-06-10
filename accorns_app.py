@@ -295,6 +295,12 @@ application, please use the access code provided by your administrator to create
 # Customised feedback button (floating at right side of screen)
 ui.input_action_button("feedback", "Provide Feedback")
 
+#Hide tabs till login complete
+elementDisplay("vTab", "h")
+elementDisplay("tTab", "h")
+elementDisplay("qTab", "h")
+elementDisplay("uTab", "h")
+
 # --- REACTIVE VARIABLES ---
 
 sessionID = reactive.value(0)
@@ -348,8 +354,8 @@ if hasattr(session, "_process_ui"):
     sID = shared.executeQuery(
         cursor,
         'INSERT INTO "session" ("shinyToken", "uID", "appID", "start")'
-        "VALUES(?, ?, 1, ?)",
-        (session.id, uID.get(), shared.dt()),
+        "VALUES(?, 1, 1, ?)",
+        (session.id, shared.dt()),
         lastRowId="sID",
     )
     # Get all active topics
@@ -361,7 +367,8 @@ if hasattr(session, "_process_ui"):
     sessionID.set(sID)
     # Set the topics
     ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])))
-    topics.set(newTopics)
+    topics.set(newTopics)    
+
 
 # Code to run at the END of the session (i.e. when user disconnects)
 _ = session.on_ended(lambda: theEnd())
