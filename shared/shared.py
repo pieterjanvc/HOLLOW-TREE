@@ -71,7 +71,6 @@ def inputCheck(input):
     else:
         False
 
-
 # Get a local or remote DB connection (depending on config)
 def appDBConn(postgresUser=postgresUser, remoteAppDB=remoteAppDB):
     if remoteAppDB:
@@ -166,3 +165,25 @@ def checkRemoteDB():
 
 if remoteAppDB:
     print(checkRemoteDB())
+
+def passCheck(password, password2):
+    # Check if the password is strong enough
+    if re_search(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_+=])[A-Za-z\d!@#$%^&*()-_+=]{8,20}$",
+                 password) is None:
+        return "Password must be between 8 and 20 characters and contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+    
+    # Check if the passwords match
+    if password != password2:
+        return "Passwords do not match"
+    
+    return None
+
+def accessCodeCheck(conn, accessCode):
+    # Check the access code (must be valid and not used yet)
+    code = pandasQuery(
+        conn,
+        'SELECT * FROM "accessCode" WHERE "code" = ? AND "used" IS NULL',
+        (accessCode,),
+    )
+
+    return None if code.shape[0] == 0 else code

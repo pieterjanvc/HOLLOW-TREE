@@ -11,6 +11,7 @@ from shared import shared
 import os
 import pandas as pd
 import toml
+from regex import search as re_search
 
 # Llamaindex
 from llama_index.core import VectorStoreIndex, ChatPromptTemplate

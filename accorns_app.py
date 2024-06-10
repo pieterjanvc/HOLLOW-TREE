@@ -255,8 +255,6 @@ with ui.navset_pill(id="tab"):
                         accessCodes().to_csv(buf, index=False)
                         yield buf.getvalue()
                  
-
-
 # Customised feedback button (floating at right side of screen)
 ui.input_action_button("feedback", "Provide Feedback")
 

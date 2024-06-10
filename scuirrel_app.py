@@ -15,6 +15,7 @@ from html import escape
 import json
 import traceback
 import bcrypt
+from regex import search as re_search
 
 # Shiny
 from shiny import reactive
@@ -87,13 +88,16 @@ application, please use the access code provided by your administrator to create
                 ui.input_password("lPassword", "Password")
                 ui.input_action_button("login", "Login", width="200px")
                 ui.input_action_link("showReset", "Reset password", width="250px")
-            with ui.card():
-                ui.card_header("Create an account")
+            with ui.card():               
+                ui.card_header("Create an account")                
+                HTML("""<i>NOTE: This application has been built for research purposes 
+                     and has not been extensively tested for security. We recommend
+                     you create a unique password for this you are not using anywhere else</i>""")
                 ui.input_text("cUsername", "Username")
                 ui.input_password("cPassword", "Password")
                 ui.input_password("cPassword2", "Repeat password")
                 ui.input_text("cAccessCode", "Access code")
-                ui.input_action_button("create", "Create", width="200px")
+                ui.input_action_button("createAccount", "Create", width="200px")
             with ui.panel_conditional("input.showReset > 0"):
                 with ui.card():
                     ui.card_header("Reset password")
@@ -243,7 +247,7 @@ def _():
     )
     
     if user.shape[0] == 1:
-        if bcrypt.checkpw(password, user.password.iloc[0].encode("utf-8")):
+        if bcrypt.checkpw(password, user.password.iloc[0]):
             ui.notification_show("Logged in successfully")
             cursor = conn.cursor()
             # For now we only have anonymous users (appID 0 -> SCUIRREL)
@@ -259,7 +263,138 @@ def _():
         ui.notification_show("Invalid username")
 
     conn.close()
+    # Clear the input fields
+    ui.update_text_area("lUsername", value="")
+    ui.update_text_area("lPassword", value="")
+
     uID.set(user.uID.iloc[0])
+
+@reactive.effect
+@reactive.event(input.createAccount)
+def _():
+    username = input.cUsername()
+    accessCode = input.cAccessCode()
+
+    # Check if the password is strong enough
+    if re_search(r"^\w{6,20}$", username) is None:
+        ui.notification_show("Username must be between 6 and 20 characters")
+        return
+    
+    # Check if the username already exists
+    conn = shared.appDBConn(scuirrel_shared.postgresUser)
+    cursor = conn.cursor()
+    user = shared.pandasQuery(
+        conn,
+        'SELECT * FROM "user" WHERE "username" = ?',
+        (username,),
+    )
+
+    if user.shape[0] > 0:
+        ui.notification_show("Username already exists")
+        return
+
+    # Check the password
+    pCheck = shared.passCheck(input.cPassword(), input.cPassword2())
+    if pCheck:
+        ui.notification_show(pCheck)
+        return    
+
+    code = shared.accessCodeCheck(conn, accessCode)
+
+    if code is None:
+        ui.notification_show("Invalid access code")
+        return    
+
+    # Create the user
+    hashed = bcrypt.hashpw(input.cPassword().encode("utf-8"), bcrypt.gensalt())
+    newuID = shared.executeQuery(
+        cursor,
+        'INSERT INTO "user" ("username", "password", "adminLevel", "created", "modified")'
+        "VALUES(?, ?, ?, ?, ?)",
+        (username, hashed, int(code["adminLevel"].iloc[0]), shared.dt(), shared.dt()),
+        lastRowId="uID",
+    )
+
+    newuID = int(newuID)
+
+    # Update the access code to show it has been used
+    _ = shared.executeQuery(
+        cursor,
+        'UPDATE "accessCode" SET "uID_user" = ?, "used" = ? WHERE "code" = ?',
+        (newuID, shared.dt(), accessCode),
+    )
+    conn.commit()
+    conn.close()
+
+    uID.set(newuID)
+
+    # Clear the input fields
+    ui.update_text_area("cUsername", value="")
+    ui.update_text_area("cPassword", value="")
+    ui.update_text_area("cPassword2", value="")
+    ui.update_text_area("cAccessCode", value="")
+
+    ui.notification_show("Account created successfully")
+
+@reactive.effect
+@reactive.event(input.reset)
+def _():
+    username = input.rUsername()
+    accessCode = input.rAccessCode()
+
+    # Check if the username already exists
+    conn = shared.appDBConn(scuirrel_shared.postgresUser)
+    cursor = conn.cursor()
+    user = shared.pandasQuery(
+        conn,
+        'SELECT * FROM "user" WHERE "username" = ?',
+        (username,),
+    )    
+
+    if user.shape[0] == 0:
+        ui.notification_show("This username does not exist")
+        return
+    
+    uID = int(user["uID"].iloc[0])
+
+    # Check the password
+    pCheck = shared.passCheck(input.rPassword(), input.rPassword2())
+    if pCheck:
+        ui.notification_show(pCheck)
+        return
+    
+    # Check the access code
+    code = shared.accessCodeCheck(conn, accessCode)
+
+    if code is None:
+        ui.notification_show("Invalid access code")
+        return
+    
+    # Update the password
+    hashed = bcrypt.hashpw(input.rPassword().encode("utf-8"), bcrypt.gensalt())
+    _ = shared.executeQuery(
+        cursor,
+        'UPDATE "user" SET "password" = ?, "modified" = ? WHERE "uID" = ?',
+        (hashed, shared.dt(), uID),
+    )
+
+     # Update the access code to show it has been used
+    _ = shared.executeQuery(
+        cursor,
+        'UPDATE "accessCode" SET "uID_user" = ?, "used" = ? WHERE "code" = ?',
+        (uID, shared.dt(), accessCode),
+    )
+    conn.commit()
+    conn.close()
+
+    # Clear the input fields
+    ui.update_text_area("rUsername", value="")
+    ui.update_text_area("rPassword", value="")
+    ui.update_text_area("rPassword2", value="")
+    ui.update_text_area("rAccessCode", value="")
+    
+    ui.notification_show("Password reset successfully, please login again")
+    
 
 @reactive.effect
 @reactive.event(input.startConversation)
