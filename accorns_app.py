@@ -37,7 +37,7 @@ nest_asyncio.apply()
 # ----------- SHINY APP -----------
 # *********************************
 
-uID = 2  # if registered admins make reactive later
+uID = reactive.value(0)  # if registered admins make reactive later
 
 # --- UI COMPONENTS ---
 uiUploadFile = div(
@@ -87,7 +87,44 @@ def elementDisplay(id, effect):
 # --- UI LAYOUT ---
 
 with ui.navset_pill(id="tab"):
-    # TAB 1 - VECTOR DATABASE
+    # TAB 1 - HOME
+    with ui.nav_panel("Home"):
+        with ui.layout_columns(col_widths=12):
+            with ui.card():
+                ui.card_header("Welcome to SCUIRREL")
+                HTML("""
+<p>To access the ACCORNS you need an admin account. If this is the first time you are accessing the 
+application, please use the access code provided by your administrator to create an account</p>""")
+        with ui.layout_columns(col_widths=6):
+            with ui.card():
+                ui.card_header("Login")
+                ui.input_text("lUsername", "Username")
+                ui.input_password("lPassword", "Password")
+                ui.input_action_button("login", "Login", width="200px")
+                ui.input_action_link("showReset", "Reset password", width="250px")
+            with ui.card():               
+                ui.card_header("Create an account")                
+                HTML("""<i>NOTE: This application has been built for research purposes 
+                     and has not been extensively tested for security. We recommend
+                     you create a unique password for this you are not using anywhere else</i>""")
+                ui.input_text("cUsername", "Username")
+                ui.input_password("cPassword", "Password")
+                ui.input_password("cPassword2", "Repeat password")
+                ui.input_text("cAccessCode", "Access code")
+                ui.input_action_button("createAccount", "Create", width="200px")
+            with ui.panel_conditional("input.showReset > 0"):
+                with ui.card():
+                    ui.card_header("Reset password")
+                    HTML("""<p><i>You will need to request a new access code from your 
+                         administrator before resetting your password.</i></p>""")
+                    ui.input_text("rUsername", "Username")
+                    ui.input_password("rPassword", "New password")
+                    ui.input_password("rPassword2", "Repeat new password")
+                    ui.input_text("rAccessCode", "Access code")
+                    ui.input_action_button("reset", "Reset password", width="250px")
+    
+    # https://shiny.posit.co/py/docs/express-in-depth.html#reactive-displays
+    # TAB 2 - VECTOR DATABASE
     with ui.nav_panel("Vector Database", value="vTab"):
         with ui.card(id="blankDBMsg", style="display: none;"):
             HTML(
@@ -118,7 +155,7 @@ with ui.navset_pill(id="tab"):
             ui.card_header("Upload a new file")
             uiUploadFile
 
-    # TAB 2 - TOPICS
+    # TAB 3 - TOPICS
     with ui.nav_panel("Topics", value="tTab"):
         with ui.layout_columns(col_widths=12):
             # Select, add or archive a topic
@@ -162,7 +199,7 @@ with ui.navset_pill(id="tab"):
                         "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"
                     )
 
-    # TAB 3 - QUIZ QUESTIONS
+    # TAB 4 - QUIZ QUESTIONS
     with ui.nav_panel("Quiz Questions", value="qTab"):
         # Select a topic and a question with options to add or archive
         with ui.card():
@@ -230,7 +267,7 @@ with ui.navset_pill(id="tab"):
                 ui.input_text_area(
                     "rqODexpl", "Explanation D", width="100%", autoresize=True
                 )
-     # TAB 4 - USER MANAGEMENT
+     # TAB 5 - USER MANAGEMENT
     with ui.nav_panel("User Management", value="uTab"):
         # Select a topic and a question with options to add or archive
         with ui.card():
@@ -312,7 +349,7 @@ if hasattr(session, "_process_ui"):
         cursor,
         'INSERT INTO "session" ("shinyToken", "uID", "appID", "start")'
         "VALUES(?, ?, 1, ?)",
-        (session.id, uID, shared.dt()),
+        (session.id, uID.get(), shared.dt()),
         lastRowId="sID",
     )
     # Get all active topics
@@ -1144,7 +1181,7 @@ def _():
 @reactive.calc
 @reactive.event(input.generateCodes)
 def accessCodes():
-    newCodes = accorns_shared.generate_access_codes(n = input.numCodes(), uID= uID, adminLevel=int(input.role()))
+    newCodes = accorns_shared.generate_access_codes(n = input.numCodes(), uID= uID.get(), adminLevel=int(input.role()))
     role = ["user", "instructor", "admin"][int(input.role())]
     # create a pandas dataframe form the dictionary
     return pd.DataFrame({"accessCode": newCodes, "role": role})
