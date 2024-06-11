@@ -8,7 +8,10 @@
 # See app_shared.py for variables and functions shared across sessions
 import shared.shared as shared
 import ACCORNS.accorns_shared as accorns_shared
-from modules.user_management import user_management_server, user_management_ui
+
+from modules.user_management_module import user_management_server, user_management_ui
+from modules.login_module import login_server,  login_ui
+from modules.topics_module import topics_ui, topics_server
 
 # -- General
 import os
@@ -87,34 +90,7 @@ app_ui = ui.page_fluid(
                     HTML("""
     <p>To access the ACCORNS you need an admin account. If this is the first time you are accessing the 
     application, please use the access code provided by your administrator to create an account</p>""")),col_widths=12),
-            ui.layout_columns(
-                ui.card(
-                    ui.card_header("Login"),
-                    ui.input_text("lUsername", "Username"),
-                    ui.input_password("lPassword", "Password"),
-                    ui.input_action_button("login", "Login", width="200px"),
-                    ui.input_action_link("showReset", "Reset password", width="250px")),
-                ui.card(               
-                    ui.card_header("Create an account"),              
-                    HTML("""<i>NOTE: This application has been built for research purposes 
-                        and has not been extensively tested for security. We recommend
-                        you create a unique password for this you are not using anywhere else</i>"""),
-                    ui.input_text("cUsername", "Username"),
-                    ui.input_password("cPassword", "Password"),
-                    ui.input_password("cPassword2", "Repeat password"),
-                    ui.input_text("cAccessCode", "Access code"),
-                    ui.input_action_button("createAccount", "Create", width="200px")),
-            ui.panel_conditional("input.showReset > 0",
-                    ui.card(
-                        ui.card_header("Reset password"),
-                        HTML("""<p><i>You will need to request a new access code from your 
-                            administrator before resetting your password.</i></p>"""),
-                        ui.input_text("rUsername", "Username"),
-                        ui.input_password("rPassword", "New password"),
-                        ui.input_password("rPassword2", "Repeat new password"),
-                        ui.input_text("rAccessCode", "Access code"),
-                        ui.input_action_button("reset", "Reset password", width="250px"),
-                    )),col_widths=6)),
+            login_ui("login")),           
         # https://shiny.posit.co/py/docs/express-in-depth.html#reactive-displays
         # TAB 2 - VECTOR DATABASE
         ui.nav_panel("Vector Database",
@@ -147,47 +123,7 @@ app_ui = ui.page_fluid(
             ), value="vTab"),
         # TAB 3 - TOPICS
         ui.nav_panel("Topics",
-            ui.layout_columns(
-                # Select, add or archive a topic
-                ui.card(
-                    ui.card_header("Topic"),
-                    ui.input_select("tID", "Pick a topic", choices=[], width="400px"),
-                    div(
-                        ui.input_action_button("tAdd", "Add new", width="180px"),
-                        ui.input_action_button("tEdit", "Edit selected", width="180px"),
-                        ui.input_action_button(
-                            "tArchive", "Archive selected", width="180px"
-                        ),
-                    )),
-                # Table of concepts per topic with option to add, edit or archive
-                ui.panel_conditional("input.tID",
-                    ui.card(
-                        ui.card_header("Concepts related to the topic"),
-                        ui.output_data_frame("conceptsTable"),
-                        # def conceptsTable():
-                        #     if concepts.get() is None:
-                        #         return
-                        #     return render.DataTable(
-                        #         concepts.get()[["concept"]],
-                        #         width="100%",
-                        #         selection_mode="row",
-                        #     )
-
-                        div(
-                            ui.input_action_button("cAdd", "Add new", width="180px"),
-                            ui.input_action_button("cEdit", "Edit selected", width="180px"),
-                            ui.input_action_button(
-                                "cArchive", "Archive selected", width="180px"
-                            ),
-                            style="display:inline",
-                        ),
-                        HTML(
-                            "<i>Concepts are specific facts or pieces of information you want SCUIRREL to check with your students. "
-                            "You can be very brief, as all context will be retrieved from the database of documents. "
-                            "Don't be too broad, split into multiple topics if needed. "
-                            "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"
-                        )
-                    )),col_widths=12), value="tTab"),
+            topics_ui("topics"), value="tTab"),
 
         # TAB 4 - QUIZ QUESTIONS
         ui.nav_panel("Quiz Questions",
@@ -293,15 +229,70 @@ app_ui = ui.page_fluid(
 
 def server(input, output, session):
 
+    # Register the session start in the DB
+    conn = shared.appDBConn()
+    cursor = conn.cursor()
+    # For now we only have anonymous users (appID 1 -> ACCORNS)
+    sID = shared.executeQuery(
+        cursor,
+        'INSERT INTO "session" ("shinyToken", "uID", "appID", "start")'
+        "VALUES(?, 1, 1, ?)",
+        (session.id, shared.dt()),
+        lastRowId="sID",
+    )
+    # Get all active topics
+    newTopics = shared.pandasQuery(
+        conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
+    )
+    conn.commit()
+    conn.close()
+    # Set the topics
+    ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])))
+    
+
+    #index = reactive.value(index)
+    topics = reactive.value(newTopics)
+    concepts = reactive.value(None)
+    #files = reactive.value(files)
+
+    uID = login_server("login", sessionID = sID)
+
     # This function allows you to hide/show/disable/enable elements by ID or data-value
-# The latter is needed because tabs don't use ID's but data-value
+    # The latter is needed because tabs don't use ID's but data-value
     def elementDisplay(id, effect, session = session):
         @reactive.effect
         async def _():
             await session.send_custom_message("hideShow", {"id": id, "effect": effect})
-    
-    _ = user_management_server("testUI", uID = 2)
-    
+
+    # Code to run at the END of the session (i.e. when user disconnects)
+    _ = session.on_ended(lambda: theEnd())
+
+    def theEnd():
+        # Add logs to the database after user exits            
+        conn = shared.appDBConn()
+        cursor = conn.cursor()
+        # Register the end of the session and if an error occurred, log it
+        errMsg = traceback.format_exc().strip()
+
+        if errMsg == "NoneType: None":
+            _ = shared.executeQuery(
+                cursor,
+                'UPDATE "session" SET "end" = ? WHERE "sID" = ?',
+                (shared.dt(), sID),
+            )
+        else:
+            _ = shared.executeQuery(
+                cursor,
+                'UPDATE "session" SET "end" = ?, "error" = ? WHERE "sID" = ?',
+                (shared.dt(), errMsg, sID),
+            )
+        conn.commit()
+        conn.close()
+
+
+    _ = user_management_server("testUI", uID = uID)
+    _ = topics_server("topics", uID = uID)
+
     #Hide tabs till login complete
     # elementDisplay("vTab", "h")
     # elementDisplay("tTab", "h")
