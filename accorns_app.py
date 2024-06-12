@@ -12,6 +12,7 @@ import ACCORNS.accorns_shared as accorns_shared
 from modules.user_management_module import user_management_server, user_management_ui
 from modules.login_module import login_server,  login_ui
 from modules.topics_module import topics_ui, topics_server
+from modules.vectorDB_management_module import vectorDB_management_ui, vectorDB_management_server
 
 # -- General
 import os
@@ -42,26 +43,7 @@ nest_asyncio.apply()
 
 uID = reactive.value(0)  # if registered admins make reactive later
 
-# --- UI COMPONENTS ---
-uiUploadFile = div(
-    ui.input_file(
-        "newFile",
-        "Pick a file",
-        width="100%",
-        accept=[
-            ".csv",
-            ".pdf",
-            ".docx",
-            ".txt",
-            ".md",
-            ".epub",
-            ".ipynb",
-            ".ppt",
-            ".pptx",
-        ],
-    ),
-    id="uiUploadFile",
-)
+
 
 # --- RENDERING UI ---
 # ********************
@@ -94,33 +76,7 @@ app_ui = ui.page_fluid(
         # https://shiny.posit.co/py/docs/express-in-depth.html#reactive-displays
         # TAB 2 - VECTOR DATABASE
         ui.nav_panel("Vector Database",
-            ui.card(#id="blankDBMsg", style="display: none;"):
-                HTML(
-                    "<i>Welcome to ACCORNS, the Admin Control Center Overseeing RAG Needed for SCUIRREL!<br>"
-                    "In order to get started, please add at least one file to the vector database</i>"
-                )),
-            # Tables of the files that are in the DB
-            ui.card(
-                ui.card_header("Vector database files"),
-
-                ui.output_data_frame("filesTable")
-                # def filesTable():
-                #     return render.DataTable(
-                #         files.get()[["title", "fileName"]],
-                #         width="100%",
-                #         selection_mode="row",
-                #     )
-            ),
-            ui.card(
-                ui.card_header("File info"),
-                ui.output_ui("fileInfo"),
-                id="fileInfoCard"            
-            ),
-            # Option to add new files
-            ui.card(
-                ui.card_header("Upload a new file"),
-                uiUploadFile
-            ), value="vTab"),
+            vectorDB_management_ui("vectorDB"), value="vTab"),
         # TAB 3 - TOPICS
         ui.nav_panel("Topics",
             topics_ui("topics"), value="tTab"),
@@ -196,30 +152,6 @@ app_ui = ui.page_fluid(
         # TAB 5 - USER MANAGEMENT
         ui.nav_panel("User Management",
             user_management_ui("testUI")
-            # # Select a topic and a question with options to add or archive
-            # ui.card(
-            #     ui.card_header("Generate access codes"),
-            #     ui.input_numeric("numCodes", "Number of codes to generate", value=1, min=1, max=500),
-            #     ui.input_select("role", "Role", choices={0: "User", 1: "Instructor", 2: "Admin"}),
-            #     ui.input_action_button("generateCodes", "Generate codes", width="180px"),
-                
-            #     ui.output_data_frame("codesTable"),
-            #     # def codesTable():
-            #     #     return render.DataTable(
-            #     #         accessCodes(),
-            #     #         width="100%",
-            #     #         selection_mode="row",
-            #     #     )
-            #     ui.panel_conditional("input.generateCodes > 0",
-            #         ui.download_button("downloadCodes", "Download as CSV")
-            #         # #Option to export codes as CSV
-            #         # @render.download(label = "Download as CSV", filename = "hollow-tree_accessCodes.csv")
-            #         # def downloadCodes():
-            #         #     with BytesIO() as buf:
-            #         #         accessCodes().to_csv(buf, index=False)
-            #         #         yield buf.getvalue()
-            #     )
-            # )
             , value="uTab"),
         id = "tab"),
     # Customised feedback button (floating at right side of screen)
@@ -247,16 +179,17 @@ def server(input, output, session):
     #index = reactive.value(index)
     topics, concepts = topics_server("topics", sID=sID, uID=uID)
     _ = user_management_server("testUI", uID = uID)
+    index, files = vectorDB_management_server("vectorDB", uID=uID)
     #files = reactive.value(files)
 
     
 
-    # This function allows you to hide/show/disable/enable elements by ID or data-value
-    # The latter is needed because tabs don't use ID's but data-value
-    def elementDisplay(id, effect, session = session):
-        @reactive.effect
-        async def _():
-            await session.send_custom_message("hideShow", {"id": id, "effect": effect})
+    # # This function allows you to hide/show/disable/enable elements by ID or data-value
+    # # The latter is needed because tabs don't use ID's but data-value
+    # def elementDisplay(id, effect, session = session):
+    #     @reactive.effect
+    #     async def _():
+    #         await session.send_custom_message("hideShow", {"id": id, "effect": effect})
 
     # Code to run at the END of the session (i.e. when user disconnects)
     _ = session.on_ended(lambda: theEnd())

@@ -19,6 +19,8 @@ from regex import search as re_search
 # Llamaindex
 from llama_index.llms.openai import OpenAI
 
+from shiny import reactive
+
 # --- VARIABLES ---
 
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
@@ -70,6 +72,13 @@ def inputCheck(input):
         return True
     else:
         False
+
+# This function allows you to hide/show/disable/enable elements by ID or data-value
+    # The latter is needed because tabs don't use ID's but data-value
+def elementDisplay(id, effect, session):
+    @reactive.effect
+    async def _():
+        await session.send_custom_message("hideShow", {"id": id, "effect": effect})
 
 # Get a local or remote DB connection (depending on config)
 def appDBConn(postgresUser=postgresUser, remoteAppDB=remoteAppDB):
