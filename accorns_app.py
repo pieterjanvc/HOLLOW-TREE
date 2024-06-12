@@ -232,7 +232,6 @@ def server(input, output, session):
     # Register the session start in the DB
     conn = shared.appDBConn()
     cursor = conn.cursor()
-    # For now we only have anonymous users (appID 1 -> ACCORNS)
     sID = shared.executeQuery(
         cursor,
         'INSERT INTO "session" ("shinyToken", "uID", "appID", "start")'
@@ -240,22 +239,17 @@ def server(input, output, session):
         (session.id, shared.dt()),
         lastRowId="sID",
     )
-    # Get all active topics
-    newTopics = shared.pandasQuery(
-        conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
-    )
     conn.commit()
     conn.close()
-    # Set the topics
-    ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])))
-    
-
-    #index = reactive.value(index)
-    topics = reactive.value(newTopics)
-    concepts = reactive.value(None)
-    #files = reactive.value(files)
 
     uID = login_server("login", sessionID = sID)
+    
+    #index = reactive.value(index)
+    topics, concepts = topics_server("topics", sID=sID, uID=uID)
+    _ = user_management_server("testUI", uID = uID)
+    #files = reactive.value(files)
+
+    
 
     # This function allows you to hide/show/disable/enable elements by ID or data-value
     # The latter is needed because tabs don't use ID's but data-value
@@ -290,8 +284,7 @@ def server(input, output, session):
         conn.close()
 
 
-    _ = user_management_server("testUI", uID = uID)
-    _ = topics_server("topics", uID = uID)
+    
 
     #Hide tabs till login complete
     # elementDisplay("vTab", "h")

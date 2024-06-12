@@ -2,7 +2,6 @@
 # --------------------------
 
 # -- General
-import pandas as pd
 import bcrypt
 from re import search as re_search
 

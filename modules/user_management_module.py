@@ -61,7 +61,7 @@ def generate_access_codes(n, uID, adminLevel):
     # Insert the new codes into the database
     _ = shared.executeQuery(cursor, 'INSERT INTO "accessCode"("code", "uID_creator", "adminLevel", "created") VALUES(?, ?, ?, ?)',
                             [(code, uID, adminLevel, shared.dt()) for code in codes])
-    #conn.commit()
+    conn.commit()
     conn.close()
 
     return codes
