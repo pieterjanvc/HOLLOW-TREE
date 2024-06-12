@@ -52,7 +52,11 @@ def login_ui():
 @module.server
 def login_server(input: Inputs, output: Outputs, session: Session, sessionID):
 
-    uID = reactive.value(1) # Default to anonymous
+    # Default to anonymous
+    conn = shared.appDBConn()
+    user = shared.pandasQuery(conn,'SELECT * FROM "user" WHERE "uID" = 1')
+    conn.close()
+    user = reactive.value(user.to_dict(orient="records")[0]) 
     
     @reactive.effect
     @reactive.event(input.login)
@@ -60,34 +64,38 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID):
         username = input.lUsername()
         password = input.lPassword().encode("utf-8")
         conn = shared.appDBConn()
-        user = shared.pandasQuery(
+        checkUser = shared.pandasQuery(
             conn,
             'SELECT * FROM "user" WHERE "username" = ? AND "username" != "anonymous"',
             (username,),
         )
         
-        if user.shape[0] == 1:
-            if bcrypt.checkpw(password, user.password.iloc[0]):
+        if checkUser.shape[0] == 1:
+            if bcrypt.checkpw(password, checkUser.password.iloc[0]):
                 ui.notification_show("Logged in successfully")
                 cursor = conn.cursor()
                 # For now we only have anonymous users (appID 0 -> SCUIRREL)
                 _ = shared.executeQuery(
                     cursor,
                     'UPDATE "session" SET "uID" = ? WHERE sID = ?',
-                    (int(user.uID.iloc[0]), sessionID)
+                    (int(checkUser.uID.iloc[0]), sessionID)
                 )
                 conn.commit()
             else:
                 ui.notification_show("Incorrect password")
+                conn.close()
+                return
         else:
             ui.notification_show("Invalid username")
+            conn.close()
+            return
 
         conn.close()
         # Clear the input fields
         ui.update_text_area("lUsername", value="")
         ui.update_text_area("lPassword", value="")
 
-        uID.set(user.uID.iloc[0])
+        user.set(checkUser.to_dict(orient="records")[0])
 
     @reactive.effect
     @reactive.event(input.createAccount)
@@ -103,26 +111,29 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID):
         # Check if the username already exists
         conn = shared.appDBConn()
         cursor = conn.cursor()
-        user = shared.pandasQuery(
+        checkUser = shared.pandasQuery(
             conn,
             'SELECT * FROM "user" WHERE "username" = ?',
             (username,),
         )
 
-        if user.shape[0] > 0:
+        if checkUser.shape[0] > 0:
             ui.notification_show("Username already exists")
+            conn.close()
             return
 
         # Check the password
         pCheck = shared.passCheck(input.cPassword(), input.cPassword2())
         if pCheck:
             ui.notification_show(pCheck)
+            conn.close()
             return    
 
         code = shared.accessCodeCheck(conn, accessCode)
 
         if code is None:
             ui.notification_show("Invalid access code")
+            conn.close()
             return    
 
         # Create the user
@@ -135,18 +146,23 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID):
             lastRowId="uID",
         )
 
-        newuID = int(newuID)
-
         # Update the access code to show it has been used
         _ = shared.executeQuery(
             cursor,
             'UPDATE "accessCode" SET "uID_user" = ?, "used" = ? WHERE "code" = ?',
-            (newuID, shared.dt(), accessCode),
+            (int(newuID), shared.dt(), accessCode),
         )
+
+        newUser = shared.pandasQuery(
+            conn,
+            'SELECT * FROM "user" WHERE "uID" = ?',
+            (int(newuID),),
+        )
+
         conn.commit()
         conn.close()
 
-        uID.set(newuID)
+        user.set(newUser.to_dict(orient="records")[0])
 
         # Clear the input fields
         ui.update_text_area("cUsername", value="")
@@ -173,6 +189,7 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID):
 
         if user.shape[0] == 0:
             ui.notification_show("This username does not exist")
+            conn.close()
             return
         
         uID = int(user["uID"].iloc[0])
@@ -188,6 +205,7 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID):
 
         if code is None:
             ui.notification_show("Invalid access code")
+            conn.close()
             return
         
         # Update the password
@@ -215,4 +233,4 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID):
         
         ui.notification_show("Password reset successfully, please login again")
 
-    return uID
+    return user

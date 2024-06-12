@@ -83,7 +83,7 @@ def quiz_generation_ui():
 
 # --- Server ---
 @module.server
-def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID, index,topics):
+def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID, index,topics, user):
     
     # Set the topics
     @reactive.effect

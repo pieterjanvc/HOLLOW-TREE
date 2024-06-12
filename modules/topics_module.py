@@ -2,7 +2,7 @@
 # --------------------------
 
 # -- Shiny
-from shiny import Inputs, Outputs, Session, module, reactive, ui, render
+from shiny import Inputs, Outputs, Session, module, reactive, ui, render, req
 from htmltools import HTML, div
 
 import shared.shared as shared
@@ -51,19 +51,26 @@ def topics_ui():
 
 # --- Server ---
 @module.server
-def topics_server(input: Inputs, output: Outputs, session: Session, sID, uID):
+def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
 
-    # Get all active topics from the accorns database
-    conn = shared.appDBConn()   
-    topics = shared.pandasQuery(
-        conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
-    )
-    conn.close()
-
-    ui.update_select("tID", choices=dict(zip(topics["tID"], topics["topic"])))
-    
-    topics = reactive.value(topics)
+    topics = reactive.value(None)
     concepts = reactive.value(None)
+    
+    @reactive.effect
+    @reactive.event(user)
+    def _():
+        req(user.get()["uID"] != 1)
+
+        # Get all active topics from the accorns database
+        conn = shared.appDBConn()   
+        activeTopics = shared.pandasQuery(
+            conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
+        )
+        conn.close()
+
+        ui.update_select("tID", choices=dict(zip(activeTopics["tID"], activeTopics["topic"])))
+        
+        topics.set(activeTopics)
 
     # --- Add topic - modal popup
     @reactive.effect

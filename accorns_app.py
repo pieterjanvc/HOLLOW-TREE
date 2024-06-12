@@ -64,33 +64,7 @@ app_ui = ui.page_fluid(
     ui.include_js(os.path.join(curDir, "ACCORNS", "accorns_js", "accorns.js")),
     ui.include_js(os.path.join(curDir, "shared", "shared_js", "shared.js")),
     ),
-    ui.navset_pill( 
-        # TAB 1 - HOME
-        ui.nav_panel("Home",
-            ui.layout_columns(
-                ui.card(
-                    ui.card_header("Welcome to SCUIRREL"),
-                    HTML("""
-    <p>To access the ACCORNS you need an admin account. If this is the first time you are accessing the 
-    application, please use the access code provided by your administrator to create an account</p>""")),col_widths=12),
-            login_ui("login")),           
-        # https://shiny.posit.co/py/docs/express-in-depth.html#reactive-displays
-        # TAB 2 - VECTOR DATABASE
-        ui.nav_panel("Vector Database",
-            vectorDB_management_ui("vectorDB"), value="vTab"),
-        # TAB 3 - TOPICS
-        ui.nav_panel("Topics",
-            topics_ui("topics"), value="tTab"),
-
-        # TAB 4 - QUIZ QUESTIONS
-        ui.nav_panel("Quiz Questions",
-            # Select a topic and a question with options to add or archive
-            quiz_generation_ui("quizGeneration"), value="qTab"),
-        # TAB 5 - USER MANAGEMENT
-        ui.nav_panel("User Management",
-            user_management_ui("testUI")
-            , value="uTab"),
-        id = "tab"),
+    ui.output_ui("accornsTabs"),
     # Customised feedback button (floating at right side of screen)
     ui.input_action_button("feedback", "Provide Feedback"),
     id = "tab", title="ACCORNS")
@@ -111,16 +85,52 @@ def server(input, output, session):
     conn.commit()
     conn.close()
 
-    uID = login_server("login", sessionID = sID)
-    
-    #index = reactive.value(index)
-    topics, concepts = topics_server("topics", sID=sID, uID=uID)
-    _ = user_management_server("testUI", uID = uID)
-    index, files = vectorDB_management_server("vectorDB", uID=uID)
-    _ = quiz_generation_server("quizGeneration", sID, index, topics)
-    #files = reactive.value(files)
+    # Check which user is using the app
+    user = login_server("login", sessionID = sID)
 
-    
+    @render.ui
+    @reactive.event(user)
+    def accornsTabs():
+        if user.get()["uID"] == 1:
+            return ui.TagList(
+                ui.navset_pill( 
+        # TAB 1 - HOME & LOGIN
+        ui.nav_panel("Home",
+            ui.layout_columns(
+                ui.card(
+                    ui.card_header("Welcome to SCUIRREL"),
+                    HTML("""
+    <p>To access the ACCORNS you need an admin account. If this is the first time you are accessing the 
+    application, please use the access code provided by your administrator to create an account</p>""")),col_widths=12),
+            login_ui("login"),
+            ),        
+        id = "tab")
+            )
+        else:
+            return ui.TagList(ui.navset_pill(
+                # https://shiny.posit.co/py/docs/express-in-depth.html#reactive-displays
+                # TAB 2 - VECTOR DATABASE
+                ui.nav_panel("Vector Database",
+                    vectorDB_management_ui("vectorDB"), value="vTab"),
+                # TAB 3 - TOPICS
+                ui.nav_panel("Topics",
+                    topics_ui("topics"), value="tTab"),
+                # TAB 4 - QUIZ QUESTIONS
+                ui.nav_panel("Quiz Questions",
+                    # Select a topic and a question with options to add or archive
+                    quiz_generation_ui("quizGeneration"), value="qTab"),
+                # TAB 5 - USER MANAGEMENT
+                ui.nav_panel("User Management",
+                    user_management_ui("testUI")
+                    , value="uTab"),
+            ))
+
+    topics, concepts = topics_server("topics", sID=sID, user = user)
+    _ = user_management_server("testUI", user = user)
+    index, files = vectorDB_management_server("vectorDB", user = user)
+    _ = quiz_generation_server("quizGeneration", sID = sID, index = index, topics = topics, user = user)
+        
+        
 
     # # This function allows you to hide/show/disable/enable elements by ID or data-value
     # # The latter is needed because tabs don't use ID's but data-value

@@ -84,7 +84,7 @@ def vectorDB_management_ui():
 
 # --- Server ---
 @module.server
-def vectorDB_management_server(input: Inputs, output: Outputs, session: Session, uID):
+def vectorDB_management_server(input: Inputs, output: Outputs, session: Session, user):
 
     conn = shared.vectorDBConn()
     files = shared.pandasQuery(conn, query='SELECT * FROM "file"')

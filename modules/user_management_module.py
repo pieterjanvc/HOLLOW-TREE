@@ -87,13 +87,13 @@ def user_management_ui():
 # ---- SERVER ----
 
 @module.server
-def user_management_server(input: Inputs, output: Outputs, session: Session, uID):
+def user_management_server(input: Inputs, output: Outputs, session: Session, user):
 
     @reactive.calc
     @reactive.event(input.generateCodes)
     def accessCodes():
-        req(uID() != 1)
-        newCodes = generate_access_codes(n = input.numCodes(), uID= uID(), adminLevel=int(input.role()))
+        req(user.get()["uID"] != 1)
+        newCodes = generate_access_codes(n = input.numCodes(), uID= user.get()["uID"], adminLevel=int(input.role()))
         role = ["user", "instructor", "admin"][int(input.role())]
         # create a pandas dataframe form the dictionary
         return pd.DataFrame({"accessCode": newCodes, "role": role})
