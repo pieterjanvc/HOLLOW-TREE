@@ -13,6 +13,7 @@ from modules.user_management_module import user_management_server, user_manageme
 from modules.login_module import login_server,  login_ui
 from modules.topics_module import topics_ui, topics_server
 from modules.vectorDB_management_module import vectorDB_management_ui, vectorDB_management_server
+from modules.quiz_generation_module import quiz_generation_ui, quiz_generation_server
 
 # -- General
 import os
@@ -84,71 +85,7 @@ app_ui = ui.page_fluid(
         # TAB 4 - QUIZ QUESTIONS
         ui.nav_panel("Quiz Questions",
             # Select a topic and a question with options to add or archive
-            ui.card(
-                ui.card_header("Questions by Topic"),
-                # Dropdown of topics and questions per topic
-                ui.input_select(
-                    "qtID", "Pick a topic", choices={1: "Central Dogma"}, width="400px"
-                ),
-                ui.input_select("qID", "Question", choices=[], width="400px"),
-                # Buttons to add or archive questions and message when busy generating
-                div(
-                    ui.input_action_button("qGenerate", "Generate new", width="180px"),
-                    ui.input_action_button("qArchive", "Archive selected", width="180px"),
-                    id="qBtnSet",
-                    style="display:inline",
-                ),
-                div(
-                    HTML("<i>Generating a new question...</i>"),
-                    id="qBusyMsg",
-                    style="display: none;",
-                )),
-
-            # Only show this panel if there is at least one question
-            ui.panel_conditional("input.qID",
-                ui.card(
-                    ui.card_header("Review question"),
-
-                    # Show a preview of the question
-                    ui.output_ui("quizQuestionPreview", style="display: none;"),
-                    # def quizQuestionPreview():
-                    #     return HTML(
-                    #         f"<b>{input.rqQuestion()}</b><ol type='A'><li>{input.rqOA()}</li>"
-                    #         f"<li>{input.rqOB()}</li><li>{input.rqOC()}</li>"
-                    #         f"<li>{input.rqOD()}</li></ol><i>Correct answer: {input.rqCorrect()}</i><hr>"
-                    #     )
-
-                    # Save updates
-                    div(
-                        ui.input_action_button("qSaveChanges", "Save Changes"),
-                        ui.input_action_button("qDiscardChanges", "Discard Changes"),
-                    ),
-                    # Fields to edit any part of the question
-                    ui.input_text_area(
-                        "rqQuestion", "Question", width="100%", autoresize=True
-                    ),
-                    ui.input_radio_buttons(
-                        "rqCorrect",
-                        "Correct answer",
-                        choices=["A", "B", "C", "D"],
-                        inline=True,
-                    ),
-                    ui.input_text("rqOA", "Option A", width="100%"),
-                    ui.input_text_area(
-                        "rqOAexpl", "Explanation A", width="100%", autoresize=True
-                    ),
-                    ui.input_text("rqOB", "Option B", width="100%"),
-                    ui.input_text_area(
-                        "rqOBexpl", "Explanation B", width="100%", autoresize=True
-                    ),
-                    ui.input_text("rqOC", "Option C", width="100%"),
-                    ui.input_text_area(
-                        "rqOCexpl", "Explanation C", width="100%", autoresize=True
-                    ),
-                    ui.input_text("rqOD", "Option D", width="100%"),
-                    ui.input_text_area(
-                        "rqODexpl", "Explanation D", width="100%", autoresize=True
-                    ))), value="qTab"),
+            quiz_generation_ui("quizGeneration"), value="qTab"),
         # TAB 5 - USER MANAGEMENT
         ui.nav_panel("User Management",
             user_management_ui("testUI")
@@ -180,6 +117,7 @@ def server(input, output, session):
     topics, concepts = topics_server("topics", sID=sID, uID=uID)
     _ = user_management_server("testUI", uID = uID)
     index, files = vectorDB_management_server("vectorDB", uID=uID)
+    _ = quiz_generation_server("quizGeneration", sID, index, topics)
     #files = reactive.value(files)
 
     
