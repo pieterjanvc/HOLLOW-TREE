@@ -5,12 +5,11 @@ import shared.shared as shared
 import ACCORNS.accorns_shared as accorns_shared
 
 # -- General
-import os
 import pandas as pd
 import json
 
 # -- Shiny
-from shiny import Inputs, Outputs, Session, module, reactive, ui, render, req
+from shiny import Inputs, Outputs, Session, module, reactive, ui, render
 from htmltools import HTML, div
 
 # -- Llamaindex

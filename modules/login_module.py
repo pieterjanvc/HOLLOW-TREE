@@ -11,9 +11,6 @@ from htmltools import HTML
 
 import shared.shared as shared
 
-# --- Functions
-
-
 # --- UI
 @module.ui
 def login_ui():
@@ -50,7 +47,7 @@ def login_ui():
 
 # --- Server
 @module.server
-def login_server(input: Inputs, output: Outputs, session: Session, sessionID):
+def login_server(input: Inputs, output: Outputs, session: Session, sessionID, minAdminLevel = 0):
 
     # Default to anonymous
     conn = shared.appDBConn()
@@ -58,6 +55,7 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID):
     conn.close()
     user = reactive.value(user.to_dict(orient="records")[0]) 
     
+    # Login
     @reactive.effect
     @reactive.event(input.login)
     def _():
@@ -69,9 +67,18 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID):
             'SELECT * FROM "user" WHERE "username" = ? AND "username" != "anonymous"',
             (username,),
         )
+
+        #Somehow the manually added test admin has a password that is not a byte string
+        passw = checkUser.password.iloc[0]
+        passw = str.encode(passw) if not isinstance(passw, bytes) else passw
         
         if checkUser.shape[0] == 1:
-            if bcrypt.checkpw(password, checkUser.password.iloc[0]):
+            if bcrypt.checkpw(password, passw):
+                if int(checkUser.adminLevel.iloc[0]) < minAdminLevel:
+                    ui.notification_show("You do not have the required permissions to access this application")
+                    conn.close()
+                    return
+                
                 ui.notification_show("Logged in successfully")
                 cursor = conn.cursor()
                 # For now we only have anonymous users (appID 0 -> SCUIRREL)
@@ -97,6 +104,7 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID):
 
         user.set(checkUser.to_dict(orient="records")[0])
 
+    # Create an account
     @reactive.effect
     @reactive.event(input.createAccount)
     def _():
@@ -172,6 +180,7 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID):
 
         ui.notification_show("Account created successfully")
 
+    # Reset password
     @reactive.effect
     @reactive.event(input.reset)
     def _():

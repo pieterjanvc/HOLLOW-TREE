@@ -58,7 +58,7 @@ else:
 # *********************************
 
 # Database to store app data (this is not the vector database!)
-def createLocalAccornsDB(DBpath, sqlFile):
+def createLocalAccornsDB(DBpath = shared.sqliteDB, sqlFile = os.path.join(appDBDir, "appDB_sqlite_accorns.sql")):
     if os.path.exists(DBpath):
         return (1, "Accorns database already exists. Skipping")
 
@@ -76,7 +76,7 @@ def createLocalAccornsDB(DBpath, sqlFile):
     conn.close()
     return (0, "Accorns database created")
 
-def createLocalVectorDB(DBpath, sqlFile):
+def createLocalVectorDB(DBpath = shared.vectorDB, sqlFile = os.path.join(appDBDir, "appDB_duckdb_vectordb.sql")):
     conn = duckdb.connect(DBpath)
     cursor = conn.cursor()
     # Check if the documents, file and keyword tables exist
@@ -96,12 +96,6 @@ def createLocalVectorDB(DBpath, sqlFile):
     conn.close()
     
     return (0, "Local DuckDB vector database created")
-
-
-# Generate local databases if needed
-if not (shared.remoteAppDB):
-    print(createLocalAccornsDB(shared.sqliteDB, os.path.join(appDBDir, "appDB_sqlite_accorns.sql")))
-    print(createLocalVectorDB(shared.vectorDB, os.path.join(appDBDir, "appDB_duckdb_vectordb.sql")))
 
 # Create vector database and add files
 def addFileToDB(
@@ -285,25 +279,21 @@ def addDemo():
     
     return (0, "Demo added")
 
-# Add the demo to the database if requested
-if shared.addDemo:
-    print(addDemo()) 
+# # Load the vector index from storage
+# if shared.remoteAppDB:
+#     vector_store = PGVectorStore.from_params(
+#         host=shared.postgresHost,
+#         port=shared.postgresPort,
+#         user=postgresUser,
+#         password=os.environ.get("POSTGRES_PASS_ACCORNS"),
+#         database="vector_db",
+#         table_name="document",
+#         embed_dim=1536,  # openai embedding dimension
+#     )
+# else:
+#     vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
 
-# Load the vector index from storage
-if shared.remoteAppDB:
-    vector_store = PGVectorStore.from_params(
-        host=shared.postgresHost,
-        port=shared.postgresPort,
-        user=postgresUser,
-        password=os.environ.get("POSTGRES_PASS_ACCORNS"),
-        database="vector_db",
-        table_name="document",
-        embed_dim=1536,  # openai embedding dimension
-    )
-else:
-    vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
-
-index = VectorStoreIndex.from_vector_store(vector_store)
+# index = VectorStoreIndex.from_vector_store(vector_store)
 
 
 def backupQuery(

@@ -210,9 +210,10 @@ CREATE TABLE "feedback_chat_msg" (
 );
 
 -- INSERT BASE USER AND ADMIN
-INSERT INTO "user" ("username", "adminLevel", "created", "modified") 
-VALUES ('anonymous', 0, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS')), 
-('admin', 2, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
+INSERT INTO "user" ("username", "password", "adminLevel", "created", "modified") 
+VALUES ('anonymous', NULL, 0, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS')), 
+('admin', '$2b$12$glrNjIMh4tGVY1pzvcoCdOnVQpG7JoFPBbvN2iLZEuY2avgWd9nWe', 3, 
+to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
 
 \c accorns;
 

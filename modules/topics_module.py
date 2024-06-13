@@ -8,9 +8,6 @@ from htmltools import HTML, div
 import shared.shared as shared
 import ACCORNS.accorns_shared as accorns_shared
 
-# --- Functions ---
-
-
 # --- UI ---
 @module.ui
 def topics_ui():

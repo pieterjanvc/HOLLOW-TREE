@@ -18,7 +18,11 @@ from regex import search as re_search
 
 # Llamaindex
 from llama_index.llms.openai import OpenAI
+from llama_index.core import VectorStoreIndex
+from llama_index.vector_stores.duckdb import DuckDBVectorStore
+from llama_index.vector_stores.postgres import PGVectorStore
 
+# Shiny
 from shiny import reactive
 
 # --- VARIABLES ---
@@ -118,6 +122,22 @@ def vectorDBConn(postgresUser=postgresUser, remoteAppDB=remoteAppDB, vectorDB=ve
 
     return conn
 
+def getIndex(user, remote = remoteAppDB):
+    if remote:
+            vectorStore = PGVectorStore.from_params(
+                host=postgresHost,
+                port=postgresPort,
+                user=user,
+                password=os.environ.get("POSTGRES_PASS_ACCORNS"),
+                database="vector_db",
+                table_name="document",
+                embed_dim=1536,  # openai embedding dimension
+            )
+            return VectorStoreIndex.from_vector_store(vectorStore)
+    else:
+        return VectorStoreIndex.from_vector_store(
+            DuckDBVectorStore.from_local(vectorDB)
+        )
 
 def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB):
     query = query.replace("?", "%s") if remoteAppDB else query
@@ -170,10 +190,6 @@ def checkRemoteDB():
             "Please check the postgres connection settings in config.toml "
             "and make sure POSTGRES_PASS_SCUIRREL and POSTGRES_PASS_SCUIRREL are set as an environment variables."
         )
-
-
-if remoteAppDB:
-    print(checkRemoteDB())
 
 def passCheck(password, password2):
     # Check if the password is strong enough

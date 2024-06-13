@@ -11,30 +11,6 @@ import os
 from shiny import Inputs, Outputs, Session, module, reactive, ui, render, req
 from htmltools import HTML, div
 
-# -- Llamaindex
-from llama_index.core import VectorStoreIndex
-from llama_index.vector_stores.duckdb import DuckDBVectorStore
-from llama_index.vector_stores.postgres import PGVectorStore
-
-
-# --- Functions ---
-def getIndex(remote = shared.remoteAppDB):
-    if remote:
-            vectorStore = PGVectorStore.from_params(
-                host=shared.postgresHost,
-                port=shared.postgresPort,
-                user=accorns_shared.postgresUser,
-                password=os.environ.get("POSTGRES_PASS_ACCORNS"),
-                database="vector_db",
-                table_name="document",
-                embed_dim=1536,  # openai embedding dimension
-            )
-            return VectorStoreIndex.from_vector_store(vectorStore)
-    else:
-        return VectorStoreIndex.from_vector_store(
-            DuckDBVectorStore.from_local(shared.vectorDB)
-        )
-
 # --- UI ---
 
 @module.ui
@@ -93,7 +69,7 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
         index = None
         shared.elementDisplay("blankDBMsg", "s", session)
     else:
-        index = getIndex()
+        index = shared.getIndex("accorns")
     
     files = reactive.value(files)
     index = reactive.value(index)
@@ -162,7 +138,7 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
         conn.close()
 
         files.set(getFiles)
-        index.set(getIndex())
+        index.set(shared.getIndex())
 
         shared.elementDisplay("uiUploadFile", "s", session)
         ui.remove_ui("#processFile")

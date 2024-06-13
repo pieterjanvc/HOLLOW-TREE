@@ -2,7 +2,7 @@ DROP TABLE IF EXISTS "user";
 CREATE TABLE IF NOT EXISTS "user" (
 	"uID" INTEGER PRIMARY KEY AUTOINCREMENT,
 	"username" TEXT UNIQUE,
-  "password" TEXT, 
+  "password" BLOB, 
   "adminLevel" INTEGER DEFAULT 0,
   "email" TEXT,
   "created" TEXT,
@@ -203,5 +203,5 @@ CREATE TABLE IF NOT EXISTS "feedback_chat_msg" (
 -- Add the main admin an anonymous user
 INSERT INTO user(username, "password", adminLevel, created, modified)
 VALUES('anonymous', NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), 
-  ('admin', '$2b$12$glrNjIMh4tGVY1pzvcoCdOnVQpG7JoFPBbvN2iLZEuY2avgWd9nWe', 
-  2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+  ('admin', '$2b$12$ihUBRiggmDrV6NZvexLByOsOtPQpnCjpP/F0tcW9XLrt586hbOlvW', 
+  3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
