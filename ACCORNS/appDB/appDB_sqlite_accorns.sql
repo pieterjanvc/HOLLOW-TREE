@@ -2,7 +2,7 @@ DROP TABLE IF EXISTS "user";
 CREATE TABLE IF NOT EXISTS "user" (
 	"uID" INTEGER PRIMARY KEY AUTOINCREMENT,
 	"username" TEXT UNIQUE,
-  "password" BLOB, 
+  "password" TEXT, 
   "adminLevel" INTEGER DEFAULT 0,
   "email" TEXT,
   "created" TEXT,
@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS "accessCode" (
   "uID_user" INTEGER, 
   "adminLevel" INTEGER DEFAULT 0,
   "created" TEXT,
-  "used" TEXT
+  "used" TEXT,
+  "note" TEXT
 );
 
 DROP TABLE IF EXISTS "group";
@@ -190,7 +191,7 @@ CREATE TABLE IF NOT EXISTS "feedback_chat" (
 );
 
 -- We can't add a mID foreign key because the first time 
--- the value is inserted it's a placeholder which gets updated 
+-- the value is inserted it's a placeholder which gets updated; 
 DROP TABLE IF EXISTS "feedback_chat_msg";
 CREATE TABLE IF NOT EXISTS "feedback_chat_msg" (
 	"fcmID" INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -200,8 +201,8 @@ CREATE TABLE IF NOT EXISTS "feedback_chat_msg" (
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
 
--- Add the main admin an anonymous user
+-- Add the main admin an anonymous user;
 INSERT INTO user(username, "password", adminLevel, created, modified)
 VALUES('anonymous', NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), 
-  ('admin', '$2b$12$ihUBRiggmDrV6NZvexLByOsOtPQpnCjpP/F0tcW9XLrt586hbOlvW', 
+  ('admin', '$2b$12$RIcoDnGHaNbuYUGzm0Ijdejw68fEpqyyAFWrS/8uteQLhtDBUI4KW', 
   3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

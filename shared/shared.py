@@ -43,7 +43,8 @@ postgresHost = config["postgres"]["host"]
 postgresPort = int(config["postgres"]["port"])
 vectorDB = os.path.normpath(config["localStorage"]["duckDB"])
 sqliteDB = os.path.normpath(config["localStorage"]["sqliteDB"])
-postgresUser = None  # Each app will set this variable to the correct user
+postgresAccorns = "accorns"
+postgresScuirrel = "scuirrel"
 
 # Create the parent directory for the sqliteDB if it does not exist
 if not os.path.exists(os.path.dirname(sqliteDB)):
@@ -85,14 +86,14 @@ def elementDisplay(id, effect, session):
         await session.send_custom_message("hideShow", {"id": id, "effect": effect})
 
 # Get a local or remote DB connection (depending on config)
-def appDBConn(postgresUser=postgresUser, remoteAppDB=remoteAppDB):
+def appDBConn(postgresUser, remoteAppDB=remoteAppDB):
     if remoteAppDB:
         return psycopg2.connect(
             host=postgresHost,
             user=postgresUser,
             password=os.environ.get(
                 "POSTGRES_PASS_"
-                + ("SCUIRREL" if postgresUser == "scuirrel" else "ACCORNS")
+                + ("SCUIRREL" if postgresUser == postgresScuirrel else "ACCORNS")
             ),
             database="accorns",
         )
@@ -105,7 +106,7 @@ def appDBConn(postgresUser=postgresUser, remoteAppDB=remoteAppDB):
         return sqlite3.connect(config["localStorage"]["sqliteDB"])
 
 
-def vectorDBConn(postgresUser=postgresUser, remoteAppDB=remoteAppDB, vectorDB=vectorDB):
+def vectorDBConn(postgresUser, remoteAppDB=remoteAppDB, vectorDB=vectorDB):
     if remoteAppDB:
         conn = psycopg2.connect(
             host=postgresHost,
@@ -113,7 +114,7 @@ def vectorDBConn(postgresUser=postgresUser, remoteAppDB=remoteAppDB, vectorDB=ve
             user=postgresUser,
             password=os.environ.get(
                 "POSTGRES_PASS_"
-                + ("SCUIRREL" if postgresUser == "scuirrel" else "ACCORNS")
+                + ("SCUIRREL" if postgresUser == postgresScuirrel else "ACCORNS")
             ),
             database="vector_db",
         )
@@ -166,6 +167,7 @@ def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB
 def pandasQuery(conn, query, params=()):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
+        query = query.replace("?", "%s") if remoteAppDB else query
         return pd.read_sql_query(sql = query, con = conn, params=params)
 
 

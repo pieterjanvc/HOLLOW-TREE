@@ -19,6 +19,7 @@ from urllib.request import urlretrieve
 from tempfile import TemporaryDirectory
 import secrets
 import string
+import pandas as pd
 
 # -- Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
@@ -30,9 +31,8 @@ from llama_index.vector_stores.postgres import PGVectorStore
 from shiny.express import ui
 
 # -- Other
-import nest_asyncio
-
-nest_asyncio.apply()
+# import nest_asyncio
+# nest_asyncio.apply()
 
 # --- Global variables
 postgresUser = "accorns"  # Used by shared.appDBConn
@@ -100,6 +100,7 @@ def createLocalVectorDB(DBpath = shared.vectorDB, sqlFile = os.path.join(appDBDi
 # Create vector database and add files
 def addFileToDB(
     newFile,
+    shinyToken,
     vectorDB=None,
     remoteAppDB=shared.remoteAppDB,
     storageFolder=None,
@@ -186,7 +187,7 @@ def addFileToDB(
     fileName = os.path.basename(newFileName)
 
     if remoteAppDB:
-        conn = shared.vectorDBConn(postgresUser)
+        conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns)
         cursor = conn.cursor()
         _ = cursor.execute(
             "SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y "
@@ -202,7 +203,7 @@ def addFileToDB(
         chunkTitles = "* " + "\n* ".join(set([x[0] for x in q]))
         chunkKeywords = ", ".join(set((", ".join([x[1] for x in q])).split(", ")))
     else:
-        conn = shared.vectorDBConn(vectorDB=vectorDB)
+        conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns, vectorDB=vectorDB)
         cursor = conn.cursor()
         _ = cursor.execute(
             "SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE "
@@ -227,13 +228,13 @@ def addFileToDB(
     )
     docSum = json.loads(str(index.as_query_engine().query(docSum)))
 
-    conn = shared.vectorDBConn(postgresUser, vectorDB=vectorDB)
+    conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns, vectorDB=vectorDB)
     cursor = conn.cursor()
     _ = shared.executeQuery(
         cursor,
-        'INSERT INTO "file"("fID", "fileName", "title", "subtitle", "created") '
-        "VALUES(nextval('seq_fID'), ?, ?, ?, ?)",
-        (fileName, docSum["title"], docSum["subtitle"], shared.dt()),
+        'INSERT INTO "file"("fID", "fileName", "title", "subtitle", "shinyToken", "created") '
+        "VALUES(nextval('seq_fID'), ?, ?, ?, ?, ?)",
+        (fileName, docSum["title"], docSum["subtitle"], shinyToken, shared.dt()),
     )
     shared.executeQuery(cursor, "SELECT currval('seq_fID')")
     fID = cursor.fetchone()[0]
@@ -248,36 +249,48 @@ def addFileToDB(
 
     return (0, "Completed")
 
-def addDemo():    
+def addDemo(shinyToken):    
+
+    msg = 0
+
     conn = shared.appDBConn(postgresUser)    
     cursor = conn.cursor()    
     
     # Check if the demo has already been added  
     cursor.execute("SELECT * FROM topic LIMIT 1")  
-    if cursor.fetchone() is not None:
-        return (1, "Demo already present")
+    if cursor.fetchone() is None:
+        msg = 1
     
-    # Check if the conn is to duckdb or postgres
-    if "sqlite" in str(conn):
-                        
-            with open(os.path.join(appDBDir, "appDB_sqlite_demo.sql"), "r") as file:
-                query = sql_split(file.read())
-
-            for x in query:
-                _ = cursor.execute(x)
+        # Check if the conn is to duckdb or postgres
+        if "sqlite" in str(conn):
                             
-    else:
-        with open(os.path.join(appDBDir, "appDB_postgres_demo.sql"), "r") as file:
-            query = file.read()
-            _ = cursor.execute(query)
-        
-    conn.commit()
-    conn.close()
+                with open(os.path.join(appDBDir, "appDB_sqlite_demo.sql"), "r") as file:
+                    query = sql_split(file.read())
+
+                for x in query:
+                    _ = cursor.execute(x)
+                                
+        else:
+            with open(os.path.join(appDBDir, "appDB_postgres_demo.sql"), "r") as file:
+                query = file.read()
+                _ = cursor.execute(query)
+            
+        conn.commit()
+        conn.close()
     
     # Add the demo file to the vector database
-    addFileToDB(shared.demoFile, shared.vectorDB)
+    # Check if the demo file is already in the database
+    conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns)
+    cursor = conn.cursor()
+    _ = cursor.execute('SELECT "fID" FROM file LIMIT 1')
     
-    return (0, "Demo added")
+    if cursor.fetchone() is  None:   
+        msg = 3 if msg == 1 else 2
+        addFileToDB(newFile=shared.demoFile, shinyToken = shinyToken, vectorDB= shared.vectorDB)    
+
+    return (msg , ["Demo already present", "Demo added to the accorns database", 
+                   "Demo file added to the vector database", 
+                   "Demo added to accorns and vector database"][msg])
 
 # # Load the vector index from storage
 # if shared.remoteAppDB:
@@ -369,7 +382,9 @@ def generate_hash_list(n = 1):
 
     return hash_values
 
-def generate_access_codes(n, uID, adminLevel):
+def generate_access_codes(n, uID, adminLevel, note = ""):
+
+    note = None if note.strip() == "" else note
 
     # Check if n and unID are set
     if not n:
@@ -378,13 +393,13 @@ def generate_access_codes(n, uID, adminLevel):
         raise ValueError("Please provide the uID of the user generating the access codes")
 
     codes = []
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
     cursor = conn.cursor()
     x = n
     while len(codes) < n:
-        codes = codes + (generate_hash_list(x))
+        codes = tuple(codes + (generate_hash_list(x)))
         # Check if the accessCode does not exist in the database
-        cursor.execute("SELECT code FROM accessCode WHERE code IN ({})".format(','.join(['?']*len(codes))), codes)
+        shared.executeQuery(cursor,'SELECT "code" FROM "accessCode" WHERE "code" IN ({})'.format(','.join(['?']*len(codes))), codes)
         existing_codes = cursor.fetchall()
         
         if existing_codes:
@@ -393,9 +408,13 @@ def generate_access_codes(n, uID, adminLevel):
             x = n - len(codes)
     
     # Insert the new codes into the database
-    _ = shared.executeQuery(cursor, 'INSERT INTO "accessCode"("code", "uID_creator", "adminLevel", "created") VALUES(?, ?, ?, ?)',
-                             [(code, uID, adminLevel, shared.dt()) for code in codes])
+    _ = shared.executeQuery(cursor, 'INSERT INTO "accessCode"("code", "uID_creator", "adminLevel", "created", "note") VALUES(?, ?, ?, ?, ?)',
+                             [(code, uID, adminLevel, shared.dt(), note) for code in codes])
     conn.commit()
     conn.close()
 
-    return codes
+    role = ["anonymous", "user", "instructor", "admin"][adminLevel]
+    
+    # Return a data frame
+    return pd.DataFrame({"accessCode": codes, "role": role, "note": note})
+

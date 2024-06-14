@@ -59,7 +59,7 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
         req(user.get()["uID"] != 1)
 
         # Get all active topics from the accorns database
-        conn = shared.appDBConn()   
+        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)   
         activeTopics = shared.pandasQuery(
             conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
         )
@@ -109,7 +109,7 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
             return
 
         # Add new topic to DB
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
         cursor = conn.cursor()
         tID = shared.executeQuery(
             cursor,
@@ -184,7 +184,7 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
             return
 
         # Update the DB
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
         cursor = conn.cursor()
         # Backup old value
         accorns_shared.backupQuery(
@@ -219,7 +219,7 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
         if input.tID() is None:
             return
 
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
         cursor = conn.cursor()
         _ = shared.executeQuery(
             cursor,
@@ -288,7 +288,7 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
             return
 
         # Add new topic to DB
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
         cursor = conn.cursor()
         _ = shared.executeQuery(
             cursor,
@@ -355,7 +355,7 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
 
         # Update the DB
         cID = concepts.get().iloc[conceptsTable.data_view(selected=True).index[0]]["cID"]
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
         cursor = conn.cursor()
         # Backup old value
         accorns_shared.backupQuery(
@@ -385,7 +385,7 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
             return
 
         cID = concepts.get().iloc[conceptsTable.data_view(selected=True).index[0]]["cID"]
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
         cursor = conn.cursor()
         _ = shared.executeQuery(
             cursor,
@@ -405,7 +405,7 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
     @reactive.event(input.tID)
     def _():
         tID = input.tID() if input.tID() else 0
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
         conceptList = shared.pandasQuery(
             conn, f'SELECT * FROM "concept" WHERE "tID" = {tID} AND "archived" = 0'
         )

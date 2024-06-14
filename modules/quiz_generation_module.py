@@ -170,7 +170,7 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
 
         topic = topics.get()[topics.get()["tID"] == int(input.qtID())].iloc[0]["topic"]
 
-        conn = shared.appDBConn()       
+        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)       
         # topic = shared.pandasQuery(
         #     conn, f'SELECT "topic" FROM "topic" WHERE "tID" = {input.qtID()}'
         # )
@@ -248,7 +248,7 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
         with reactive.isolate():
             q = resp["resp"].iloc[0]  # For now only processing one
             # Save the questions in the appAB
-            conn = shared.appDBConn()
+            conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
             cursor = conn.cursor()
             # Insert question
             qID = shared.executeQuery(
@@ -291,7 +291,7 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
     @reactive.event(input.qtID)
     def _():
         # Get the question info from the DB
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
         q = shared.pandasQuery(
             conn,
             f'SELECT "qID", "question" FROM "question" WHERE "tID" = {int(input.qtID())} AND "archived" = 0',
@@ -305,7 +305,7 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
     @reactive.event(input.qID, input.qDiscardChanges)
     def _():
         # Get the question info from the DB
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
         q = shared.pandasQuery(
             conn, f'SELECT * FROM "question" WHERE "qID" = {input.qID()}'
         ).iloc[0]
@@ -328,7 +328,7 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
     @reactive.event(input.qSaveChanges)
     def _():
         # Get the original question
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
         cursor = conn.cursor()
         q = shared.pandasQuery(
             conn,

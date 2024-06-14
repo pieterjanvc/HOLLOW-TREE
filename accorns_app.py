@@ -2,9 +2,6 @@
 # ----------- ACCORNS: ADMIN APP -----------
 # ******************************************
 
-# Welcome to ACCORNS:
-# Admin Control Center Overseeing RAG Needed for SCUIRREL
-
 # See app_shared.py for variables and functions shared across sessions
 import shared.shared as shared
 import ACCORNS.accorns_shared as accorns_shared
@@ -26,7 +23,6 @@ from htmltools import HTML
 # The following is needed to prevent async issues when inserting new data in vector DB
 # https://github.com/run-llama/llama_index/issues/9978
 import nest_asyncio
-
 nest_asyncio.apply()
 
 # ----------- SHINY APP -----------
@@ -41,10 +37,10 @@ if not (shared.remoteAppDB):
     print(accorns_shared.createLocalVectorDB())
 else:
     # Check if a remote database is used and if it's accessible
-    print(accorns_shared.checkRemoteDB())
+    print(shared.checkRemoteDB())
 # Add the demo to the database if requested
 if shared.addDemo:
-    print(accorns_shared.addDemo()) 
+    print(accorns_shared.addDemo(None)) 
 
 
 # --- RENDERING UI ---
@@ -70,7 +66,7 @@ app_ui = ui.page_fluid(
 def server(input, output, session):
 
     # Register the session start in the DB
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(postgresUser=accorns_shared.postgresUser)
     cursor = conn.cursor()
     sID = shared.executeQuery(
         cursor,
@@ -83,7 +79,7 @@ def server(input, output, session):
     conn.close()
 
     # Check which user is using the app
-    user = login_server("login", sessionID = sID, minAdminLevel = 2)
+    user = login_server("login", postgresUser = shared.postgresAccorns, sessionID = sID, minAdminLevel = 2)
 
     # Which tabs to show based on the user
     @render.ui
@@ -134,7 +130,7 @@ def server(input, output, session):
 
     def theEnd():
         # Add logs to the database after user exits            
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser=accorns_shared.postgresUser)
         cursor = conn.cursor()
         # Register the end of the session and if an error occurred, log it
         errMsg = traceback.format_exc().strip()

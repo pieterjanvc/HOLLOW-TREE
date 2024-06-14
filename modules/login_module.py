@@ -47,10 +47,10 @@ def login_ui():
 
 # --- Server
 @module.server
-def login_server(input: Inputs, output: Outputs, session: Session, sessionID, minAdminLevel = 0):
+def login_server(input: Inputs, output: Outputs, session: Session, postgresUser, sessionID, minAdminLevel = 0):
 
     # Default to anonymous
-    conn = shared.appDBConn()
+    conn = shared.appDBConn(postgresUser=postgresUser)
     user = shared.pandasQuery(conn,'SELECT * FROM "user" WHERE "uID" = 1')
     conn.close()
     user = reactive.value(user.to_dict(orient="records")[0]) 
@@ -61,19 +61,15 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID, mi
     def _():
         username = input.lUsername()
         password = input.lPassword().encode("utf-8")
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser=postgresUser)
         checkUser = shared.pandasQuery(
             conn,
-            'SELECT * FROM "user" WHERE "username" = ? AND "username" != "anonymous"',
+            'SELECT * FROM "user" WHERE "username" = ? AND "username" != \'anonymous\'',
             (username,),
         )
-
-        #Somehow the manually added test admin has a password that is not a byte string
-        passw = checkUser.password.iloc[0]
-        passw = str.encode(passw) if not isinstance(passw, bytes) else passw
         
         if checkUser.shape[0] == 1:
-            if bcrypt.checkpw(password, passw):
+            if bcrypt.checkpw(password, checkUser.password.iloc[0].encode("utf-8")):
                 if int(checkUser.adminLevel.iloc[0]) < minAdminLevel:
                     ui.notification_show("You do not have the required permissions to access this application")
                     conn.close()
@@ -84,7 +80,7 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID, mi
                 # For now we only have anonymous users (appID 0 -> SCUIRREL)
                 _ = shared.executeQuery(
                     cursor,
-                    'UPDATE "session" SET "uID" = ? WHERE sID = ?',
+                    'UPDATE "session" SET "uID" = ? WHERE "sID" = ?',
                     (int(checkUser.uID.iloc[0]), sessionID)
                 )
                 conn.commit()
@@ -117,7 +113,7 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID, mi
             return
         
         # Check if the username already exists
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser=postgresUser)
         cursor = conn.cursor()
         checkUser = shared.pandasQuery(
             conn,
@@ -150,7 +146,7 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID, mi
             cursor,
             'INSERT INTO "user" ("username", "password", "adminLevel", "created", "modified")'
             "VALUES(?, ?, ?, ?, ?)",
-            (username, hashed, int(code["adminLevel"].iloc[0]), shared.dt(), shared.dt()),
+            (username, hashed.decode(), int(code["adminLevel"].iloc[0]), shared.dt(), shared.dt()),
             lastRowId="uID",
         )
 
@@ -188,7 +184,7 @@ def login_server(input: Inputs, output: Outputs, session: Session, sessionID, mi
         accessCode = input.rAccessCode()
 
         # Check if the username already exists
-        conn = shared.appDBConn()
+        conn = shared.appDBConn(postgresUser=postgresUser)
         cursor = conn.cursor()
         user = shared.pandasQuery(
             conn,

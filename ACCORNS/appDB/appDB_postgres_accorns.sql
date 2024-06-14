@@ -38,7 +38,8 @@ CREATE TABLE "accessCode" (
   "uID_user" INTEGER, 
   "adminLevel" INTEGER DEFAULT 0,
   "created" TEXT,
-  "used" TEXT
+  "used" TEXT,
+  "note" TEXT
 );
 
 
@@ -48,7 +49,7 @@ CREATE TABLE "group" (
   "created" TEXT,
   "modified" TEXT,
   "description" TEXT
-)
+);
 
 CREATE TABLE group_member(
   "gmID" SERIAL PRIMARY KEY,
@@ -212,7 +213,7 @@ CREATE TABLE "feedback_chat_msg" (
 -- INSERT BASE USER AND ADMIN
 INSERT INTO "user" ("username", "password", "adminLevel", "created", "modified") 
 VALUES ('anonymous', NULL, 0, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS')), 
-('admin', '$2b$12$glrNjIMh4tGVY1pzvcoCdOnVQpG7JoFPBbvN2iLZEuY2avgWd9nWe', 3, 
+('admin', '$2b$12$RIcoDnGHaNbuYUGzm0Ijdejw68fEpqyyAFWrS/8uteQLhtDBUI4KW', 3, 
 to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
 
 \c accorns;

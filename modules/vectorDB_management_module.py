@@ -62,7 +62,7 @@ def vectorDB_management_ui():
 @module.server
 def vectorDB_management_server(input: Inputs, output: Outputs, session: Session, user):
 
-    conn = shared.vectorDBConn()
+    conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns)
     files = shared.pandasQuery(conn, query='SELECT * FROM "file"')
     conn.close()
     if files.shape[0] == 0:
@@ -112,6 +112,7 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
         print("Start adding file...")
         return accorns_shared.addFileToDB(
             newFile=newFile,
+            shinyToken = session.id,
             vectorDB=vectorDB,
             storageFolder=storageFolder,
             newFileName=newFileName,
@@ -133,12 +134,12 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
         #ui.modal_show(ui.modal(msg, title="Success" if insertionResult == 0 else "Issue"))
 
         # Get the new file info
-        conn = shared.vectorDBConn()
+        conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns)
         getFiles = shared.pandasQuery(conn, 'SELECT * FROM "file"')                
         conn.close()
 
         files.set(getFiles)
-        index.set(shared.getIndex())
+        index.set(shared.getIndex(user = "accorns"))
 
         shared.elementDisplay("uiUploadFile", "s", session)
         ui.remove_ui("#processFile")
@@ -153,7 +154,7 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
 
         info = files().iloc[filesTable.data_view(selected=True).index[0]]
 
-        conn = shared.vectorDBConn()
+        conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns)
         keywords = shared.pandasQuery(
             conn, f'SELECT "keyword" FROM "keyword" WHERE "fID" = {int(info.fID)}'
         )
