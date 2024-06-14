@@ -62,6 +62,8 @@ app_ui = ui.page_fluid(
     ui.input_action_button("feedback", "Provide Feedback"),
     id = "tab", title="ACCORNS")
 
+# --- SERVER ---
+# **************
 
 def server(input, output, session):
 
@@ -92,7 +94,7 @@ def server(input, output, session):
         ui.nav_panel("Home",
             ui.layout_columns(
                 ui.card(
-                    ui.card_header("Welcome to SCUIRREL"),
+                    ui.card_header("Welcome to ACCORNS"),
                     HTML("""
     <p>To access the ACCORNS you need an admin account. If this is the first time you are accessing the 
     application, please use the access code provided by your administrator to create an account</p>""")),col_widths=12),
