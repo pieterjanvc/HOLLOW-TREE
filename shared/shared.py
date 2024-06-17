@@ -80,10 +80,12 @@ def inputCheck(input):
 
 # This function allows you to hide/show/disable/enable elements by ID or data-value
     # The latter is needed because tabs don't use ID's but data-value
-def elementDisplay(id, effect, session):
-    @reactive.effect
-    async def _():
-        await session.send_custom_message("hideShow", {"id": id, "effect": effect})
+def elementDisplay(id, effect, session, alertNotFound=True):
+    id = session.ns + '-' + id if session.ns != '' else id
+
+    @reactive.effect    
+    async def _():        
+        await session.send_custom_message("hideShow", {"id": id, "effect": effect, "alertNotFound": alertNotFound})
 
 # Get a local or remote DB connection (depending on config)
 def appDBConn(postgresUser, remoteAppDB=remoteAppDB):

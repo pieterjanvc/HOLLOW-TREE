@@ -7,7 +7,7 @@ body {
     --userCol: var(--theme1);
 }
 
-#chatWindow .card-body {
+.chatWindow .card-body {
     flex-direction: column-reverse;
 }
 

@@ -12,10 +12,11 @@ from htmltools import HTML, div
 # --- UI ---
 
 @module.ui
-def quiz_ui():
+def quiz_ui(inline=True):
+    inline = 'display: inline-block;' if inline else ''
     return ([
         ui.input_action_button("quizQuestion", "Take a quiz question", 
-                               width="250px"),
+                               width="250px", style=inline),
     ])
 
 @module.server
@@ -106,7 +107,7 @@ def quiz_server(input: Inputs, output: Outputs, session: Session, tID, sID, user
 
         # Hide the answer button (don't allow for multiple guessing)
         if not allowMultiGuess:
-            elementDisplay("checkAnswer", "h")
+            elementDisplay("checkAnswer", "h", session)
 
         # Add the timestamp the answer was checked
         q["check"] = shared.dt()
