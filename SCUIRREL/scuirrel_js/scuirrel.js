@@ -24,13 +24,13 @@ function chatSelection(message, x){
         flaggedMsg.push(x)
     }
     // Keep track of selected messages in Shiny with custom input
-    Shiny.setInputValue("selectedMsg", JSON.stringify(flaggedMsg));            
+    Shiny.setInputValue("chat-selectedMsg", JSON.stringify(flaggedMsg));            
 
 }
 
 // Make sure the custom Shiny input gets initialised
 $(document).on('shiny:connected', function() {    
-    Shiny.setInputValue("selectedMsg", JSON.stringify(flaggedMsg)); 
+    Shiny.setInputValue("chat-selectedMsg", JSON.stringify(flaggedMsg)); 
 });
 
 Shiny.addCustomMessageHandler("progressBar", function(x) {

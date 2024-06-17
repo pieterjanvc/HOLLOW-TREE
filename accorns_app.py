@@ -11,6 +11,7 @@ from modules.login_module import login_server,  login_ui
 from modules.topics_module import topics_ui, topics_server
 from modules.vectorDB_management_module import vectorDB_management_ui, vectorDB_management_server
 from modules.quiz_generation_module import quiz_generation_ui, quiz_generation_server
+from modules.feedback_module import feedback_ui, feedback_server
 
 # -- General
 import os
@@ -59,7 +60,7 @@ app_ui = ui.page_fluid(
     ),
     ui.output_ui("accornsTabs"),
     # Customised feedback button (floating at right side of screen)
-    ui.input_action_button("feedback", "Provide Feedback"),
+    feedback_ui("feedback"),
     id = "tab", title="ACCORNS")
 
 # --- SERVER ---
@@ -82,6 +83,7 @@ def server(input, output, session):
 
     # Check which user is using the app
     user = login_server("login", postgresUser = shared.postgresAccorns, sessionID = sID, minAdminLevel = 2)
+    _ = feedback_server("feedback", sID = sID, postgresUser=shared.postgresAccorns)
 
     # Which tabs to show based on the user
     @render.ui

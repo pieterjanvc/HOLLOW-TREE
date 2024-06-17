@@ -2,23 +2,23 @@
 # -------------------------
 
 from modules.quiz_module import quiz_ui, quiz_server
+import shared.shared as shared
+import SCUIRREL.scuirrel_shared as scuirrel_shared
 
 # -- General
 import json
 from html import escape
+import os
 
 # -- Shiny
 from shiny import Inputs, Outputs, Session, module, reactive, ui
 from htmltools import HTML, div
 
-import shared.shared as shared
-import SCUIRREL.scuirrel_shared as scuirrel_shared
-
 # --- UI
 @module.ui
 def chat_ui():
     return ([
-       ui.layout_columns(
+       ui.layout_columns(       
             ui.card(
                 HTML("""<p>Hello, I'm Scuirrel (Science Concept Understanding Interactive Research RAG Educational LLM). 
                      I'm here to help you test your knowledge on specific concepts
@@ -109,7 +109,7 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
     @reactive.event(input.startConversation)
     def _():
         tID = int(topics()[topics()["tID"] == int(input.selTopic())].iloc[0]["tID"])
-        conn = shared.appDBConn(scuirrel_shared.postgresUser)
+        conn = shared.appDBConn(shared.postgresScuirrel)
         cursor = conn.cursor()        
 
         # Save the logs for the previous discussion (if any) adn wipe the chat window
@@ -157,7 +157,7 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
     # Get the concepts related to the topic
     @reactive.calc
     def concepts():
-        conn = shared.appDBConn(scuirrel_shared.postgresUser)
+        conn = shared.appDBConn(shared.postgresScuirrel)
         concepts = shared.pandasQuery(
             conn,
             f'SELECT * FROM "concept" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0',
@@ -259,5 +259,76 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
             else:
                 ui.insert_ui(HTML("<hr>"), "#"+module.resolve_id("conversation"))
 
-    
+    # When the chat feedback button is clicked
+    @reactive.effect
+    @reactive.event(input.chatFeedback)
+    def _():
+        sel = json.loads(input.selectedMsg())  # Custom JS input selectedMsg
+        if sel == []:
+            # With no messages selected
+            ui.notification_show(
+                "Please select all chat messages relevant to your feedback report"
+            )
+        else:
+            # Ask for more details
+            m = ui.modal(
+                ui.input_radio_buttons(
+                    "feedbackChatCode",
+                    " Pick a category",
+                    choices={
+                        1: "Incorrect",
+                        2: "Inappropriate",
+                        3: "Not helpful",
+                        4: "Not able to proceed",
+                        5: "Other",
+                    },
+                    inline=True,
+                ),
+                ui.input_text_area(
+                    "feedbackChatDetails", "Please provide more details", width="100%"
+                ),
+                title="Please provide some more information",
+                size="l",
+                footer=[
+                    ui.input_action_button("feedbackChatSubmit", "Submit"),
+                    ui.modal_button("Cancel"),
+                ],
+            )
+            ui.modal_show(m)
+
+
+    # Insert the issue into the DB
+    @reactive.effect
+    @reactive.event(input.feedbackChatSubmit)
+    def _():
+        # Because multiple issues can be submitted for a single conversation, we have to commit to the
+        # DB immediately or it would become harder to keep track of TODO
+        # This means we add a temp mID which will be updated in the end
+        conn = shared.appDBConn(shared.postgresScuirrel)
+        cursor = conn.cursor()
+        fcID = shared.executeQuery(
+            cursor,
+            'INSERT INTO "feedback_chat"("dID","code","created","details") '
+            "VALUES(?,?,?,?)",
+            (
+                discussionID.get(),
+                int(input.feedbackChatCode()),
+                shared.dt(),
+                input.feedbackChatDetails(),
+            ),
+            lastRowId="fcID",
+        )
+        tempID = json.loads(input.selectedMsg())
+        tempID.sort()
+        _ = shared.executeQuery(
+            cursor,
+            f'INSERT INTO "feedback_chat_msg"("fcID","mID") VALUES({fcID},?)',
+            [(x,) for x in tempID],
+        )
+        conn.commit()
+        conn.close()
+        # Remove modal and show confirmation
+        ui.modal_remove()
+        ui.notification_show("Feedback successfully submitted!", duration=3)
+
     return
