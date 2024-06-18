@@ -67,9 +67,9 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
     conn.close()
     if files.shape[0] == 0:
         index = None
-        shared.elementDisplay("blankDBMsg", "s", session)
+        shared.elementDisplay("blankDBMsg", "s", session, alertNotFound=False)
     else:
-        index = shared.getIndex("accorns")
+        index = shared.getIndex("accorns", postgresUser=shared.postgresAccorns)
     
     files = reactive.value(files)
     index = reactive.value(index)
@@ -95,7 +95,7 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
             accorns_shared.storageFolder,
             input.newFile()[0]["name"],
         )
-        shared.elementDisplay("uiUploadFile", "h", session)
+        shared.elementDisplay("uiUploadFile", "h", session, alertNotFound=False)
         # TODO add nice loading animation https://codepen.io/nzbin/pen/GGrXbp
         ui.insert_ui(
             HTML(
@@ -139,9 +139,9 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
         conn.close()
 
         files.set(getFiles)
-        index.set(shared.getIndex(user = "accorns"))
+        index.set(shared.getIndex(user = "accorns", postgresUser=shared.postgresAccorns))
 
-        shared.elementDisplay("uiUploadFile", "s", session)
+        shared.elementDisplay("uiUploadFile", "s", session, alertNotFound=False)
         ui.remove_ui("#processFile")
 
     # Get file details

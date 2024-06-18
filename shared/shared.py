@@ -68,10 +68,12 @@ if os.environ["OPENAI_API_KEY"] is None:
 
 
 # --- FUNCTIONS ---
+
+# Get the current date and time in the format "YYYY-MM-DD HH:MM:SS"
 def dt():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-
+# Check if the input is of sufficient length
 def inputCheck(input):
     if re_search(r"(?=(.*[a-zA-Z0-9]){6,}).*", input):
         return True
@@ -107,7 +109,7 @@ def appDBConn(postgresUser, remoteAppDB=remoteAppDB):
             )
         return sqlite3.connect(config["localStorage"]["sqliteDB"])
 
-
+# Connect to the vector database
 def vectorDBConn(postgresUser, remoteAppDB=remoteAppDB, vectorDB=vectorDB):
     if remoteAppDB:
         conn = psycopg2.connect(
@@ -125,13 +127,17 @@ def vectorDBConn(postgresUser, remoteAppDB=remoteAppDB, vectorDB=vectorDB):
 
     return conn
 
-def getIndex(user, remote = remoteAppDB):
+# Get the current vector database index
+def getIndex(user, postgresUser, remote = remoteAppDB):
     if remote:
             vectorStore = PGVectorStore.from_params(
                 host=postgresHost,
                 port=postgresPort,
                 user=user,
-                password=os.environ.get("POSTGRES_PASS_ACCORNS"),
+                password=os.environ.get(
+                "POSTGRES_PASS_"
+                + ("SCUIRREL" if postgresUser == postgresScuirrel else "ACCORNS")
+                ),
                 database="vector_db",
                 table_name="document",
                 embed_dim=1536,  # openai embedding dimension
@@ -141,7 +147,7 @@ def getIndex(user, remote = remoteAppDB):
         return VectorStoreIndex.from_vector_store(
             DuckDBVectorStore.from_local(vectorDB)
         )
-
+# Execute a query on the accorns database
 def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB):
     query = query.replace("?", "%s") if remoteAppDB else query
     query = (
@@ -165,7 +171,7 @@ def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB
 
     return
 
-
+# Execute a query on the accorns database returning a pandas dataframe
 def pandasQuery(conn, query, params=()):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -194,7 +200,7 @@ def checkRemoteDB():
             "Please check the postgres connection settings in config.toml "
             "and make sure POSTGRES_PASS_SCUIRREL and POSTGRES_PASS_SCUIRREL are set as an environment variables."
         )
-
+# Check if the 2 passwords match and if the password is strong enough
 def passCheck(password, password2):
     # Check if the password is strong enough
     if re_search(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_+=])[A-Za-z\d!@#$%^&*()-_+=]{8,20}$",
@@ -207,6 +213,7 @@ def passCheck(password, password2):
     
     return None
 
+# Check if the access code has not been used yet
 def accessCodeCheck(conn, accessCode):
     # Check the access code (must be valid and not used yet)
     code = pandasQuery(

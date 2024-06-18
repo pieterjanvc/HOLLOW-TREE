@@ -27,7 +27,6 @@ if shared.remoteAppDB:
 # ********************
 
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
-os.path.join(curDir, "SCUIRREL")
 
 # --- UI LAYOUT ---
 # Add some JS so that pressing enter can send the message too
@@ -44,7 +43,7 @@ app_ui = ui.page_fluid(
     ui.output_ui("scuirrelTabs"),
     # Customised feedback button (floating at right side of screen)
     feedback_ui("feedback"),
-    id = "tab", title="SCUIRREL")
+    id = "tab", title=" SCUIRREL ")
 
 # --- SERVER ---
 # **************

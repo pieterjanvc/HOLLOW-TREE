@@ -68,7 +68,7 @@ app_ui = ui.page_fluid(
 def server(input, output, session):
 
     # Register the session start in the DB
-    conn = shared.appDBConn(postgresUser=accorns_shared.postgresUser)
+    conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
     cursor = conn.cursor()
     sID = shared.executeQuery(
         cursor,
@@ -133,7 +133,7 @@ def server(input, output, session):
 
     def theEnd():
         # Add logs to the database after user exits            
-        conn = shared.appDBConn(postgresUser=accorns_shared.postgresUser)
+        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
         cursor = conn.cursor()
         # Register the end of the session and if an error occurred, log it
         errMsg = traceback.format_exc().strip()

@@ -82,7 +82,7 @@ def quiz_generation_ui():
 
 # --- Server ---
 @module.server
-def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID, index,topics, user):
+def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID, index, topics, user):
     
     # Set the topics
     @reactive.effect
@@ -165,8 +165,8 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
     @reactive.effect
     @reactive.event(input.qGenerate)
     def _():
-        shared.elementDisplay("qBusyMsg", "s", session)
-        shared.elementDisplay("qBtnSet", "h", session)
+        shared.elementDisplay("qBusyMsg", "s", session, alertNotFound=False)
+        shared.elementDisplay("qBtnSet", "h", session, alertNotFound=False)
 
         topic = topics.get()[topics.get()["tID"] == int(input.qtID())].iloc[0]["topic"]
 
@@ -236,8 +236,8 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
     def _():
         # Populate the respective UI outputs with the questions details
         resp = botResponse.result()
-        shared.elementDisplay("qBusyMsg", "h", session)
-        shared.elementDisplay("qBtnSet", "s", session)
+        shared.elementDisplay("qBusyMsg", "h", session, alertNotFound=False)
+        shared.elementDisplay("qBtnSet", "s", session, alertNotFound=False)
 
         if resp["resp"] is None:
             accorns_shared.modalMsg(

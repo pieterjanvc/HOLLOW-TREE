@@ -2,9 +2,6 @@
 # ----------- ACCORNS APP SHARED CODE ---------
 # *********************************************
 
-# All variables and functions below are shared across different session
-# https://shiny.posit.co/py/docs/express-in-depth.html#shared-objects
-
 from shared import shared
 
 # -- General
@@ -30,12 +27,7 @@ from llama_index.vector_stores.postgres import PGVectorStore
 # -- Shiny
 from shiny.express import ui
 
-# -- Other
-# import nest_asyncio
-# nest_asyncio.apply()
-
 # --- Global variables
-postgresUser = "accorns"  # Used by shared.appDBConn
 
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 appDBDir = os.path.join(curDir, "appDB")
@@ -57,7 +49,7 @@ else:
 # ----------- FUNCTIONS -----------
 # *********************************
 
-# Database to store app data (this is not the vector database!)
+# Create a file-based accorns database
 def createLocalAccornsDB(DBpath = shared.sqliteDB, sqlFile = os.path.join(appDBDir, "appDB_sqlite_accorns.sql")):
     if os.path.exists(DBpath):
         return (1, "Accorns database already exists. Skipping")
@@ -76,6 +68,7 @@ def createLocalAccornsDB(DBpath = shared.sqliteDB, sqlFile = os.path.join(appDBD
     conn.close()
     return (0, "Accorns database created")
 
+# Create a file-based vector database
 def createLocalVectorDB(DBpath = shared.vectorDB, sqlFile = os.path.join(appDBDir, "appDB_duckdb_vectordb.sql")):
     conn = duckdb.connect(DBpath)
     cursor = conn.cursor()
@@ -161,7 +154,7 @@ def addFileToDB(
         vector_store = PGVectorStore.from_params(
             host=shared.postgresHost,
             port=shared.postgresPort,
-            user=postgresUser,
+            user=shared.postgresAccorns,
             password=os.environ.get("POSTGRES_PASS_ACCORNS"),
             database="vector_db",
             table_name="document",
@@ -249,11 +242,12 @@ def addFileToDB(
 
     return (0, "Completed")
 
+# Add the demo to the app
 def addDemo(shinyToken):    
 
     msg = 0
 
-    conn = shared.appDBConn(postgresUser)    
+    conn = shared.appDBConn(postgresUser = shared.postgresAccorns)    
     cursor = conn.cursor()    
     
     # Check if the demo has already been added  
@@ -292,23 +286,7 @@ def addDemo(shinyToken):
                    "Demo file added to the vector database", 
                    "Demo added to accorns and vector database"][msg])
 
-# # Load the vector index from storage
-# if shared.remoteAppDB:
-#     vector_store = PGVectorStore.from_params(
-#         host=shared.postgresHost,
-#         port=shared.postgresPort,
-#         user=postgresUser,
-#         password=os.environ.get("POSTGRES_PASS_ACCORNS"),
-#         database="vector_db",
-#         table_name="document",
-#         embed_dim=1536,  # openai embedding dimension
-#     )
-# else:
-#     vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
-
-# index = VectorStoreIndex.from_vector_store(vector_store)
-
-
+# Backup fields from specific tables in accorns
 def backupQuery(
     cursor, sID, table, rowID, attribute, dataType, isBot=None, timeStamp=shared.dt()
 ):
@@ -368,6 +346,7 @@ def modalMsg(content, title="Info"):
     )
     ui.modal_show(m)
 
+# Generate a hash from a string
 def generate_hash():
     alphanumeric_characters = string.ascii_letters + string.digits
     hash_parts = []
@@ -376,7 +355,7 @@ def generate_hash():
         hash_parts.append(hash_part)
     return '-'.join(hash_parts)
 
-
+# Generate a list of unique hash values
 def generate_hash_list(n = 1):
     hash_values = []
     for _ in range(n):
@@ -391,6 +370,7 @@ def generate_hash_list(n = 1):
 
     return hash_values
 
+# Generate access codes and add them to the database
 def generate_access_codes(n, uID, adminLevel, note = ""):
 
     note = None if note.strip() == "" else note
@@ -426,4 +406,3 @@ def generate_access_codes(n, uID, adminLevel, note = ""):
     
     # Return a data frame
     return pd.DataFrame({"accessCode": codes, "role": role, "note": note})
-
