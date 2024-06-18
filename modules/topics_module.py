@@ -113,9 +113,9 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
         cursor = conn.cursor()
         tID = shared.executeQuery(
             cursor,
-            'INSERT INTO "topic"("topic", "created", "modified", "description")'
-            "VALUES(?, ?, ?, ?)",
-            (input.ntTopic(), shared.dt(), shared.dt(), input.ntDescr()),
+            'INSERT INTO "topic"("sID", "topic", "created", "modified", "description")'
+            "VALUES(?, ?, ?, ?, ?)",
+            (sID, input.ntTopic(), shared.dt(), shared.dt(), input.ntDescr()),
             lastRowId="tID",
         )
         newTopics = shared.pandasQuery(
@@ -186,15 +186,22 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
         # Update the DB
         conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
         cursor = conn.cursor()
-        # Backup old value
+        # Backup old values
+        ts = shared.dt()
         accorns_shared.backupQuery(
-            cursor, sID, "topic", input.tID(), "topic", False
+            cursor = cursor, sID = sID, table = "topic", rowID = input.tID(), 
+            attribute = "topic", dataType = "str", isBot = False, timeStamp = ts
         )
+        accorns_shared.backupQuery(
+            cursor = cursor, sID = sID, table = "topic", rowID = input.tID(), 
+            attribute = "sID", dataType = "int", isBot = False, timeStamp = ts
+        )
+
         # Update to new
         _ = shared.executeQuery(
             cursor,
-            'UPDATE "topic" SET "topic" = ?, "modified" = ? WHERE "tID" = ?',
-            (input.etInput(), shared.dt(), input.tID()),
+            'UPDATE "topic" SET "sID" = ?, "topic" = ?, "modified" = ? WHERE "tID" = ?',
+            (sID, input.etInput(), shared.dt(), input.tID()),
         )
         newTopics = shared.pandasQuery(
             conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
@@ -292,8 +299,8 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
         cursor = conn.cursor()
         _ = shared.executeQuery(
             cursor,
-            'INSERT INTO "concept"("tID", "concept", "created", "modified") VALUES(?, ?, ?, ?)',
-            (input.tID(), input.ncInput(), shared.dt(), shared.dt()),
+            'INSERT INTO "concept"("sID", "tID", "concept", "created", "modified") VALUES(?, ?, ?, ?, ?)',
+            (sID, input.tID(), input.ncInput(), shared.dt(), shared.dt()),
         )
         conceptList = shared.pandasQuery(
             conn, f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0'
@@ -358,14 +365,20 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
         conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
         cursor = conn.cursor()
         # Backup old value
+        ts = shared.dt()
         accorns_shared.backupQuery(
-            cursor, sID, "concept", int(cID), "concept", False
+            cursor = cursor, sID = sID, table = "concept", rowID = int(cID), 
+            attribute = "concept", dataType = "str", isBot = False, timeStamp = ts
+        )
+        accorns_shared.backupQuery(
+            cursor = cursor, sID = sID, table = "concept", rowID = int(cID), 
+            attribute = "sID", dataType = "int", isBot = False, timeStamp = ts
         )
         # Update to new
         _ = shared.executeQuery(
             cursor,
-            'UPDATE "concept" SET "concept" = ?, "modified" = ? WHERE "cID" = ?',
-            (input.ecInput(), shared.dt(), int(cID)),
+            'UPDATE "concept" SET "sID" = ?, "concept" = ?, "modified" = ? WHERE "cID" = ?',
+            (sID, input.ecInput(), shared.dt(), int(cID)),
         )
         conceptList = shared.pandasQuery(
             conn, f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0'

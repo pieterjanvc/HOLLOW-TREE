@@ -310,7 +310,7 @@ def addDemo(shinyToken):
 
 
 def backupQuery(
-    cursor, sID, table, rowID, attribute, isBot=None, timeStamp=shared.dt()
+    cursor, sID, table, rowID, attribute, dataType, isBot=None, timeStamp=shared.dt()
 ):
     # Get the Primary Key
     if shared.remoteAppDB:
@@ -339,13 +339,22 @@ def backupQuery(
         raise ValueError(f"'{attribute}' is not a column of table '{table}'")
     # Check isBot and assign 0, 1 or Null when False, True, None
     isBot = isBot + 0 if isBot is not None else "NULL"
+
+    # type of the attribute needs to be checked
+    if dataType == "str":
+        dataType = '"tValue"'
+    elif dataType == "int":
+        dataType = '"iValue"'
+    else:
+        raise ValueError("The data type of the attribute is not supported")
+    
     # Insert into backup
     _ = shared.executeQuery(
         cursor,
-        f'INSERT INTO "backup" ("sID", "modified", "table", "rowID", "created", "isBot", "attribute", "tValue") '
+        (f'INSERT INTO "backup" ("sID", "modified", "table", "rowID", "created", "isBot", "attribute", {dataType}) '
         f'SELECT {sID} as "sID", \'{timeStamp}\' as "modified", \'{table}\' as "table", {rowID} as "rowID", '
-        f'"modified" as "created", {isBot} as "isBot", \'{attribute}\' as "attribute", "{attribute}" as "tValue" '
-        f'FROM "{table}" WHERE "{PK}" = {rowID}',
+        f'"modified" as "created", {isBot} as "isBot", \'{attribute}\' as "attribute", "{attribute}" as {dataType} '
+        f'FROM "{table}" WHERE "{PK}" = {rowID}'),
     )
 
 

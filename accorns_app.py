@@ -2,7 +2,6 @@
 # ----------- ACCORNS: ADMIN APP -----------
 # ******************************************
 
-# See app_shared.py for variables and functions shared across sessions
 import shared.shared as shared
 import ACCORNS.accorns_shared as accorns_shared
 
@@ -18,7 +17,7 @@ import os
 import traceback
 
 # -- Shiny
-from shiny import App,reactive, render, req, ui
+from shiny import App,reactive, render, ui
 from htmltools import HTML
 
 # The following is needed to prevent async issues when inserting new data in vector DB

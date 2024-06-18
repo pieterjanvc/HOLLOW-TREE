@@ -76,6 +76,7 @@ CREATE TABLE "session" (
 
 CREATE TABLE "topic" (
 	"tID" SERIAL PRIMARY KEY,
+  "sID" INTEGER,
 	"topic" TEXT,
   "archived" INTEGER DEFAULT 0,
   "created" TEXT,
@@ -85,6 +86,7 @@ CREATE TABLE "topic" (
 
 CREATE TABLE "concept" (
 	"cID" SERIAL PRIMARY KEY,
+  "sID" INTEGER,
 	"tID" INTEGER,
   "concept" TEXT,
   "archived" INTEGER DEFAULT 0,

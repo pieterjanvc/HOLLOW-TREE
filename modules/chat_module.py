@@ -82,6 +82,11 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
         async def _():
             await session.send_custom_message("progressBar", {"id": id, "percent": percent})
 
+    def scrollElement(selectors, direction = "top"):
+        @reactive.effect
+        async def _():
+            await session.send_custom_message("scrollElement", {"selectors": selectors, "direction": direction})
+
     # When a new user signs in, show / update the relevant topics
     @reactive.calc
     @reactive.event(user)
@@ -147,7 +152,7 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
                                 the following topic: <b>{topics().iloc[0]["topic"]}</b>. 
                                 What do you already know about this?</p></div>"""),
             "#"+module.resolve_id("conversation"),
-        )
+        )        
         botLog.set(f"---- PREVIOUS CONVERSATION ----\n--- MENTOR:\n{firstWelcome}")
 
         shared.elementDisplay("chatIn", "s", session)
@@ -191,9 +196,10 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
                 f"<div class='userChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'><p>{escape(newChat)}</p></div>"
             ),
             "#"+module.resolve_id("conversation"),
-        )
+        )        
         botLog.set(botLog.get() + f"\n--- STUDENT:\n{newChat}")
         topic = topics()[topics()["tID"] == int(input.selTopic())].iloc[0]["topic"]
+        scrollElement('.chatWindow .card-body')
         # Send the message to the LLM for processing
         botResponse(topic, concepts(), conceptIndex.get(), conversation)
 
@@ -203,7 +209,19 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
     async def botResponse(topic, concepts, cIndex, conversation):
         # Check the student's progress on the current concept based on the last reply (other engine)
         engine = scuirrel_shared.progressCheckEngine(conversation, topic, concepts, cIndex)
-        eval = json.loads(str(engine.query(conversation)))
+        tries = 0
+        while tries < 3:
+            try:
+                eval = json.loads(str(engine.query(conversation)))
+                break
+            except json.JSONDecodeError:
+                print("Conversation agent JSON decode error, retrying...")
+                tries += 1
+        eval = None if tries == 3 else eval
+
+        if eval is None:
+            return {"resp": None, "eval": None}
+        
         # See if the LLM thinks we can move on to the next concept or or not
         if int(eval["score"]) > 2:
             cIndex += 1
@@ -223,6 +241,12 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
         result = botResponse.result()
         eval = result["eval"]  # Evaluation of last response and progress
         resp = result["resp"]  # New response to student
+
+        if eval is None:
+            ui.notification_show("SCUIRREL is having issues processing your response. Please try again later.")
+            shared.elementDisplay("waitResp", "h", session)
+            shared.elementDisplay("chatIn", "s", session)
+            return
 
         with reactive.isolate():
             # Check the topic progress and move on to next concept if current one scored well
@@ -256,6 +280,7 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
             # If conversation is over don't show new message box
             if not finished:
                 shared.elementDisplay("chatIn", "s", session)
+                scrollElement('.chatWindow .card-body')
             else:
                 ui.insert_ui(HTML("<hr>"), "#"+module.resolve_id("conversation"))
 

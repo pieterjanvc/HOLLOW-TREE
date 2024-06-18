@@ -20,7 +20,6 @@ from llama_index.vector_stores.duckdb import DuckDBVectorStore
 from llama_index.vector_stores.postgres import PGVectorStore
 
 # --- VARIABLES ---
-postgresUser = "scuirrel"  # Used by shared.appDBConn
 
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 
@@ -35,7 +34,7 @@ if not os.path.exists(shared.vectorDB) and not shared.remoteAppDB:
     raise ConnectionError("The vector database was not found. Please run ACCORNS first")
 
 # Check if there are topics to discuss before proceeding
-conn = shared.appDBConn(postgresUser)
+conn = shared.appDBConn(shared.postgresScuirrel)
 topics = shared.pandasQuery(
     conn,
     'SELECT * FROM "topic" WHERE "archived" = 0 AND "tID" IN'
@@ -54,7 +53,7 @@ if shared.remoteAppDB:
     vector_store = PGVectorStore.from_params(
         host=shared.postgresHost,
         port=shared.postgresPort,
-        user=postgresUser,
+        user=shared.postgresScuirrel,
         password=os.environ.get("POSTGRES_PASS_SCUIRREL"),
         database="vector_db",
         table_name="document",
