@@ -123,7 +123,7 @@ def login_server(
         username = input.cUsername()
         accessCode = input.cAccessCode()
 
-        # Check if the password is strong enough
+        # Check if the username is long enough
         if re_search(r"^\w{6,20}$", username) is None:
             ui.notification_show("Username must be between 6 and 20 characters")
             return
@@ -164,7 +164,7 @@ def login_server(
             "VALUES(?, ?, ?, ?, ?)",
             (
                 username,
-                hashed.decode(),
+                hashed.decode("utf-8"),
                 int(code["adminLevel"].iloc[0]),
                 shared.dt(),
                 shared.dt(),
@@ -240,7 +240,7 @@ def login_server(
         _ = shared.executeQuery(
             cursor,
             'UPDATE "user" SET "password" = ?, "modified" = ? WHERE "uID" = ?',
-            (hashed, shared.dt(), uID),
+            (hashed.decode("utf-8"), shared.dt(), uID),
         )
 
         # Update the access code to show it has been used
