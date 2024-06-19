@@ -10,14 +10,14 @@
 @REM Note that if postgres bin is not in the PATH to put in the full path
 SET "postgresAdmin=postgres"
 SET "postgresBin=psql"
-SET "postgresHost=localhost"
+SET "postgresHost=scuirrel-instance-1.cfi288y0knjq.us-east-2.rds.amazonaws.com"
 SET "postgresPort=5432"
 @REM Create "accorns" or "vector_db" or "both"
 SET "toCreate=both" 
 SET "overWrite=True"
 @REM -------------------------------------------
 
-SET "appDBFolder=%~dp0"
+SET "appDBFolder=C:\Users\pj\Documents\LocalProjects\HOLLOW-TREE\ACCORNS\appDB"
 SET "sqlAccorns=%appDBFolder%\appDB_postgres_accorns.sql" 
 SET "sqlVectordb=%appDBFolder%\appDB_postgres_vectordb.sql" 
 

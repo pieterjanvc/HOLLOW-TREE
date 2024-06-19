@@ -216,12 +216,12 @@ def passCheck(password, password2):
     # Check if the password is strong enough
     if (
         re_search(
-            r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_+=])[A-Za-z\d!@#$%^&*()-_+=]{8,20}$",
+            r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_+=.])[A-Za-z\d!@#$%^&*()-_+=.]{8,20}$",
             password,
         )
         is None
     ):
-        return "Password must be between 8 and 20 characters and contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+        return "Password must be between 8 and 20 characters and contain at least one uppercase letter, one lowercase letter, one number, and one special character (!@#$%^&*()-_+=.)"
 
     # Check if the passwords match
     if password != password2:

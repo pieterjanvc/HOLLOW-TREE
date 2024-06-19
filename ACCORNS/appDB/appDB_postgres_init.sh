@@ -10,9 +10,11 @@
 # Note that if postgres bin is not in the PATH to put in the full path
 postgresAdmin="postgres"
 postgresBin="psql"
+postgresHost="localhost"
+postgresPort="5432"
 # Create "accorns" or "vector_db" or "both"
 toCreate="both"
-overWrite="True"
+overWrite="true"
 # -------------------------------------------
 
 appDBFolder="$(dirname "$0")"
@@ -20,7 +22,7 @@ sqlAccorns="$appDBFolder/appDB_postgres_accorns.sql"
 sqlVectordb="$appDBFolder/appDB_postgres_vectordb.sql"
 
 # Check if postgres is installed
-command -v "$postgresBin" >/dev/null 2>&1 || {
+$postgresBin --version >/dev/null 2>&1  || {
     echo "ERROR: Postgres is not installed or cannot be found in PATH."
     exit 1
 }
@@ -64,7 +66,7 @@ else
     toRun="-f $sqlVectordb"
 fi
 
-"$postgresBin" -U "$postgresAdmin" $toRun \
+$postgresBin -h "$postgresHost" -p "$postgresPort" -U "$postgresAdmin" postgres $toRun \
     -v overWrite="$overWrite" \
     -v scuirrelPass="$POSTGRES_PASS_SCUIRREL" \
     -v accornsPass="$POSTGRES_PASS_ACCORNS" > /dev/null 2> "$errorFile"
