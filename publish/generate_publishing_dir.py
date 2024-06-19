@@ -74,6 +74,23 @@ if toGenerate == "ACCORNS":
             copyfile(os.path.join(baseFolder, "ACCORNS","appDB", file),
                       os.path.join(newFolder, "appDB", file))
 
+# Create a new modules directory in the publish directory
+os.makedirs(os.path.join(newFolder, "modules"))
+
+# Copy relevant modules depending on the app
+if toGenerate == "SCUIRREL":
+    modules = ["login_module.py", "feedback_module.py", "chat_module.py", "quiz_module.py"]
+    for module in modules:
+        copyfile(os.path.join(baseFolder, "modules", module), 
+                 os.path.join(newFolder, "modules", module))
+    
+else:
+    modules = ["login_module.py", "feedback_module.py", "vectorDB_management_module.py", 
+               "topics_module.py", "quiz_generation_module.py", "user_management_module.py"]
+    for module in modules:
+        copyfile(os.path.join(baseFolder, "modules", module), 
+                 os.path.join(newFolder, "modules", module))
+
 ### PART 2: MODIFY PATHS ###
 
 # In the new app.py file, replace import SCUIRREL.scuirrel_shared as scuirrel_shared with import shared as shared
@@ -83,17 +100,48 @@ with open(os.path.join(newFolder, "app.py"), "r") as f:
     toEdit = toEdit.replace(f"import {toGenerate}.{toGenerate.lower()}_shared as {toGenerate.lower()}_shared",
                             f"import {toGenerate.lower()}_shared")
     toEdit = toEdit.replace("import shared.shared as shared", "import shared")
-    toEdit = toEdit.replace('"shared",', '')
-    toEdit = toEdit.replace(f'"{toGenerate}",', '')
+    toEdit = toEdit.replace('curDir, "shared",', 'curDir, ')
+    toEdit = toEdit.replace(f'curDir, "{toGenerate}",', 'curDir, ')
 
 with open(os.path.join(newFolder, "app.py"), "w") as f:
     f.write(toEdit)
 
+# Fix shared imports for relevant files
+files = ["login_module.py", "feedback_module.py", "chat_module.py", "vectorDB_management_module.py", 
+         "topics_module.py", "quiz_generation_module.py", "user_management_module.py",
+         "quiz_module.py"]
+
+for file in files:
+    
+    file = os.path.join(newFolder, "modules", file)
+    
+    # If the file does not exist, skip it
+    if not os.path.exists(file):
+        continue
+
+    with open(file, "r") as f:
+        toEdit = f.read()
+        toEdit = toEdit.replace("shared.shared", "shared")
+        toEdit = toEdit.replace("ACCORNS.accorns_shared","accorns_shared")
+        toEdit = toEdit.replace("SCUIRREL.scuirrel_shared","scuirrel_shared")
+
+    with open(os.path.join(newFolder, "modules", file), "w") as f:
+        f.write(toEdit)
+
+# Fix the shared file
 with open(os.path.join(newFolder, f"{toGenerate}_shared.py"), "r") as f:
     toEdit = f.read()
-    toEdit = toEdit.replace("from shared import shared","import shared")
+    toEdit = toEdit.replace("from shared import shared","import shared")    
 
 with open(os.path.join(newFolder, f"{toGenerate}_shared.py"), "w") as f:
+    f.write(toEdit)
+
+# Make sure remoteAppDBis True
+with open(os.path.join(newFolder, "shared_config.toml"), "r") as f:
+    toEdit = f.read()
+    toEdit = toEdit.replace('remoteAppDB = "False"','remoteAppDB = "True"')
+
+with open(os.path.join(newFolder, "shared_config.toml"), "w") as f:
     f.write(toEdit)
 
 print(f"Publishing directory generated successfully at {os.path.join(publishDir, toGenerate)}")

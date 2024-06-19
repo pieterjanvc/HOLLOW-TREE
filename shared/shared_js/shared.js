@@ -10,7 +10,9 @@ Shiny.addCustomMessageHandler("hideShow", function(x) {
     } else if (document.querySelector('[data-value="' + x.id + '"]')) {
         var element = document.querySelector('[data-value="' + x.id + '"]');
     } else {
-        alert("No element found with an ID or data-value of:" + x.id);
+        if (x.alertNotFound == true) {
+            alert("No element found with an ID or data-value of:" + x.id);
+        }        
         return;
     }
 

@@ -29,6 +29,7 @@ CREATE TABLE file (
   "fileName" TEXT,
   "title" TEXT,
   "subtitle" TEXT,
+  "shinyToken" TEXT,
   "created" TEXT,
   "modified" TEXT
 );

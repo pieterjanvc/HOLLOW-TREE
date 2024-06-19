@@ -11,3 +11,4 @@ duckdb
 toml
 psycopg2-binary
 sqlparse
+bcrypt

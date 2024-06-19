@@ -2,10 +2,44 @@ DROP TABLE IF EXISTS "user";
 CREATE TABLE IF NOT EXISTS "user" (
 	"uID" INTEGER PRIMARY KEY AUTOINCREMENT,
 	"username" TEXT UNIQUE,
-  "isAdmin" INTEGER DEFAULT 0,
+  "password" TEXT, 
+  "adminLevel" INTEGER DEFAULT 0,
   "email" TEXT,
   "created" TEXT,
   "modified" TEXT
+);
+
+DROP TABLE IF EXISTS "accessCode";
+CREATE TABLE IF NOT EXISTS "accessCode" (
+	"aID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "code" TEXT UNIQUE,
+	"uID_creator" INTEGER, 
+  "uID_user" INTEGER, 
+  "adminLevel" INTEGER DEFAULT 0,
+  "created" TEXT,
+  "used" TEXT,
+  "note" TEXT
+);
+
+DROP TABLE IF EXISTS "group";
+CREATE TABLE "group" (
+  "gID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "name" TEXT,
+  "created" TEXT,
+  "modified" TEXT,
+  "description" TEXT
+);
+
+DROP TABLE IF EXISTS "group_member";
+CREATE TABLE "group_member" (
+  "gmID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "uID" INTEGER,
+  "gID" INTEGER,
+  "isAdmin" INTEGER DEFAULT 0,
+  FOREIGN KEY("uID") REFERENCES "user"("uID") 
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("gID") REFERENCES "group"("gID") 
+    ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 DROP TABLE IF EXISTS "session";
@@ -24,6 +58,7 @@ CREATE TABLE IF NOT EXISTS "session" (
 DROP TABLE IF EXISTS "topic";
 CREATE TABLE IF NOT EXISTS "topic" (
 	"tID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "sID" INTEGER,
 	"topic" TEXT,
   "archived" INTEGER DEFAULT 0,
   "created" TEXT,
@@ -34,6 +69,7 @@ CREATE TABLE IF NOT EXISTS "topic" (
 DROP TABLE IF EXISTS "concept";
 CREATE TABLE IF NOT EXISTS "concept" (
 	"cID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "sID" INTEGER,
 	"tID" INTEGER,
   "concept" TEXT,
   "archived" INTEGER DEFAULT 0,
@@ -157,7 +193,7 @@ CREATE TABLE IF NOT EXISTS "feedback_chat" (
 );
 
 -- We can't add a mID foreign key because the first time 
--- the value is inserted it's a placeholder which gets updated 
+-- the value is inserted it's a placeholder which gets updated; 
 DROP TABLE IF EXISTS "feedback_chat_msg";
 CREATE TABLE IF NOT EXISTS "feedback_chat_msg" (
 	"fcmID" INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -167,7 +203,8 @@ CREATE TABLE IF NOT EXISTS "feedback_chat_msg" (
 	  ON DELETE CASCADE ON UPDATE CASCADE
 );
 
--- Add the main admin an anonymous user
-INSERT INTO user(username, isAdmin, created, modified)
-VALUES("anonymous", 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), 
-  ("admin", 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+-- Add the main admin an anonymous user;
+INSERT INTO user(username, "password", adminLevel, created, modified)
+VALUES('anonymous', NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), 
+  ('admin', '$2b$12$RIcoDnGHaNbuYUGzm0Ijdejw68fEpqyyAFWrS/8uteQLhtDBUI4KW', 
+  3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

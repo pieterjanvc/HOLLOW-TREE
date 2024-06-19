@@ -7,7 +7,9 @@ body {
     --userCol: var(--theme1);
 }
 
-#chatWindow .card-body {
+.chatWindow .card-body {
+    overflow: auto;
+    display: flex;
     flex-direction: column-reverse;
 }
 
@@ -70,7 +72,7 @@ https://gist.github.com/WeiChiaChang/abe92ca2e8da86ef69560b63903e8764
     background-color: var(--theme4);
 }
 
-#chatFeedback {    
+#chat-chatFeedback {    
     border: transparent;
     background-color: var(--theme4);
     cursor: pointer;
@@ -83,6 +85,6 @@ https://gist.github.com/WeiChiaChang/abe92ca2e8da86ef69560b63903e8764
     /* writing-mode: vertical-lr; */
 }
 
-#chatFeedback:hover {
+#chat-chatFeedback:hover {
     transform: translateX(-50%) scale(1.1);
 }

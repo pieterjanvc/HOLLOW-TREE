@@ -24,10 +24,42 @@ CREATE DATABASE accorns;
 CREATE TABLE "user" (
 	"uID" SERIAL PRIMARY KEY,
 	"username" TEXT UNIQUE,
-  "isAdmin" INTEGER DEFAULT 0,
+  "password" TEXT, 
+  "adminLevel" INTEGER DEFAULT 0,
   "email" TEXT,
   "created" TEXT,
   "modified" TEXT
+);
+
+CREATE TABLE "accessCode" (
+	"aID" SERIAL PRIMARY KEY,
+  "code" TEXT UNIQUE,
+	"uID_creator" INTEGER, 
+  "uID_user" INTEGER, 
+  "adminLevel" INTEGER DEFAULT 0,
+  "created" TEXT,
+  "used" TEXT,
+  "note" TEXT
+);
+
+
+CREATE TABLE "group" (
+  "gID" SERIAL PRIMARY KEY,
+  "name" TEXT,
+  "created" TEXT,
+  "modified" TEXT,
+  "description" TEXT
+);
+
+CREATE TABLE group_member(
+  "gmID" SERIAL PRIMARY KEY,
+  "uID" INTEGER,
+  "gID" INTEGER,
+  "isAdmin" INTEGER DEFAULT 0,
+  FOREIGN KEY("uID") REFERENCES "user"("uID") 
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("gID") REFERENCES "group"("gID") 
+    ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE "session" (
@@ -44,6 +76,7 @@ CREATE TABLE "session" (
 
 CREATE TABLE "topic" (
 	"tID" SERIAL PRIMARY KEY,
+  "sID" INTEGER,
 	"topic" TEXT,
   "archived" INTEGER DEFAULT 0,
   "created" TEXT,
@@ -53,6 +86,7 @@ CREATE TABLE "topic" (
 
 CREATE TABLE "concept" (
 	"cID" SERIAL PRIMARY KEY,
+  "sID" INTEGER,
 	"tID" INTEGER,
   "concept" TEXT,
   "archived" INTEGER DEFAULT 0,
@@ -179,9 +213,10 @@ CREATE TABLE "feedback_chat_msg" (
 );
 
 -- INSERT BASE USER AND ADMIN
-INSERT INTO "user" ("username", "isAdmin", "created", "modified") 
-VALUES ('anonymous', 0, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS')), 
-('admin', 1, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
+INSERT INTO "user" ("username", "password", "adminLevel", "created", "modified") 
+VALUES ('anonymous', NULL, 0, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS')), 
+('admin', '$2b$12$RIcoDnGHaNbuYUGzm0Ijdejw68fEpqyyAFWrS/8uteQLhtDBUI4KW', 3, 
+to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
 
 \c accorns;
 

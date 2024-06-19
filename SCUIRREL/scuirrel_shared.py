@@ -2,9 +2,6 @@
 # ----------- SCUIRREL APP SHARED CODE -----------
 # ************************************************
 
-# All variables and functions below are shared across different session
-# https://shiny.posit.co/py/docs/express-in-depth.html#shared-objects
-
 from shared import shared
 
 # General
@@ -13,13 +10,10 @@ import pandas as pd
 import toml
 
 # Llamaindex
-from llama_index.core import VectorStoreIndex, ChatPromptTemplate
+from llama_index.core import ChatPromptTemplate
 from llama_index.core.llms import ChatMessage, MessageRole
-from llama_index.vector_stores.duckdb import DuckDBVectorStore
-from llama_index.vector_stores.postgres import PGVectorStore
 
 # --- VARIABLES ---
-postgresUser = "scuirrel"  # Used by shared.appDBConn
 
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 
@@ -34,7 +28,7 @@ if not os.path.exists(shared.vectorDB) and not shared.remoteAppDB:
     raise ConnectionError("The vector database was not found. Please run ACCORNS first")
 
 # Check if there are topics to discuss before proceeding
-conn = shared.appDBConn(postgresUser)
+conn = shared.appDBConn(shared.postgresScuirrel)
 topics = shared.pandasQuery(
     conn,
     'SELECT * FROM "topic" WHERE "archived" = 0 AND "tID" IN'
@@ -48,24 +42,8 @@ if topics.shape[0] == 0:
     )
 conn.close()
 
-# Load the vector index from storage
-if shared.remoteAppDB:
-    vector_store = PGVectorStore.from_params(
-        host=shared.postgresHost,
-        port=shared.postgresPort,
-        user=postgresUser,
-        password=os.environ.get("POSTGRES_PASS_SCUIRREL"),
-        database="vector_db",
-        table_name="document",
-        embed_dim=1536,  # openai embedding dimension
-    )
-else:
-    vector_store = DuckDBVectorStore.from_local(shared.vectorDB)
 
-index = VectorStoreIndex.from_vector_store(vector_store)
-
-
-# Adapt the chat engine to the topic
+# Chat Agent - Adapt the chat engine to the topic
 def chatEngine(topic, concepts, cIndex, eval):
     # TUTORIAL Llamaindex + Prompt engineering
     # https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
@@ -163,6 +141,8 @@ interesting
     ]
     refine_template = ChatPromptTemplate(chat_refine_msgs)
 
+    index = shared.getIndex("scuirrel", postgresUser=shared.postgresScuirrel)
+
     return index.as_query_engine(
         text_qa_template=text_qa_template,
         refine_template=refine_template,
@@ -170,7 +150,7 @@ interesting
     )
 
 
-# Adapt the chat engine to the topic
+# Monitoring Agent - Adapt the chat engine to the topic
 def progressCheckEngine(conversation, topic, concepts, cIndex):
     cDone = (
         ""
@@ -231,6 +211,8 @@ Please output your score in the following format:"""
         ChatMessage(role=MessageRole.USER),
     ]
     refine_template = ChatPromptTemplate(chat_refine_msgs)
+
+    index = shared.getIndex("scuirrel", postgresUser=shared.postgresScuirrel)
 
     return index.as_query_engine(
         text_qa_template=text_qa_template,
