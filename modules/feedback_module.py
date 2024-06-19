@@ -6,14 +6,17 @@ import shared.shared as shared
 # -- Shiny
 from shiny import Inputs, Outputs, Session, module, reactive, ui
 
+
 # --- UI
 @module.ui
 def feedback_ui():
-    return ui.input_action_button("feedback", "Provide Feedback"),
+    return (ui.input_action_button("feedback", "Provide Feedback"),)
+
 
 @module.server
-def feedback_server(input: Inputs, output: Outputs, session: Session, sID, postgresUser):
-
+def feedback_server(
+    input: Inputs, output: Outputs, session: Session, sID, postgresUser
+):
     @reactive.effect
     @reactive.event(input.feedback)
     def _():
@@ -56,7 +59,6 @@ def feedback_server(input: Inputs, output: Outputs, session: Session, sID, postg
         )
         ui.modal_show(m)
 
-
     # Register feedback in the appDB
     @reactive.effect
     @reactive.event(input.feedbackSubmit)
@@ -78,7 +80,5 @@ def feedback_server(input: Inputs, output: Outputs, session: Session, sID, postg
         conn.close()
         ui.modal_remove()
         ui.notification_show("Thank you for sharing feedback", duration=3)
-    
+
     return
-
-

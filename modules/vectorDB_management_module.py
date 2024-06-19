@@ -13,56 +13,60 @@ from htmltools import HTML, div
 
 # --- UI ---
 
+
 @module.ui
 def vectorDB_management_ui():
-    return ([
-            div(ui.card(
+    return [
+        div(
+            ui.card(
                 HTML(
                     "<i>Welcome to ACCORNS, the Admin Control Center Overseeing RAG Needed for SCUIRREL!<br>"
                     "In order to get started, please add at least one file to the vector database</i>"
-                )), id="blankDBMsg", style="display: none;"),
-            # Tables of the files that are in the DB
-            ui.card(
-                ui.card_header("Vector database files"),
-                ui.output_data_frame("filesTable")
+                )
             ),
-            ui.panel_conditional("output.fileInfo != ''",
-                ui.card(
-                ui.card_header("File info"),
-                ui.output_ui("fileInfo"),
-                id="fileInfoCard"            
-            )),
-            # Option to add new files
+            id="blankDBMsg",
+            style="display: none;",
+        ),
+        # Tables of the files that are in the DB
+        ui.card(
+            ui.card_header("Vector database files"), ui.output_data_frame("filesTable")
+        ),
+        ui.panel_conditional(
+            "output.fileInfo != ''",
             ui.card(
-                ui.card_header("Upload a new file"),
-                div(
-                    ui.input_file(
-                        "newFile",
-                        "Pick a file",
-                        width="100%",
-                        accept=[
-                            ".csv",
-                            ".pdf",
-                            ".docx",
-                            ".txt",
-                            ".md",
-                            ".epub",
-                            ".ipynb",
-                            ".ppt",
-                            ".pptx",
-                        ],
-                    ),
-                    id="uiUploadFile",
+                ui.card_header("File info"), ui.output_ui("fileInfo"), id="fileInfoCard"
+            ),
+        ),
+        # Option to add new files
+        ui.card(
+            ui.card_header("Upload a new file"),
+            div(
+                ui.input_file(
+                    "newFile",
+                    "Pick a file",
+                    width="100%",
+                    accept=[
+                        ".csv",
+                        ".pdf",
+                        ".docx",
+                        ".txt",
+                        ".md",
+                        ".epub",
+                        ".ipynb",
+                        ".ppt",
+                        ".pptx",
+                    ],
                 ),
+                id="uiUploadFile",
             ),
-            
-    ])
+        ),
+    ]
+
 
 # --- Server ---
 @module.server
 def vectorDB_management_server(input: Inputs, output: Outputs, session: Session, user):
-
-    conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns)
+    conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
     files = shared.pandasQuery(conn, query='SELECT * FROM "file"')
     conn.close()
     if files.shape[0] == 0:
@@ -70,10 +74,10 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
         shared.elementDisplay("blankDBMsg", "s", session, alertNotFound=False)
     else:
         index = shared.getIndex("accorns", postgresUser=shared.postgresAccorns)
-    
+
     files = reactive.value(files)
     index = reactive.value(index)
-    
+
     # Display the files in the vector database as a table
     @render.data_frame
     def filesTable():
@@ -105,14 +109,13 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
             "afterEnd",
         )
 
-
     # Add the file to the vector database
     @reactive.extended_task
     async def updateVectorDB(newFile, vectorDB, storageFolder, newFileName):
         print("Start adding file...")
         return accorns_shared.addFileToDB(
             newFile=newFile,
-            shinyToken = session.id,
+            shinyToken=session.id,
             vectorDB=vectorDB,
             storageFolder=storageFolder,
             newFileName=newFileName,
@@ -131,15 +134,15 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
             msg = "Not a valid file type. Please upload a .csv, .pdf, .docx, .txt, .md, .epub, .ipynb, .ppt or .pptx file"
 
         ui.notification_show(msg)
-        #ui.modal_show(ui.modal(msg, title="Success" if insertionResult == 0 else "Issue"))
+        # ui.modal_show(ui.modal(msg, title="Success" if insertionResult == 0 else "Issue"))
 
         # Get the new file info
-        conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns)
-        getFiles = shared.pandasQuery(conn, 'SELECT * FROM "file"')                
+        conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
+        getFiles = shared.pandasQuery(conn, 'SELECT * FROM "file"')
         conn.close()
 
         files.set(getFiles)
-        index.set(shared.getIndex(user = "accorns", postgresUser=shared.postgresAccorns))
+        index.set(shared.getIndex(user="accorns", postgresUser=shared.postgresAccorns))
 
         shared.elementDisplay("uiUploadFile", "s", session, alertNotFound=False)
         ui.remove_ui("#processFile")
@@ -154,7 +157,7 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
 
         info = files().iloc[filesTable.data_view(selected=True).index[0]]
 
-        conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns)
+        conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
         keywords = shared.pandasQuery(
             conn, f'SELECT "keyword" FROM "keyword" WHERE "fID" = {int(info.fID)}'
         )
@@ -169,5 +172,5 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
             "<p><b>Top-10 keywords extracted from document</b> <i>(AI generated)</i></p>"
             f"{keywords}"
         )
-    
+
     return index, files

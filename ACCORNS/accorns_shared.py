@@ -49,8 +49,11 @@ else:
 # ----------- FUNCTIONS -----------
 # *********************************
 
+
 # Create a file-based accorns database
-def createLocalAccornsDB(DBpath = shared.sqliteDB, sqlFile = os.path.join(appDBDir, "appDB_sqlite_accorns.sql")):
+def createLocalAccornsDB(
+    DBpath=shared.sqliteDB, sqlFile=os.path.join(appDBDir, "appDB_sqlite_accorns.sql")
+):
     if os.path.exists(DBpath):
         return (1, "Accorns database already exists. Skipping")
 
@@ -63,32 +66,38 @@ def createLocalAccornsDB(DBpath = shared.sqliteDB, sqlFile = os.path.join(appDBD
 
     for x in query:
         _ = cursor.execute(x)
-    
+
     conn.commit()
     conn.close()
     return (0, "Accorns database created")
 
+
 # Create a file-based vector database
-def createLocalVectorDB(DBpath = shared.vectorDB, sqlFile = os.path.join(appDBDir, "appDB_duckdb_vectordb.sql")):
+def createLocalVectorDB(
+    DBpath=shared.vectorDB, sqlFile=os.path.join(appDBDir, "appDB_duckdb_vectordb.sql")
+):
     conn = duckdb.connect(DBpath)
     cursor = conn.cursor()
     # Check if the documents, file and keyword tables exist
-    cursor.execute("SELECT count(*) FROM information_schema.tables WHERE table_name IN('documents', 'file', 'keyword');")
+    cursor.execute(
+        "SELECT count(*) FROM information_schema.tables WHERE table_name IN('documents', 'file', 'keyword');"
+    )
     # Check there are three tables
     if cursor.fetchone()[0] == 3:
         conn.close()
         return (1, "Vector database already exists. Skipping")
-    
+
     with open(sqlFile, "r") as file:
         query = sql_split(file.read())
-        
+
         for x in query:
             _ = cursor.execute(x)
 
     cursor.commit()
     conn.close()
-    
+
     return (0, "Local DuckDB vector database created")
+
 
 # Create vector database and add files
 def addFileToDB(
@@ -180,7 +189,7 @@ def addFileToDB(
     fileName = os.path.basename(newFileName)
 
     if remoteAppDB:
-        conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns)
+        conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
         cursor = conn.cursor()
         _ = cursor.execute(
             "SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y "
@@ -196,7 +205,9 @@ def addFileToDB(
         chunkTitles = "* " + "\n* ".join(set([x[0] for x in q]))
         chunkKeywords = ", ".join(set((", ".join([x[1] for x in q])).split(", ")))
     else:
-        conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns, vectorDB=vectorDB)
+        conn = shared.vectorDBConn(
+            postgresUser=shared.postgresAccorns, vectorDB=vectorDB
+        )
         cursor = conn.cursor()
         _ = cursor.execute(
             "SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE "
@@ -221,7 +232,7 @@ def addFileToDB(
     )
     docSum = json.loads(str(index.as_query_engine().query(docSum)))
 
-    conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns, vectorDB=vectorDB)
+    conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns, vectorDB=vectorDB)
     cursor = conn.cursor()
     _ = shared.executeQuery(
         cursor,
@@ -242,49 +253,57 @@ def addFileToDB(
 
     return (0, "Completed")
 
-# Add the demo to the app
-def addDemo(shinyToken):    
 
+# Add the demo to the app
+def addDemo(shinyToken):
     msg = 0
 
-    conn = shared.appDBConn(postgresUser = shared.postgresAccorns)    
-    cursor = conn.cursor()    
-    
-    # Check if the demo has already been added  
-    cursor.execute("SELECT * FROM topic LIMIT 1")  
+    conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
+    cursor = conn.cursor()
+
+    # Check if the demo has already been added
+    cursor.execute("SELECT * FROM topic LIMIT 1")
     if cursor.fetchone() is None:
         msg = 1
-    
+
         # Check if the conn is to duckdb or postgres
         if "sqlite" in str(conn):
-                            
-                with open(os.path.join(appDBDir, "appDB_sqlite_demo.sql"), "r") as file:
-                    query = sql_split(file.read())
+            with open(os.path.join(appDBDir, "appDB_sqlite_demo.sql"), "r") as file:
+                query = sql_split(file.read())
 
-                for x in query:
-                    _ = cursor.execute(x)
-                                
+            for x in query:
+                _ = cursor.execute(x)
+
         else:
             with open(os.path.join(appDBDir, "appDB_postgres_demo.sql"), "r") as file:
                 query = file.read()
                 _ = cursor.execute(query)
-            
+
         conn.commit()
         conn.close()
-    
+
     # Add the demo file to the vector database
     # Check if the demo file is already in the database
-    conn = shared.vectorDBConn(postgresUser = shared.postgresAccorns)
+    conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
     cursor = conn.cursor()
     _ = cursor.execute('SELECT "fID" FROM file LIMIT 1')
-    
-    if cursor.fetchone() is  None:   
-        msg = 3 if msg == 1 else 2
-        addFileToDB(newFile=shared.demoFile, shinyToken = shinyToken, vectorDB= shared.vectorDB)    
 
-    return (msg , ["Demo already present", "Demo added to the accorns database", 
-                   "Demo file added to the vector database", 
-                   "Demo added to accorns and vector database"][msg])
+    if cursor.fetchone() is None:
+        msg = 3 if msg == 1 else 2
+        addFileToDB(
+            newFile=shared.demoFile, shinyToken=shinyToken, vectorDB=shared.vectorDB
+        )
+
+    return (
+        msg,
+        [
+            "Demo already present",
+            "Demo added to the accorns database",
+            "Demo file added to the vector database",
+            "Demo added to accorns and vector database",
+        ][msg],
+    )
+
 
 # Backup fields from specific tables in accorns
 def backupQuery(
@@ -325,14 +344,16 @@ def backupQuery(
         dataType = '"iValue"'
     else:
         raise ValueError("The data type of the attribute is not supported")
-    
+
     # Insert into backup
     _ = shared.executeQuery(
         cursor,
-        (f'INSERT INTO "backup" ("sID", "modified", "table", "rowID", "created", "isBot", "attribute", {dataType}) '
-        f'SELECT {sID} as "sID", \'{timeStamp}\' as "modified", \'{table}\' as "table", {rowID} as "rowID", '
-        f'"modified" as "created", {isBot} as "isBot", \'{attribute}\' as "attribute", "{attribute}" as {dataType} '
-        f'FROM "{table}" WHERE "{PK}" = {rowID}'),
+        (
+            f'INSERT INTO "backup" ("sID", "modified", "table", "rowID", "created", "isBot", "attribute", {dataType}) '
+            f'SELECT {sID} as "sID", \'{timeStamp}\' as "modified", \'{table}\' as "table", {rowID} as "rowID", '
+            f'"modified" as "created", {isBot} as "isBot", \'{attribute}\' as "attribute", "{attribute}" as {dataType} '
+            f'FROM "{table}" WHERE "{PK}" = {rowID}'
+        ),
     )
 
 
@@ -346,40 +367,45 @@ def modalMsg(content, title="Info"):
     )
     ui.modal_show(m)
 
+
 # Generate a hash from a string
 def generate_hash():
     alphanumeric_characters = string.ascii_letters + string.digits
     hash_parts = []
     for _ in range(3):
-        hash_part = ''.join(secrets.choice(alphanumeric_characters) for _ in range(3))
+        hash_part = "".join(secrets.choice(alphanumeric_characters) for _ in range(3))
         hash_parts.append(hash_part)
-    return '-'.join(hash_parts)
+    return "-".join(hash_parts)
+
 
 # Generate a list of unique hash values
-def generate_hash_list(n = 1):
+def generate_hash_list(n=1):
     hash_values = []
     for _ in range(n):
         hash_value = generate_hash()
         hash_values.append(hash_value)
-    
+
     # CHeck if all the hash values are unique otherwise generate new hash values
     while len(hash_values) != len(set(hash_values)):
         # Only generate the number of hash values that are not unique
-        hash_values = list(set(hash_values)) + generate_hash_list(n - len(set(hash_values)))
-        
+        hash_values = list(set(hash_values)) + generate_hash_list(
+            n - len(set(hash_values))
+        )
 
     return hash_values
 
-# Generate access codes and add them to the database
-def generate_access_codes(n, uID, adminLevel, note = ""):
 
+# Generate access codes and add them to the database
+def generate_access_codes(n, uID, adminLevel, note=""):
     note = None if note.strip() == "" else note
 
     # Check if n and unID are set
     if not n:
         raise ValueError("Please provide the number of access codes to generate")
     if not uID:
-        raise ValueError("Please provide the uID of the user generating the access codes")
+        raise ValueError(
+            "Please provide the uID of the user generating the access codes"
+        )
 
     codes = []
     conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
@@ -388,21 +414,30 @@ def generate_access_codes(n, uID, adminLevel, note = ""):
     while len(codes) < n:
         codes = tuple(codes + (generate_hash_list(x)))
         # Check if the accessCode does not exist in the database
-        shared.executeQuery(cursor,'SELECT "code" FROM "accessCode" WHERE "code" IN ({})'.format(','.join(['?']*len(codes))), codes)
+        shared.executeQuery(
+            cursor,
+            'SELECT "code" FROM "accessCode" WHERE "code" IN ({})'.format(
+                ",".join(["?"] * len(codes))
+            ),
+            codes,
+        )
         existing_codes = cursor.fetchall()
-        
+
         if existing_codes:
             # remove the existing codes from the list
             codes = [code for code in codes if code not in existing_codes[0]]
             x = n - len(codes)
-    
+
     # Insert the new codes into the database
-    _ = shared.executeQuery(cursor, 'INSERT INTO "accessCode"("code", "uID_creator", "adminLevel", "created", "note") VALUES(?, ?, ?, ?, ?)',
-                             [(code, uID, adminLevel, shared.dt(), note) for code in codes])
+    _ = shared.executeQuery(
+        cursor,
+        'INSERT INTO "accessCode"("code", "uID_creator", "adminLevel", "created", "note") VALUES(?, ?, ?, ?, ?)',
+        [(code, uID, adminLevel, shared.dt(), note) for code in codes],
+    )
     conn.commit()
     conn.close()
 
     role = ["anonymous", "user", "instructor", "admin"][adminLevel]
-    
+
     # Return a data frame
     return pd.DataFrame({"accessCode": codes, "role": role, "note": note})

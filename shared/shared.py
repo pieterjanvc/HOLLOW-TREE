@@ -35,9 +35,7 @@ with open(os.path.join(curDir, "shared_config.toml"), "r") as f:
 remoteAppDB = any(
     config["general"]["remoteAppDB"] == x for x in ["True", "true", "T", 1]
 )
-addDemo = any(
-    config["general"]["addDemo"] == x for x in ["True", "true", "T", 1]
-)
+addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
 demoFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
 postgresHost = config["postgres"]["host"]
 postgresPort = int(config["postgres"]["port"])
@@ -69,9 +67,11 @@ if os.environ["OPENAI_API_KEY"] is None:
 
 # --- FUNCTIONS ---
 
+
 # Get the current date and time in the format "YYYY-MM-DD HH:MM:SS"
 def dt():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 
 # Check if the input is of sufficient length
 def inputCheck(input):
@@ -80,14 +80,18 @@ def inputCheck(input):
     else:
         False
 
-# This function allows you to hide/show/disable/enable elements by ID or data-value
-    # The latter is needed because tabs don't use ID's but data-value
-def elementDisplay(id, effect, session, alertNotFound=True):
-    id = session.ns + '-' + id if session.ns != '' else id
 
-    @reactive.effect    
-    async def _():        
-        await session.send_custom_message("hideShow", {"id": id, "effect": effect, "alertNotFound": alertNotFound})
+# This function allows you to hide/show/disable/enable elements by ID or data-value
+# The latter is needed because tabs don't use ID's but data-value
+def elementDisplay(id, effect, session, alertNotFound=True):
+    id = session.ns + "-" + id if session.ns != "" else id
+
+    @reactive.effect
+    async def _():
+        await session.send_custom_message(
+            "hideShow", {"id": id, "effect": effect, "alertNotFound": alertNotFound}
+        )
+
 
 # Get a local or remote DB connection (depending on config)
 def appDBConn(postgresUser, remoteAppDB=remoteAppDB):
@@ -109,6 +113,7 @@ def appDBConn(postgresUser, remoteAppDB=remoteAppDB):
             )
         return sqlite3.connect(config["localStorage"]["sqliteDB"])
 
+
 # Connect to the vector database
 def vectorDBConn(postgresUser, remoteAppDB=remoteAppDB, vectorDB=vectorDB):
     if remoteAppDB:
@@ -127,26 +132,29 @@ def vectorDBConn(postgresUser, remoteAppDB=remoteAppDB, vectorDB=vectorDB):
 
     return conn
 
+
 # Get the current vector database index
-def getIndex(user, postgresUser, remote = remoteAppDB):
+def getIndex(user, postgresUser, remote=remoteAppDB):
     if remote:
-            vectorStore = PGVectorStore.from_params(
-                host=postgresHost,
-                port=postgresPort,
-                user=user,
-                password=os.environ.get(
+        vectorStore = PGVectorStore.from_params(
+            host=postgresHost,
+            port=postgresPort,
+            user=user,
+            password=os.environ.get(
                 "POSTGRES_PASS_"
                 + ("SCUIRREL" if postgresUser == postgresScuirrel else "ACCORNS")
-                ),
-                database="vector_db",
-                table_name="document",
-                embed_dim=1536,  # openai embedding dimension
-            )
-            return VectorStoreIndex.from_vector_store(vectorStore)
+            ),
+            database="vector_db",
+            table_name="document",
+            embed_dim=1536,  # openai embedding dimension
+        )
+        return VectorStoreIndex.from_vector_store(vectorStore)
     else:
         return VectorStoreIndex.from_vector_store(
             DuckDBVectorStore.from_local(vectorDB)
         )
+
+
 # Execute a query on the accorns database
 def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB):
     query = query.replace("?", "%s") if remoteAppDB else query
@@ -171,12 +179,13 @@ def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB
 
     return
 
+
 # Execute a query on the accorns database returning a pandas dataframe
 def pandasQuery(conn, query, params=()):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         query = query.replace("?", "%s") if remoteAppDB else query
-        return pd.read_sql_query(sql = query, con = conn, params=params)
+        return pd.read_sql_query(sql=query, con=conn, params=params)
 
 
 # Check if the postgres scuirrel database is available when remoteAppDB is set to True
@@ -200,18 +209,26 @@ def checkRemoteDB():
             "Please check the postgres connection settings in config.toml "
             "and make sure POSTGRES_PASS_SCUIRREL and POSTGRES_PASS_SCUIRREL are set as an environment variables."
         )
+
+
 # Check if the 2 passwords match and if the password is strong enough
 def passCheck(password, password2):
     # Check if the password is strong enough
-    if re_search(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_+=])[A-Za-z\d!@#$%^&*()-_+=]{8,20}$",
-                 password) is None:
+    if (
+        re_search(
+            r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_+=])[A-Za-z\d!@#$%^&*()-_+=]{8,20}$",
+            password,
+        )
+        is None
+    ):
         return "Password must be between 8 and 20 characters and contain at least one uppercase letter, one lowercase letter, one number, and one special character"
-    
+
     # Check if the passwords match
     if password != password2:
         return "Passwords do not match"
-    
+
     return None
+
 
 # Check if the access code has not been used yet
 def accessCodeCheck(conn, accessCode):

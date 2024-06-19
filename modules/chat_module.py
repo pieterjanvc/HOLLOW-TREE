@@ -14,11 +14,12 @@ import os
 from shiny import Inputs, Outputs, Session, module, reactive, ui
 from htmltools import HTML, div
 
+
 # --- UI
 @module.ui
 def chat_ui():
-    return ([
-       ui.layout_columns(       
+    return [
+        ui.layout_columns(
             ui.card(
                 HTML("""<p>Hello, I'm Scuirrel (Science Concept Understanding Interactive Research RAG Educational LLM). 
                      I'm here to help you test your knowledge on specific concepts
@@ -28,64 +29,92 @@ def chat_ui():
                      fellows if you have questions or concerns.<br><br><i>NOTE:
                      Though this app is anonymous, I still like to collect data acorns (including chat history) for 
                      research purposes so don't share any personal information and keep to the topic at hand.</i></p>"""),
-                     id="about"),
+                id="about",
+            ),
             ui.card(
                 ui.card_header("Pick a topic"),
                 ui.input_select("selTopic", None, choices=[], width="600px"),
-                div(ui.input_action_button("startConversation", "Start conversation", 
-                                       width="200px", style='display: inline-block;'),
-                quiz_ui("quiz")), id="topicSelection"),
-            ui.panel_conditional("input.startConversation > 0",
+                div(
+                    ui.input_action_button(
+                        "startConversation",
+                        "Start conversation",
+                        width="200px",
+                        style="display: inline-block;",
+                    ),
+                    quiz_ui("quiz"),
+                ),
+                id="topicSelection",
+            ),
+            ui.panel_conditional(
+                "input.startConversation > 0",
                 ui.card(
-                    ui.card_header(HTML(
-                        '<div class="progress-bar"><span id="chatProgress" class="progress-bar-fill" style="width: 0%;">Topic Progress</span></div>'
-                        + str(
-                            ui.input_action_button("chatFeedback", "Provide chat feedback")
-                        )
-                    ), id="chatHeader"),                    
-                    div(id=module.resolve_id("conversation")),id="chatWindow", **{'class': "chatWindow"}, height="45vh")),
+                    ui.card_header(
+                        HTML(
+                            '<div class="progress-bar"><span id="chatProgress" class="progress-bar-fill" style="width: 0%;">Topic Progress</span></div>'
+                            + str(
+                                ui.input_action_button(
+                                    "chatFeedback", "Provide chat feedback"
+                                )
+                            )
+                        ),
+                        id="chatHeader",
+                    ),
+                    div(id=module.resolve_id("conversation")),
+                    id="chatWindow",
+                    **{"class": "chatWindow"},
+                    height="45vh",
+                ),
+            ),
+            # User input, send button and wait message
+            ui.card(
+                ui.input_text_area(
+                    "newChat",
+                    "",
+                    value="",
+                    width="100%",
+                    spellcheck=True,
+                    resize=False,
+                    placeholder="Type your message here...",
+                ),
+                ui.input_action_button("send", "Send", width="100px"),
+                style="display: none;",
+                id="chatIn",
+            ),
+            ui.card(
+                HTML("<p><i>Scuirrel is foraging for an answer ...</i></p>"),
+                id="waitResp",
+                style="display: none;",
+            ),
+            col_widths=12,
+        )
+    ]
 
-                # User input, send button and wait message
-                ui.card(
-                    ui.input_text_area(
-                        "newChat", "", value="", width="100%", spellcheck=True, resize=False,
-                        placeholder="Type your message here...",
-                    ),
-                    ui.input_action_button("send", "Send", width="100px"),
-                    style="display: none;",
-                    id="chatIn",
-                    ),
-                ui.card(
-                    HTML(
-                        "<p><i>Scuirrel is foraging for an answer ...</i></p>"
-                    ),
-                    id="waitResp",
-                    style="display: none;",
-                ),col_widths=12)
-    ])
 
 @module.server
 def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
-
     # Reactive variables
     discussionID = reactive.value(0)  # Current conversation
     conceptIndex = reactive.value(0)  # Current concept index to discuss
     messages = reactive.value(None)  # Raw chat messages
-    botLog = reactive.value(None)  # Chat sent to the LLM 
+    botLog = reactive.value(None)  # Chat sent to the LLM
 
     # The quiz question popup is a separate module
-    _ = quiz_server("quiz", tID = input.selTopic, sID = sID, user = user)       
+    _ = quiz_server("quiz", tID=input.selTopic, sID=sID, user=user)
 
     # Update a custom, simple progress bar
     def progressBar(id, percent):
         @reactive.effect
         async def _():
-            await session.send_custom_message("progressBar", {"id": id, "percent": percent})
+            await session.send_custom_message(
+                "progressBar", {"id": id, "percent": percent}
+            )
 
-    def scrollElement(selectors, direction = "top"):
+    def scrollElement(selectors, direction="top"):
         @reactive.effect
         async def _():
-            await session.send_custom_message("scrollElement", {"selectors": selectors, "direction": direction})
+            await session.send_custom_message(
+                "scrollElement", {"selectors": selectors, "direction": direction}
+            )
 
     # When a new user signs in, show / update the relevant topics
     @reactive.calc
@@ -94,34 +123,38 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
         # Get all active topics - TODO: add a filter specific users
         conn = shared.appDBConn(shared.postgresScuirrel)
         topics = shared.pandasQuery(conn, 'SELECT * FROM "topic" WHERE "archived" = 0')
-        conn.close()        
-        
+        conn.close()
+
         return topics
-    
+
     @reactive.effect
     @reactive.event(topics)
-    def _():        
-        
+    def _():
         if not topics().empty:
-            ui.update_select("selTopic", choices=dict(zip(topics()["tID"], topics()["topic"])))
-            shared.elementDisplay("startConversation", "s", session, False)  
-            shared.elementDisplay("chatIn", "s", session, False)      
-        
+            ui.update_select(
+                "selTopic", choices=dict(zip(topics()["tID"], topics()["topic"]))
+            )
+            shared.elementDisplay("startConversation", "s", session, False)
+            shared.elementDisplay("chatIn", "s", session, False)
+
         return
-    
+
     # When the start conversation button is clicked...
     @reactive.effect
     @reactive.event(input.startConversation)
     def _():
         tID = int(topics()[topics()["tID"] == int(input.selTopic())].iloc[0]["tID"])
         conn = shared.appDBConn(shared.postgresScuirrel)
-        cursor = conn.cursor()        
+        cursor = conn.cursor()
 
         # Save the logs for the previous discussion (if any) adn wipe the chat window
         if messages.get():
             scuirrel_shared.endDiscussion(cursor, discussionID.get(), messages.get())
-            ui.remove_ui("#"+module.resolve_id("conversation"))  
-            ui.insert_ui(div(id=module.resolve_id("conversation")), "#"+module.resolve_id("chatWindow"))        
+            ui.remove_ui("#" + module.resolve_id("conversation"))
+            ui.insert_ui(
+                div(id=module.resolve_id("conversation")),
+                "#" + module.resolve_id("chatWindow"),
+            )
 
         # Register the start of the  new topic discussion
         dID = shared.executeQuery(
@@ -151,13 +184,12 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
                                 <p>Hello, I'm here to help you get a basic understanding of 
                                 the following topic: <b>{topics().iloc[0]["topic"]}</b>. 
                                 What do you already know about this?</p></div>"""),
-            "#"+module.resolve_id("conversation"),
-        )        
+            "#" + module.resolve_id("conversation"),
+        )
         botLog.set(f"---- PREVIOUS CONVERSATION ----\n--- MENTOR:\n{firstWelcome}")
 
         shared.elementDisplay("chatIn", "s", session)
         return tID
-
 
     # Get the concepts related to the topic
     @reactive.calc
@@ -169,7 +201,6 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
         )
         conn.close()
         return concepts
-
 
     # When the send button is clicked...
     @reactive.effect
@@ -186,29 +217,34 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
         # Add the user message
         msg = messages.get()
         msg.add_message(
-            isBot=0, cID=int(concepts().iloc[conceptIndex.get()]["cID"]), content=newChat
+            isBot=0,
+            cID=int(concepts().iloc[conceptIndex.get()]["cID"]),
+            content=newChat,
         )
         messages.set(msg)
         # Generate chat logs
-        conversation = botLog.get() + "\n---- NEW RESPONSE FROM STUDENT ----\n" + newChat
+        conversation = (
+            botLog.get() + "\n---- NEW RESPONSE FROM STUDENT ----\n" + newChat
+        )
         ui.insert_ui(
             HTML(
                 f"<div class='userChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'><p>{escape(newChat)}</p></div>"
             ),
-            "#"+module.resolve_id("conversation"),
-        )        
+            "#" + module.resolve_id("conversation"),
+        )
         botLog.set(botLog.get() + f"\n--- STUDENT:\n{newChat}")
         topic = topics()[topics()["tID"] == int(input.selTopic())].iloc[0]["topic"]
-        scrollElement('.chatWindow .card-body')
+        scrollElement(".chatWindow .card-body")
         # Send the message to the LLM for processing
         botResponse(topic, concepts(), conceptIndex.get(), conversation)
-
 
     # Async Shiny task waiting for LLM reply
     @reactive.extended_task
     async def botResponse(topic, concepts, cIndex, conversation):
         # Check the student's progress on the current concept based on the last reply (other engine)
-        engine = scuirrel_shared.progressCheckEngine(conversation, topic, concepts, cIndex)
+        engine = scuirrel_shared.progressCheckEngine(
+            conversation, topic, concepts, cIndex
+        )
         tries = 0
         while tries < 3:
             try:
@@ -221,7 +257,7 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
 
         if eval is None:
             return {"resp": None, "eval": None}
-        
+
         # See if the LLM thinks we can move on to the next concept or or not
         if int(eval["score"]) > 2:
             cIndex += 1
@@ -234,7 +270,6 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
 
         return {"resp": resp, "eval": eval}
 
-
     # Processing LLM responses
     @reactive.effect
     def _():
@@ -243,7 +278,9 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
         resp = result["resp"]  # New response to student
 
         if eval is None:
-            ui.notification_show("SCUIRREL is having issues processing your response. Please try again later.")
+            ui.notification_show(
+                "SCUIRREL is having issues processing your response. Please try again later."
+            )
             shared.elementDisplay("waitResp", "h", session)
             shared.elementDisplay("chatIn", "s", session)
             return
@@ -270,7 +307,7 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
                 HTML(
                     f"<div class='botChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'><p>{escape(resp)}</p></div>"
                 ),
-                "#"+module.resolve_id("conversation"),
+                "#" + module.resolve_id("conversation"),
             )
             botLog.set(botLog.get() + "\n--- MENTOR:\n" + resp)
 
@@ -280,9 +317,9 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
             # If conversation is over don't show new message box
             if not finished:
                 shared.elementDisplay("chatIn", "s", session)
-                scrollElement('.chatWindow .card-body')
+                scrollElement(".chatWindow .card-body")
             else:
-                ui.insert_ui(HTML("<hr>"), "#"+module.resolve_id("conversation"))
+                ui.insert_ui(HTML("<hr>"), "#" + module.resolve_id("conversation"))
 
     # When the chat feedback button is clicked
     @reactive.effect
@@ -320,7 +357,6 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
                 ],
             )
             ui.modal_show(m)
-
 
     # Insert the issue into the DB
     @reactive.effect

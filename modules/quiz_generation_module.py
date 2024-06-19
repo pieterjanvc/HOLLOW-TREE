@@ -18,77 +18,83 @@ from llama_index.core.llms import ChatMessage, MessageRole
 
 # --- UI ---
 
+
 @module.ui
 def quiz_generation_ui():
-    return ([
+    return [
         ui.card(
-                ui.card_header("Questions by Topic"),
-                # Dropdown of topics and questions per topic
-                ui.input_select(
-                    "qtID", "Pick a topic", choices=[], width="400px"
-                ),
-                ui.input_select("qID", "Question", choices=[], width="400px"),
-                # Buttons to add or archive questions and message when busy generating
+            ui.card_header("Questions by Topic"),
+            # Dropdown of topics and questions per topic
+            ui.input_select("qtID", "Pick a topic", choices=[], width="400px"),
+            ui.input_select("qID", "Question", choices=[], width="400px"),
+            # Buttons to add or archive questions and message when busy generating
+            div(
+                ui.input_action_button("qGenerate", "Generate new", width="180px"),
+                ui.input_action_button("qArchive", "Archive selected", width="180px"),
+                id="qBtnSet",
+                style="display:inline",
+            ),
+            div(
+                HTML("<i>Generating a new question...</i>"),
+                id="qBusyMsg",
+                style="display: none;",
+            ),
+        ),
+        # Only show this panel if there is at least one question
+        ui.panel_conditional(
+            "input.qID",
+            ui.card(
+                ui.card_header("Review question"),
+                # Show a preview of the question
+                ui.output_ui("quizQuestionPreview", style="display: none;"),
+                # Save updates
                 div(
-                    ui.input_action_button("qGenerate", "Generate new", width="180px"),
-                    ui.input_action_button("qArchive", "Archive selected", width="180px"),
-                    id="qBtnSet",
-                    style="display:inline",
+                    ui.input_action_button("qSaveChanges", "Save Changes"),
+                    ui.input_action_button("qDiscardChanges", "Discard Changes"),
                 ),
-                div(
-                    HTML("<i>Generating a new question...</i>"),
-                    id="qBusyMsg",
-                    style="display: none;",
-                )),
+                # Fields to edit any part of the question
+                ui.input_text_area(
+                    "rqQuestion", "Question", width="100%", autoresize=True
+                ),
+                ui.input_radio_buttons(
+                    "rqCorrect",
+                    "Correct answer",
+                    choices=["A", "B", "C", "D"],
+                    inline=True,
+                ),
+                ui.input_text("rqOA", "Option A", width="100%"),
+                ui.input_text_area(
+                    "rqOAexpl", "Explanation A", width="100%", autoresize=True
+                ),
+                ui.input_text("rqOB", "Option B", width="100%"),
+                ui.input_text_area(
+                    "rqOBexpl", "Explanation B", width="100%", autoresize=True
+                ),
+                ui.input_text("rqOC", "Option C", width="100%"),
+                ui.input_text_area(
+                    "rqOCexpl", "Explanation C", width="100%", autoresize=True
+                ),
+                ui.input_text("rqOD", "Option D", width="100%"),
+                ui.input_text_area(
+                    "rqODexpl", "Explanation D", width="100%", autoresize=True
+                ),
+            ),
+        ),
+    ]
 
-            # Only show this panel if there is at least one question
-            ui.panel_conditional("input.qID",
-                ui.card(
-                    ui.card_header("Review question"),
-                    # Show a preview of the question
-                    ui.output_ui("quizQuestionPreview", style="display: none;"),
-                    # Save updates
-                    div(
-                        ui.input_action_button("qSaveChanges", "Save Changes"),
-                        ui.input_action_button("qDiscardChanges", "Discard Changes"),
-                    ),
-                    # Fields to edit any part of the question
-                    ui.input_text_area(
-                        "rqQuestion", "Question", width="100%", autoresize=True
-                    ),
-                    ui.input_radio_buttons(
-                        "rqCorrect",
-                        "Correct answer",
-                        choices=["A", "B", "C", "D"],
-                        inline=True,
-                    ),
-                    ui.input_text("rqOA", "Option A", width="100%"),
-                    ui.input_text_area(
-                        "rqOAexpl", "Explanation A", width="100%", autoresize=True
-                    ),
-                    ui.input_text("rqOB", "Option B", width="100%"),
-                    ui.input_text_area(
-                        "rqOBexpl", "Explanation B", width="100%", autoresize=True
-                    ),
-                    ui.input_text("rqOC", "Option C", width="100%"),
-                    ui.input_text_area(
-                        "rqOCexpl", "Explanation C", width="100%", autoresize=True
-                    ),
-                    ui.input_text("rqOD", "Option D", width="100%"),
-                    ui.input_text_area(
-                        "rqODexpl", "Explanation D", width="100%", autoresize=True
-                    )))
-    ])
 
 # --- Server ---
 @module.server
-def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID, index, topics, user):
-    
+def quiz_generation_server(
+    input: Inputs, output: Outputs, session: Session, sID, index, topics, user
+):
     # Set the topics
     @reactive.effect
     @reactive.event(topics)
     def _():
-        ui.update_select("qtID", choices=dict(zip(topics.get()["tID"], topics.get()["topic"])))
+        ui.update_select(
+            "qtID", choices=dict(zip(topics.get()["tID"], topics.get()["topic"]))
+        )
 
     @render.ui
     def quizQuestionPreview():
@@ -160,7 +166,6 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
             llm=shared.llm,
         )
 
-
     # When the generate button is clicked...
     @reactive.effect
     @reactive.event(input.qGenerate)
@@ -170,7 +175,7 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
 
         topic = topics.get()[topics.get()["tID"] == int(input.qtID())].iloc[0]["topic"]
 
-        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)       
+        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
         # topic = shared.pandasQuery(
         #     conn, f'SELECT "topic" FROM "topic" WHERE "tID" = {input.qtID()}'
         # )
@@ -181,7 +186,9 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
             f'UNION ALL SELECT "cID", \'\' as concept FROM "question" where "tID" = {int(input.qtID())}) GROUP BY "cID"',
         )
         cID = int(
-            conceptList[conceptList["n"] == min(conceptList["n"])].sample(1)["cID"].iloc[0]
+            conceptList[conceptList["n"] == min(conceptList["n"])]
+            .sample(1)["cID"]
+            .iloc[0]
         )
         prevQuestions = shared.pandasQuery(
             conn,
@@ -210,7 +217,6 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
 
         botResponse(quizEngine(), info, cID)
 
-
     # Async Shiny task waiting for LLM reply
     @reactive.extended_task
     async def botResponse(quizEngine, info, cID):
@@ -230,7 +236,6 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
 
         return {"resp": resp, "cID": cID}
 
-
     # Processing LLM response
     @reactive.effect
     def _():
@@ -241,14 +246,15 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
 
         if resp["resp"] is None:
             accorns_shared.modalMsg(
-                "The generation of a question with the LLM failed, try again later", "Error"
+                "The generation of a question with the LLM failed, try again later",
+                "Error",
             )
             return
 
         with reactive.isolate():
             q = resp["resp"].iloc[0]  # For now only processing one
             # Save the questions in the appAB
-            conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
+            conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
             cursor = conn.cursor()
             # Insert question
             qID = shared.executeQuery(
@@ -286,12 +292,11 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
                 "qID", choices=dict(zip(q["qID"], q["question"])), selected=qID
             )
 
-
     @reactive.effect
     @reactive.event(input.qtID)
     def _():
         # Get the question info from the DB
-        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
+        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
         q = shared.pandasQuery(
             conn,
             f'SELECT "qID", "question" FROM "question" WHERE "tID" = {int(input.qtID())} AND "archived" = 0',
@@ -300,12 +305,11 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
         # Update the UI
         ui.update_select("qID", choices=dict(zip(q["qID"], q["question"])))
 
-
     @reactive.effect
     @reactive.event(input.qID, input.qDiscardChanges)
     def _():
         # Get the question info from the DB
-        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
+        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
         q = shared.pandasQuery(
             conn, f'SELECT * FROM "question" WHERE "qID" = {input.qID()}'
         ).iloc[0]
@@ -322,13 +326,12 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
         ui.update_text_area("rqODexpl", value=q["explanationD"])
         ui.update_radio_buttons("rqCorrect", selected=q["answer"])
 
-
     # Save question edits
     @reactive.effect
     @reactive.event(input.qSaveChanges)
     def _():
         # Get the original question
-        conn = shared.appDBConn(postgresUser = shared.postgresAccorns)
+        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
         cursor = conn.cursor()
         q = shared.pandasQuery(
             conn,
@@ -365,7 +368,9 @@ def quiz_generation_server(input: Inputs, output: Outputs, session: Session, sID
                 cursor, f'UPDATE "question" SET {updates} WHERE "qID" = ?', (qID,)
             )
             conn.commit()
-            accorns_shared.modalMsg("Your edits were successfully saved", "Update complete")
+            accorns_shared.modalMsg(
+                "Your edits were successfully saved", "Update complete"
+            )
         else:
             accorns_shared.modalMsg("No changes were detected")
 

@@ -11,17 +11,19 @@ from htmltools import HTML, div
 
 # --- UI ---
 
+
 @module.ui
 def quiz_ui(inline=True):
-    inline = 'display: inline-block;' if inline else ''
-    return ([
-        ui.input_action_button("quizQuestion", "Take a quiz question", 
-                               width="250px", style=inline),
-    ])
+    inline = "display: inline-block;" if inline else ""
+    return [
+        ui.input_action_button(
+            "quizQuestion", "Take a quiz question", width="250px", style=inline
+        ),
+    ]
+
 
 @module.server
 def quiz_server(input: Inputs, output: Outputs, session: Session, tID, sID, user):
-
     quizQuestion = reactive.value()
 
     @reactive.effect
@@ -89,7 +91,6 @@ def quiz_server(input: Inputs, output: Outputs, session: Session, tID, sID, user
         ui.modal_show(m)
         quizQuestion.set(q)
 
-
     # Clicking the check answer button will show result + explanation
     @reactive.calc
     @reactive.event(input.checkAnswer)
@@ -117,7 +118,6 @@ def quiz_server(input: Inputs, output: Outputs, session: Session, tID, sID, user
             f'<hr><h3>{"Correct!" if correct else "Incorrect..."}</h3>'
             f'{q["explanation" + input.quizOptions()]}'
         )
-
 
     @reactive.effect
     @reactive.event(input.qClose)

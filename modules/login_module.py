@@ -11,50 +11,64 @@ from htmltools import HTML
 
 import shared.shared as shared
 
+
 # --- UI
 @module.ui
 def login_ui():
-    return ([
+    return [
         ui.layout_columns(
-                ui.card(
-                    ui.card_header("Login"),
-                    ui.input_text("lUsername", "Username"),
-                    ui.input_password("lPassword", "Password"),
-                    ui.input_action_button("login", "Login", width="200px"),
-                    ui.input_action_link("showReset", "Reset password", width="250px")),
-                ui.card(               
-                    ui.card_header("Create an account"),              
-                    HTML("""<i>NOTE: This application has been built for research purposes 
+            ui.card(
+                ui.card_header("Login"),
+                ui.input_text("lUsername", "Username"),
+                ui.input_password("lPassword", "Password"),
+                ui.input_action_button("login", "Login", width="200px"),
+                ui.input_action_link("showReset", "Reset password", width="250px"),
+            ),
+            ui.card(
+                ui.card_header("Create an account"),
+                HTML("""<i>NOTE: This application has been built for research purposes 
                         and has not been extensively tested for security. We recommend
                         you create a unique password for this you are not using anywhere else</i>"""),
-                    ui.input_text("cUsername", "Username"),
-                    ui.input_password("cPassword", "Password"),
-                    ui.input_password("cPassword2", "Repeat password"),
-                    ui.input_text("cAccessCode", "Access code"),
-                    ui.input_action_button("createAccount", "Create", width="200px")),
-            ui.panel_conditional("input.showReset > 0",
-                    ui.card(
-                        ui.card_header("Reset password"),
-                        HTML("""<p><i>You will need to request a new access code from your 
+                ui.input_text("cUsername", "Username"),
+                ui.input_password("cPassword", "Password"),
+                ui.input_password("cPassword2", "Repeat password"),
+                ui.input_text("cAccessCode", "Access code"),
+                ui.input_action_button("createAccount", "Create", width="200px"),
+            ),
+            ui.panel_conditional(
+                "input.showReset > 0",
+                ui.card(
+                    ui.card_header("Reset password"),
+                    HTML("""<p><i>You will need to request a new access code from your 
                             administrator before resetting your password.</i></p>"""),
-                        ui.input_text("rUsername", "Username"),
-                        ui.input_password("rPassword", "New password"),
-                        ui.input_password("rPassword2", "Repeat new password"),
-                        ui.input_text("rAccessCode", "Access code"),
-                        ui.input_action_button("reset", "Reset password", width="250px"),
-                    )),col_widths=6)
-    ])
+                    ui.input_text("rUsername", "Username"),
+                    ui.input_password("rPassword", "New password"),
+                    ui.input_password("rPassword2", "Repeat new password"),
+                    ui.input_text("rAccessCode", "Access code"),
+                    ui.input_action_button("reset", "Reset password", width="250px"),
+                ),
+            ),
+            col_widths=6,
+        )
+    ]
+
 
 # --- Server
 @module.server
-def login_server(input: Inputs, output: Outputs, session: Session, postgresUser, sessionID, minAdminLevel = 0):
-
+def login_server(
+    input: Inputs,
+    output: Outputs,
+    session: Session,
+    postgresUser,
+    sessionID,
+    minAdminLevel=0,
+):
     # Default to anonymous
     conn = shared.appDBConn(postgresUser=postgresUser)
-    user = shared.pandasQuery(conn,'SELECT * FROM "user" WHERE "uID" = 1')
+    user = shared.pandasQuery(conn, 'SELECT * FROM "user" WHERE "uID" = 1')
     conn.close()
-    user = reactive.value(user.to_dict(orient="records")[0]) 
-    
+    user = reactive.value(user.to_dict(orient="records")[0])
+
     # Login
     @reactive.effect
     @reactive.event(input.login)
@@ -67,21 +81,23 @@ def login_server(input: Inputs, output: Outputs, session: Session, postgresUser,
             'SELECT * FROM "user" WHERE "username" = ? AND "username" != \'anonymous\'',
             (username,),
         )
-        
+
         if checkUser.shape[0] == 1:
             if bcrypt.checkpw(password, checkUser.password.iloc[0].encode("utf-8")):
                 if int(checkUser.adminLevel.iloc[0]) < minAdminLevel:
-                    ui.notification_show("You do not have the required permissions to access this application")
+                    ui.notification_show(
+                        "You do not have the required permissions to access this application"
+                    )
                     conn.close()
                     return
-                
+
                 ui.notification_show("Logged in successfully")
                 cursor = conn.cursor()
                 # For now we only have anonymous users (appID 0 -> SCUIRREL)
                 _ = shared.executeQuery(
                     cursor,
                     'UPDATE "session" SET "uID" = ? WHERE "sID" = ?',
-                    (int(checkUser.uID.iloc[0]), sessionID)
+                    (int(checkUser.uID.iloc[0]), sessionID),
                 )
                 conn.commit()
             else:
@@ -111,7 +127,7 @@ def login_server(input: Inputs, output: Outputs, session: Session, postgresUser,
         if re_search(r"^\w{6,20}$", username) is None:
             ui.notification_show("Username must be between 6 and 20 characters")
             return
-        
+
         # Check if the username already exists
         conn = shared.appDBConn(postgresUser=postgresUser)
         cursor = conn.cursor()
@@ -131,14 +147,14 @@ def login_server(input: Inputs, output: Outputs, session: Session, postgresUser,
         if pCheck:
             ui.notification_show(pCheck)
             conn.close()
-            return    
+            return
 
         code = shared.accessCodeCheck(conn, accessCode)
 
         if code is None:
             ui.notification_show("Invalid access code")
             conn.close()
-            return    
+            return
 
         # Create the user
         hashed = bcrypt.hashpw(input.cPassword().encode("utf-8"), bcrypt.gensalt())
@@ -146,7 +162,13 @@ def login_server(input: Inputs, output: Outputs, session: Session, postgresUser,
             cursor,
             'INSERT INTO "user" ("username", "password", "adminLevel", "created", "modified")'
             "VALUES(?, ?, ?, ?, ?)",
-            (username, hashed.decode(), int(code["adminLevel"].iloc[0]), shared.dt(), shared.dt()),
+            (
+                username,
+                hashed.decode(),
+                int(code["adminLevel"].iloc[0]),
+                shared.dt(),
+                shared.dt(),
+            ),
             lastRowId="uID",
         )
 
@@ -190,13 +212,13 @@ def login_server(input: Inputs, output: Outputs, session: Session, postgresUser,
             conn,
             'SELECT * FROM "user" WHERE "username" = ?',
             (username,),
-        )    
+        )
 
         if user.shape[0] == 0:
             ui.notification_show("This username does not exist")
             conn.close()
             return
-        
+
         uID = int(user["uID"].iloc[0])
 
         # Check the password
@@ -204,7 +226,7 @@ def login_server(input: Inputs, output: Outputs, session: Session, postgresUser,
         if pCheck:
             ui.notification_show(pCheck)
             return
-        
+
         # Check the access code
         code = shared.accessCodeCheck(conn, accessCode)
 
@@ -212,7 +234,7 @@ def login_server(input: Inputs, output: Outputs, session: Session, postgresUser,
             ui.notification_show("Invalid access code")
             conn.close()
             return
-        
+
         # Update the password
         hashed = bcrypt.hashpw(input.rPassword().encode("utf-8"), bcrypt.gensalt())
         _ = shared.executeQuery(
@@ -235,7 +257,7 @@ def login_server(input: Inputs, output: Outputs, session: Session, postgresUser,
         ui.update_text_area("rPassword", value="")
         ui.update_text_area("rPassword2", value="")
         ui.update_text_area("rAccessCode", value="")
-        
+
         ui.notification_show("Password reset successfully, please login again")
 
     return user

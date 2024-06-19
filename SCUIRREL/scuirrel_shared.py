@@ -42,6 +42,7 @@ if topics.shape[0] == 0:
     )
 conn.close()
 
+
 # Chat Agent - Adapt the chat engine to the topic
 def chatEngine(topic, concepts, cIndex, eval):
     # TUTORIAL Llamaindex + Prompt engineering
