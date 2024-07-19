@@ -4,7 +4,7 @@ VALUES('The central dogma of molecular biology',
   CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO "concept" ("tID", "concept", "created", "modified")
- VALUES (1,'Central dogma of molecular biology: DNA makes RNA makes Protein',
+ VALUES (1,'DNA (deoxyribonucleic acid) is the molecule that carries the genetic information in every living organism',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
   (1,'Genes: Hold code for specific functional molecular products (RNA and Protein)',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
@@ -21,4 +21,6 @@ INSERT INTO "concept" ("tID", "concept", "created", "modified")
   (1,'Amino acids: Building blocks of proteins. Linked by peptide bonds',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
   (1,'Protein folding: Adopts specific three-dimensional structure',
+  CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+  (1,'In summary: The central dogma states that DNA makes RNA makes Protein',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);

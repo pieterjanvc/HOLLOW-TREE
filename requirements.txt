@@ -1,5 +1,5 @@
 pandas>=2.0.0
-shiny>=0.9.0
+shiny==0.9.0
 llama-index
 llama-index-llms-openai
 # Issue with DuckDB in llamaindex forced reverting to previous version

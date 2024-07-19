@@ -21,7 +21,7 @@ Shiny.addCustomMessageHandler("hideShow", function(x) {
             element.setAttribute("disabled", true);
             break;
         case "e":
-            element.setAttribute("disabled", false);
+            element.removeAttribute("disabled");
             break;
         case "h":
             element.style.display = "none";
@@ -29,6 +29,9 @@ Shiny.addCustomMessageHandler("hideShow", function(x) {
         case "s":
             element.style.display = "";
             break;
+        default:
+            alert("Invalid effect: " + x.effect + 
+                ". Use 'd' to disable, 'e' to enable, 'h' to hide, or 's' to show.");
     }    
     
 });
