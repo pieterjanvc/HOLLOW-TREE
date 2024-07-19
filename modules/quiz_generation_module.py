@@ -46,7 +46,7 @@ def quiz_generation_ui():
             ui.card(
                 ui.card_header("Review question"),
                 # Show a preview of the question
-                ui.output_ui("quizQuestionPreview", style="display: none;"),
+                ui.output_ui("quizQuestionPreview", style=""),
                 # Save updates
                 div(
                     ui.input_action_button("qSaveChanges", "Save Changes"),
@@ -78,6 +78,7 @@ def quiz_generation_ui():
                 ui.input_text_area(
                     "rqODexpl", "Explanation D", width="100%", autoresize=True
                 ),
+                id="qEditPanel",
             ),
         ),
     ]
@@ -170,21 +171,45 @@ def quiz_generation_server(
     @reactive.effect
     @reactive.event(input.qGenerate)
     def _():
-        shared.elementDisplay("qBusyMsg", "s", session, alertNotFound=False)
-        shared.elementDisplay("qBtnSet", "h", session, alertNotFound=False)
+        shared.elementDisplay(
+            "qBusyMsg", "s", session, alertNotFound=False, ignoreNS=True
+        )
+        shared.elementDisplay(
+            "qBtnSet", "h", session, alertNotFound=False, ignoreNS=True
+        )
+        shared.elementDisplay("qtID", "d", session, alertNotFound=False)
+        shared.elementDisplay("qID", "d", session, alertNotFound=False)
+        shared.elementDisplay("qEditPanel", "h", session, alertNotFound=False)
 
+        # Get the topic
         topic = topics.get()[topics.get()["tID"] == int(input.qtID())].iloc[0]["topic"]
 
         conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
-        # topic = shared.pandasQuery(
-        #     conn, f'SELECT "topic" FROM "topic" WHERE "tID" = {input.qtID()}'
-        # )
+
+        # Get the concept with the least questions
         conceptList = shared.pandasQuery(
             conn,
             'SELECT "cID", max("concept") as "concept", count(*) as n FROM '
-            f'(SELECT "cID", "concept" FROM "concept" WHERE "tID" = {int(input.qtID())} '
+            f'(SELECT "cID", "concept" FROM "concept" WHERE "tID" = {int(input.qtID())} AND "archived" = 0 '
             f'UNION ALL SELECT "cID", \'\' as concept FROM "question" where "tID" = {int(input.qtID())}) GROUP BY "cID"',
         )
+        # If there are no concepts, show a notification and return
+        if conceptList.shape[0] == 0:
+            ui.notification_show(
+                "This topic has no concepts yet, please add some first in the Topics tab"
+            )
+            shared.elementDisplay(
+                "qBusyMsg", "h", session, alertNotFound=False, ignoreNS=True
+            )
+            shared.elementDisplay(
+                "qBtnSet", "s", session, alertNotFound=False, ignoreNS=True
+            )
+            shared.elementDisplay("qtID", "e", session, alertNotFound=False)
+            shared.elementDisplay("qID", "e", session, alertNotFound=False)
+            shared.elementDisplay("qEditPanel", "s", session, alertNotFound=False)
+
+            return
+
         cID = int(
             conceptList[conceptList["n"] == min(conceptList["n"])]
             .sample(1)["cID"]
@@ -241,8 +266,15 @@ def quiz_generation_server(
     def _():
         # Populate the respective UI outputs with the questions details
         resp = botResponse.result()
-        shared.elementDisplay("qBusyMsg", "h", session, alertNotFound=False)
-        shared.elementDisplay("qBtnSet", "s", session, alertNotFound=False)
+        shared.elementDisplay(
+            "qBusyMsg", "h", session, alertNotFound=False, ignoreNS=True
+        )
+        shared.elementDisplay(
+            "qBtnSet", "s", session, alertNotFound=False, ignoreNS=True
+        )
+        shared.elementDisplay("qtID", "e", session, alertNotFound=False)
+        shared.elementDisplay("qID", "e", session, alertNotFound=False)
+        shared.elementDisplay("qEditPanel", "s", session, alertNotFound=False)
 
         if resp["resp"] is None:
             accorns_shared.modalMsg(

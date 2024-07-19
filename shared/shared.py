@@ -83,8 +83,8 @@ def inputCheck(input):
 
 # This function allows you to hide/show/disable/enable elements by ID or data-value
 # The latter is needed because tabs don't use ID's but data-value
-def elementDisplay(id, effect, session, alertNotFound=True):
-    id = session.ns + "-" + id if session.ns != "" else id
+def elementDisplay(id, effect, session, alertNotFound=True, ignoreNS=False):
+    id = session.ns + "-" + id if (session.ns != "") and (not ignoreNS) else id
 
     @reactive.effect
     async def _():
