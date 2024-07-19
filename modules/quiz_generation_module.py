@@ -78,7 +78,8 @@ def quiz_generation_ui():
                 ui.input_text_area(
                     "rqODexpl", "Explanation D", width="100%", autoresize=True
                 ),
-            id = "qEditPanel"),
+                id="qEditPanel",
+            ),
         ),
     ]
 
@@ -170,8 +171,12 @@ def quiz_generation_server(
     @reactive.effect
     @reactive.event(input.qGenerate)
     def _():
-        shared.elementDisplay("qBusyMsg", "s", session, alertNotFound=False, ignoreNS=True)
-        shared.elementDisplay("qBtnSet", "h", session, alertNotFound=False, ignoreNS=True)
+        shared.elementDisplay(
+            "qBusyMsg", "s", session, alertNotFound=False, ignoreNS=True
+        )
+        shared.elementDisplay(
+            "qBtnSet", "h", session, alertNotFound=False, ignoreNS=True
+        )
         shared.elementDisplay("qtID", "d", session, alertNotFound=False)
         shared.elementDisplay("qID", "d", session, alertNotFound=False)
         shared.elementDisplay("qEditPanel", "h", session, alertNotFound=False)
@@ -193,14 +198,18 @@ def quiz_generation_server(
             ui.notification_show(
                 "This topic has no concepts yet, please add some first in the Topics tab"
             )
-            shared.elementDisplay("qBusyMsg", "h", session, alertNotFound=False, ignoreNS=True)
-            shared.elementDisplay("qBtnSet", "s", session, alertNotFound=False, ignoreNS=True)
+            shared.elementDisplay(
+                "qBusyMsg", "h", session, alertNotFound=False, ignoreNS=True
+            )
+            shared.elementDisplay(
+                "qBtnSet", "s", session, alertNotFound=False, ignoreNS=True
+            )
             shared.elementDisplay("qtID", "e", session, alertNotFound=False)
             shared.elementDisplay("qID", "e", session, alertNotFound=False)
             shared.elementDisplay("qEditPanel", "s", session, alertNotFound=False)
 
             return
-        
+
         cID = int(
             conceptList[conceptList["n"] == min(conceptList["n"])]
             .sample(1)["cID"]
@@ -257,8 +266,12 @@ def quiz_generation_server(
     def _():
         # Populate the respective UI outputs with the questions details
         resp = botResponse.result()
-        shared.elementDisplay("qBusyMsg", "h", session, alertNotFound=False, ignoreNS=True)
-        shared.elementDisplay("qBtnSet", "s", session, alertNotFound=False, ignoreNS=True)
+        shared.elementDisplay(
+            "qBusyMsg", "h", session, alertNotFound=False, ignoreNS=True
+        )
+        shared.elementDisplay(
+            "qBtnSet", "s", session, alertNotFound=False, ignoreNS=True
+        )
         shared.elementDisplay("qtID", "e", session, alertNotFound=False)
         shared.elementDisplay("qID", "e", session, alertNotFound=False)
         shared.elementDisplay("qEditPanel", "s", session, alertNotFound=False)
