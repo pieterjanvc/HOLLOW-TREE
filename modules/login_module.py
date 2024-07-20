@@ -93,7 +93,6 @@ def login_server(
 
                 ui.notification_show("Logged in successfully")
                 cursor = conn.cursor()
-                # For now we only have anonymous users (appID 0 -> SCUIRREL)
                 _ = shared.executeQuery(
                     cursor,
                     'UPDATE "session" SET "uID" = ? WHERE "sID" = ?',

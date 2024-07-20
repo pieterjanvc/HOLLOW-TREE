@@ -9,7 +9,7 @@ from io import BytesIO
 import shared.shared as shared
 import ACCORNS.accorns_shared as accorns_shared
 
-# ---- FUNCTIONS ----
+# ---- VARS & FUNCTIONS ----
 
 adminLevels = {1: "User", 2: "Instructor", 3: "Admin"}
 
@@ -79,11 +79,14 @@ def user_management_server(input: Inputs, output: Outputs, session: Session, use
     @reactive.effect
     @reactive.event(user)
     def _():
-        # Only admins can create new admins
-        choices = adminLevels
-        if user.get()["adminLevel"] == 2:
-            _ = choices.pop(3)
-        ui.update_select("role", choices=choices)
+        ui.update_select(
+            "role",
+            choices={
+                key: adminLevels[key]
+                for key in adminLevels
+                if key <= user.get()["adminLevel"]
+            },
+        )
 
     @reactive.calc
     @reactive.event(input.generateCodes)
