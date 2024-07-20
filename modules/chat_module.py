@@ -197,7 +197,7 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
         conn = shared.appDBConn(shared.postgresScuirrel)
         concepts = shared.pandasQuery(
             conn,
-            f'SELECT * FROM "concept" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0',
+            f'SELECT * FROM "concept" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0 ORDER BY "order"',
         )
         conn.close()
         return concepts

@@ -38,6 +38,9 @@ def topics_ui():
                         ui.input_action_button(
                             "cArchive", "Archive selected", width="180px"
                         ),
+                        ui.input_action_button(
+                            "cReorder", "Reorder", width="180px"
+                        ),
                         style="display:inline",
                     ),
                     HTML(
@@ -106,12 +109,12 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
     def _():
         # Only proceed if the input is valid
         if not shared.inputCheck(input.ntTopic()):
-            ui.remove_ui("#noGoodTopic")
+            ui.remove_ui(shared.nsID("noGoodTopic", session, True)),
             ui.insert_ui(
                 HTML(
-                    "<div id=noGoodTopic style='color: red'>New topic must be at least 6 characters</div>"
+                    f"<div id={shared.nsID('noGoodTopic', session)} style='color: red'>New topic must be at least 6 characters</div>"
                 ),
-                "#ntDescr",
+                shared.nsID("ntDescr", session, True),
                 "afterEnd",
             )
             return
@@ -171,12 +174,12 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
     def _():
         # Only proceed if the input is valid
         if not shared.inputCheck(input.etInput()):
-            ui.remove_ui("#noGoodTopic")
+            ui.remove_ui(shared.nsID("noGoodTopic", session, True))
             ui.insert_ui(
                 HTML(
-                    "<div id=noGoodTopic style='color: red'>A topic must be at least 6 characters</div>"
+                    f"<div id={shared.nsID('noGoodTopic', session)} style='color: red'>A topic must be at least 6 characters</div>"
                 ),
-                "#etInput",
+                shared.nsID("etInput", session, True),
                 "afterEnd",
             )
             return
@@ -185,10 +188,10 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
             topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["topic"]
             == input.etInput()
         ):
-            ui.remove_ui("#noGoodTopic")
+            ui.remove_ui(shared.nsID("noGoodTopic", session, True))
             ui.insert_ui(
-                HTML("<div id=noGoodTopic style='color: red'>No change detected</div>"),
-                "#etInput",
+                HTML(f"<div id={shared.nsID('noGoodTopic', session)} style='color: red'>No change detected</div>"),
+                shared.nsID("etInput", session, True),
                 "afterEnd",
             )
             return
@@ -258,7 +261,7 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
             conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
         )
 
-        # Empty the concept table is last topic was removed
+        # Empty the concept table if last topic was removed
         if topics.shape[0] == 0:
             conceptList = shared.pandasQuery(
                 conn, 'SELECT * FROM "concept" WHERE "tID" = 0'
@@ -276,7 +279,7 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
     @render.data_frame
     def conceptsTable():
         return render.DataTable(
-            concepts.get()[["concept"]], width="100%", selection_mode="row"
+            concepts.get()[["concept"]], width="100%", selection_mode="row", height="auto"
         )
 
     # --- Add a new concepts - modal popup
@@ -306,12 +309,12 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
     def _():
         # Only proceed if the input is valid
         if not shared.inputCheck(input.ncInput()):
-            ui.remove_ui("#noGoodConcept")
+            ui.remove_ui(shared.nsID("noGoodConcept", session, True))
             ui.insert_ui(
                 HTML(
-                    "<div id=noGoodConcept style='color: red'>New concept must be at least 6 characters</div>"
+                    f"<div id={shared.nsID('noGoodConcept', session)} style='color: red'>New concept must be at least 6 characters</div>"
                 ),
-                "#ncInput",
+                shared.nsID("ncInput", session, True),
                 "afterEnd",
             )
             return
@@ -326,7 +329,7 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
         )
         conceptList = shared.pandasQuery(
             conn,
-            f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0',
+            f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0 ORDER BY "order"',
         )
         conn.commit()
         conn.close()
@@ -364,23 +367,23 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
     def _():
         # Only proceed if the input is valid
         if not shared.inputCheck(input.ecInput()):
-            ui.remove_ui("#noGoodConcept")
+            ui.remove_ui(shared.nsID("noGoodConcept", session, True))
             ui.insert_ui(
                 HTML(
-                    "<div id=noGoodConcept style='color: red'>A concept must be at least 6 characters</div>"
+                    f"<div id={shared.nsID('noGoodConcept', session)} style='color: red'>A concept must be at least 6 characters</div>"
                 ),
-                "#ecInput",
+                shared.nsID("ecInput", session, True),
                 "afterEnd",
             )
             return
         concept = conceptsTable.data_view(selected=True).iloc[0]["concept"]
         if concept == input.ecInput():
-            ui.remove_ui("#noGoodConcept")
+            ui.remove_ui(shared.nsID("noGoodConcept", session, True))
             ui.insert_ui(
                 HTML(
-                    "<div id=noGoodConcept style='color: red'>No change detected</div>"
+                    f"<div id{shared.nsID('noGoodConcept', session)} style='color: red'>No change detected</div>"
                 ),
-                "#ecInput",
+                shared.nsID("ecInput", session, True),
                 "afterEnd",
             )
             return
@@ -421,7 +424,7 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
         )
         conceptList = shared.pandasQuery(
             conn,
-            f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0',
+            f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0 ORDER BY "order"',
         )
         conn.commit()
         conn.close()
@@ -448,7 +451,7 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
         )
         conceptList = shared.pandasQuery(
             conn,
-            f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0',
+            f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0 ORDER BY "order"',
         )
         conn.commit()
         conn.close()
@@ -462,9 +465,112 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user):
         tID = input.tID() if input.tID() else 0
         conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
         conceptList = shared.pandasQuery(
-            conn, f'SELECT * FROM "concept" WHERE "tID" = {tID} AND "archived" = 0'
+            conn, f'SELECT * FROM "concept" WHERE "tID" = {tID} AND "archived" = 0 ORDER BY "order"'
         )
         conn.close()
-        concepts.set(conceptList)
+        concepts.set(conceptList)    
+
+    # --- Reorder the concepts - modal popup
+    @reactive.effect
+    @reactive.event(input.cReorder)
+    def _():
+        
+        # Limit the number of character in the concept list to 80 followed by ... if cropped
+        conceptList = [i[:80] + (i[80:] and "...") for i in concepts.get()["concept"]]
+        # Generate a comma separated string of integers as long as the concept list
+        defOrder = ",".join([str(i) for i in range(1, len(conceptList) + 1)])
+        # Create a numbered list of concepts
+        conceptList = ui.tags.ol(
+            [
+                ui.tags.li(concept)
+                for concept in conceptList
+            ]
+        )
+
+        m = ui.modal(
+            conceptList,
+            ui.input_text("rcNewOrder", "New order:", width="100%", value=defOrder),
+            title="Reorder concepts",
+            easy_close=True,
+            size="l",
+            footer=ui.TagList(
+                ui.input_action_button("rcUpdate", "Update"),                
+                ui.modal_button("Cancel"),
+            ),
+        )
+        ui.modal_show(m)
+
+    # When edit button is clicked
+    @reactive.effect
+    @reactive.event(input.rcUpdate)
+    def _():
+        # Check if the rcNewOrder contains a comma separated list of integers non repeating and between 1 and the number of concepts
+        newOrder = input.rcNewOrder().split(",")
+        # Remove all strings that are not integers after whitespace removal
+        newOrder = [int(i) for i in newOrder if i.strip().isdigit()]
+        # Check if the list is the same length as the concept list and all integers are consecutive if ordered
+        if len(set(newOrder)) != concepts.get().shape[0] or not shared.consecutiveInt(newOrder):
+            ui.remove_ui(shared.nsID("noGoodOrder", session, True))
+            ui.insert_ui(
+                HTML(
+                    f"<div id={shared.nsID('noGoodOrder', session)} style='color: red'>Order must be a comma separated list of all integers</div>"
+                ),
+                shared.nsID("rcNewOrder", session, True),
+                "afterEnd",
+            )
+            return
+        
+        #Reorder the concepts based on the new order
+        newConcepts = concepts.get().copy()
+        newConcepts["newOrder"] = newOrder
+        newConcepts = newConcepts.sort_values("newOrder")
+
+        # Get data frame with only rows where concept order changed
+        changedOrder = newConcepts[newConcepts["order"] != newConcepts["newOrder"]]
+
+        # Message if no order changed
+        if changedOrder.shape[0] == 0:
+            ui.remove_ui(shared.nsID("noGoodOrder", session, True))
+            ui.insert_ui(
+                HTML(
+                    f"<div id={shared.nsID('noGoodOrder', session)} style='color: red'>No order change detected</div>"
+                ),
+                shared.nsID("rcNewOrder", session, True),
+                "afterEnd",
+            )
+            return
+
+        # Get the connection to the database
+        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
+        cursor = conn.cursor()
+        ts = shared.dt()
+        for _, row in changedOrder.iterrows():
+            # Backup old value
+            accorns_shared.backupQuery(
+                cursor=cursor,
+                sID=sID,
+                table="concept",
+                rowID=row["cID"],
+                attribute="order",
+                dataType="int",
+                isBot=False,
+                timeStamp=ts,
+            )
+        # Update the order of the concept with changedOrder["newOrder"] for changedOrder["cID"]
+        _ = shared.executeQuery(
+            cursor,
+            f'UPDATE "concept" SET "order" = ?, "modified" = \'{ts}\' WHERE "cID" = ?',
+            list(changedOrder[["newOrder", "cID"]].itertuples(index=False, name=None))
+        )
+        conn.commit()
+        conn.close()
+
+        # Replace the order with newOrder and remove the newOrder column
+        newConcepts["order"] = newConcepts["newOrder"]
+        newConcepts.drop(columns=["newOrder"], inplace=True)
+
+        concepts.set(newConcepts)
+        
+        ui.modal_remove()
 
     return topics, concepts
