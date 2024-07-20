@@ -80,11 +80,13 @@ def inputCheck(input):
     else:
         False
 
+
 # Get the correct ID depending on the session namespace
-def nsID(id, session, addHashtag = False):
+def nsID(id, session, addHashtag=False):
     id = session.ns + "-" + id if (session.ns != "") else id
-    
+
     return "#" + id if addHashtag else id
+
 
 # This function allows you to hide/show/disable/enable elements by ID or data-value
 # The latter is needed because tabs don't use ID's but data-value
@@ -97,11 +99,13 @@ def elementDisplay(id, effect, session, alertNotFound=True, ignoreNS=False):
             "hideShow", {"id": id, "effect": effect, "alertNotFound": alertNotFound}
         )
 
+
 def consecutiveInt(nums, start=1):
     # Sort the list of numbers
-    sorted_nums = sorted(nums)    
+    sorted_nums = sorted(nums)
     # Check if each number is consecutive starting from 1
     return all(sorted_nums[i] == i + start for i in range(len(sorted_nums)))
+
 
 # Get a local or remote DB connection (depending on config)
 def appDBConn(postgresUser, remoteAppDB=remoteAppDB):
