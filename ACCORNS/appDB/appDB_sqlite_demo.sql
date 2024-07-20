@@ -3,24 +3,24 @@ INSERT INTO topic("topic", "created", "modified")
 VALUES('The central dogma of molecular biology', 
   CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
-INSERT INTO "concept" ("tID", "concept", "created", "modified")
- VALUES (1,'DNA (deoxyribonucleic acid) is the molecule that carries the genetic information in every living organism',
+INSERT INTO "concept" ("tID", "order", "concept", "created", "modified")
+ VALUES (1,1,'DNA is the molecule that carries the genetic information in every living organism',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
-  (1,'Genes: Hold code for specific functional molecular products (RNA and Protein)',
+  (1,2,'Genes: Hold code for specific functional molecular products (RNA and Protein)',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
-  (1,'RNA: Composed of nucleotides (including uracil, U). Single-stranded',
+  (1,3,'RNA: Composed of nucleotides (including uracil, U). Single-stranded',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
-  (1,'Transcription: RNA polymerase unwinds DNA double helix. Synthesizes complementary RNA strand',
+  (1,4,'Transcription: RNA polymerase unwinds DNA double helix. Synthesizes complementary RNA strand',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
-  (1,'Messenger RNA (mRNA): Carries genetic code from nucleus to cytoplasm',
+  (1,5,'Messenger RNA (mRNA): Carries genetic code from nucleus to cytoplasm',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
-  (1,'RNA splicing: Removes introns, Retains exons',
+  (1,6,'RNA splicing: Removes introns, Retains exons',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
-  (1,'Translation: Occurs in ribosomes, Deciphers mRNA to assemble protein',
+  (1,7,'Translation: Occurs in ribosomes, Deciphers mRNA to assemble protein',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
-  (1,'Amino acids: Building blocks of proteins. Linked by peptide bonds',
+  (1,8,'Amino acids: Building blocks of proteins. Linked by peptide bonds',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
-  (1,'Protein folding: Adopts specific three-dimensional structure',
-  CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
-  (1,'In summary: The central dogma states that DNA makes RNA makes Protein',
+  (1,9,'Protein folding: Adopts specific three-dimensional structure',
+  CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+  (1,10,'In summary: The central dogma states that DNA makes RNA makes Protein',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
