@@ -14,18 +14,18 @@ import shared.shared as shared
 # --- UI
 @module.ui
 def login_reset_ui():
-    return [        
+    return [
         ui.card(
-                ui.card_header("Reset password"),
-                ui.input_text("rUsername", "Username"),
-                ui.input_action_button("request", "Request reset code", width="250px"),
-                HTML("""<p><i>You will need to request a new access code from your 
-                        administrator before resetting your password.</i></p>"""),                
-                ui.input_password("rPassword", "New password"),
-                ui.input_password("rPassword2", "Repeat new password"),
-                ui.input_text("rAccessCode", "Reset code"),
-                ui.input_action_button("reset", "Reset password", width="250px"),
-            ),
+            ui.card_header("Reset password"),
+            ui.input_text("rUsername", "Username"),
+            ui.input_action_button("request", "Request reset code", width="250px"),
+            HTML("""<p><i>You will need to request a new access code from your 
+                        administrator before resetting your password.</i></p>"""),
+            ui.input_password("rPassword", "New password"),
+            ui.input_password("rPassword2", "Repeat new password"),
+            ui.input_text("rAccessCode", "Reset code"),
+            ui.input_action_button("reset", "Reset password", width="250px"),
+        ),
     ]
 
 
@@ -53,12 +53,14 @@ def login_reset_server(
         checkUser = shared.authCheck(conn, username, "")
 
         invalid = checkUser["user"] is None
-        shared.inputNotification(session, "rUsername", "This username does not exist", invalid)
-        
-        if invalid :            
+        shared.inputNotification(
+            session, "rUsername", "This username does not exist", invalid
+        )
+
+        if invalid:
             conn.close()
-            return 
-        
+            return
+
         # Generate a new access code to be used for resetting password
         cursor = conn.cursor()
         uID = checkUser["user"]["uID"].iloc[0]
@@ -69,29 +71,37 @@ def login_reset_server(
             'SELECT * FROM "accessCode" WHERE "uID_user" = ? AND "adminLevel" IS NULL AND "used" IS NULL',
             (uID,),
         )
-        
+
         invalid = existing.shape[0] > 0
-        shared.inputNotification(session, "request", "You already requested a new reset code, please contact your admin to get it", invalid)
-        
-        if invalid :            
+        shared.inputNotification(
+            session,
+            "request",
+            "You already requested a new reset code, please contact your admin to get it",
+            invalid,
+        )
+
+        if invalid:
             conn.close()
-            return 
+            return
 
         # Generate a new reset code
         code = shared.generate_access_codes(cursor=cursor, creatorID=uID, userID=uID)
         conn.commit()
         conn.close()
 
-         # Clear the input fields
+        # Clear the input fields
         ui.update_text_area("rUsername", value="")
         ui.update_text_area("rPassword", value="")
         ui.update_text_area("rPassword2", value="")
         ui.update_text_area("rAccessCode", value="")
 
-        shared.inputNotification(session, "request", "SUCCESS: Contact an admin to get your reset code", colour="blue")        
+        shared.inputNotification(
+            session,
+            "request",
+            "SUCCESS: Contact an admin to get your reset code",
+            colour="blue",
+        )
 
-
-   
     # Reset password
     @reactive.effect
     @reactive.event(input.reset)
@@ -103,11 +113,13 @@ def login_reset_server(
         checkUser = shared.authCheck(conn, username, "")
 
         invalid = checkUser["user"] is None
-        shared.inputNotification(session, "rUsername", "This username does not exist", invalid)
-        
-        if invalid :            
+        shared.inputNotification(
+            session, "rUsername", "This username does not exist", invalid
+        )
+
+        if invalid:
             conn.close()
-            return        
+            return
 
         # Check the passwords
         pCheck = shared.passCheck(input.rPassword(), input.rPassword2())
@@ -117,7 +129,9 @@ def login_reset_server(
             return
 
         # Check the access code
-        code = shared.accessCodeCheck(conn = conn, accessCode = accessCode, uID=checkUser["user"]["uID"].iloc[0])
+        code = shared.accessCodeCheck(
+            conn=conn, accessCode=accessCode, uID=checkUser["user"]["uID"].iloc[0]
+        )
 
         invalid = code is None
         shared.inputNotification(session, "rAccessCode", "Invalid reset code", invalid)
@@ -152,6 +166,8 @@ def login_reset_server(
         ui.update_text_area("rPassword2", value="")
         ui.update_text_area("rAccessCode", value="")
 
-        shared.inputNotification(session, "reset", "Successfully updated password", colour="blue")        
+        shared.inputNotification(
+            session, "reset", "Successfully updated password", colour="blue"
+        )
 
-    return 
+    return

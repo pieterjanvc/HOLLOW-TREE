@@ -15,9 +15,7 @@ def getAccessCodes(uID, adminLevel):
     conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
     # Admins can see all codes, instructors only their own
     if adminLevel < 3:
-        query = (
-            f'SELECT * FROM "accessCode" WHERE "uID_creator" = {uID} AND "used" IS NULL AND "adminLevel" IS NOT NULL'
-        )
+        query = f'SELECT * FROM "accessCode" WHERE "uID_creator" = {uID} AND "used" IS NULL AND "adminLevel" IS NOT NULL'
         result = shared.pandasQuery(conn, query=query)
         result = result[["code", "adminLevel", "created", "note"]]
     else:
@@ -94,14 +92,16 @@ def user_management_server(input: Inputs, output: Outputs, session: Session, use
         conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
         resetTable = shared.pandasQuery(
             conn,
-            ('SELECT u."username", a."code" AS \'resetCode\', u."fName", u."lName", u."email"'
-             'FROM "accessCode" AS a, "user" AS u WHERE a."uID_user" = u."uID" '
-             'AND a."adminLevel" IS NULL AND a."used" IS NULL'
-             ))
+            (
+                'SELECT u."username", a."code" AS \'resetCode\', u."fName", u."lName", u."email"'
+                'FROM "accessCode" AS a, "user" AS u WHERE a."uID_user" = u."uID" '
+                'AND a."adminLevel" IS NULL AND a."used" IS NULL'
+            ),
+        )
         conn.close()
 
         return render.DataTable(resetTable, width="100%", height="auto")
-    
+
     # Generate new access codes
     @reactive.calc
     @reactive.event(input.generateCodes)
@@ -110,7 +110,7 @@ def user_management_server(input: Inputs, output: Outputs, session: Session, use
         conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
         cursor = conn.cursor()
         newCodes = shared.generate_access_codes(
-            cursor = cursor,
+            cursor=cursor,
             n=input.numCodes(),
             creatorID=user.get()["uID"],
             adminLevel=int(input.role()),
@@ -132,7 +132,7 @@ def user_management_server(input: Inputs, output: Outputs, session: Session, use
         with BytesIO() as buf:
             newAccessCodes().to_csv(buf, index=False)
             yield buf.getvalue()
-      
+
     @render.data_frame
     def codesTable():
         return render.DataTable(accessCodes(), width="100%", height="auto")

@@ -13,6 +13,7 @@ from htmltools import HTML
 import shared.shared as shared
 from modules.login_reset_module import login_reset_ui, login_reset_server
 
+
 # --- UI
 @module.ui
 def login_ui():
@@ -31,11 +32,12 @@ def login_ui():
                         and has not been extensively tested for security. We recommend
                         you create a unique password for this you are not using anywhere else</i>"""),
                 ui.input_text("cUsername", "Username"),
-                ui.panel_conditional("true" if shared.personalInfo else "false",
-                                     ui.input_text("cFirstName", "First name"),
-                                     ui.input_text("cLastName", "Last name"),
-                                     ui.input_text("cEmail", "Email")
-                                     ),
+                ui.panel_conditional(
+                    "true" if shared.personalInfo else "false",
+                    ui.input_text("cFirstName", "First name"),
+                    ui.input_text("cLastName", "Last name"),
+                    ui.input_text("cEmail", "Email"),
+                ),
                 ui.input_password("cPassword", "Password"),
                 ui.input_password("cPassword2", "Repeat password"),
                 ui.input_text("cAccessCode", "Access code"),
@@ -66,38 +68,37 @@ def login_server(
     @reactive.effect
     @reactive.event(input.login)
     def _():
-        
         conn = shared.appDBConn(postgresUser=postgresUser)
         userCheck = shared.authCheck(conn, input.lUsername(), input.lPassword())
 
-        if userCheck["user"] is None:            
+        if userCheck["user"] is None:
             ui.notification_show("Invalid username")
             conn.close()
             return
-        
+
         if userCheck["adminLevel"] < minAdminLevel:
             ui.notification_show(
                 "You do not have the required permissions to access this application"
             )
             conn.close()
             return
-        
+
         if not userCheck["password_check"]:
             ui.notification_show("Incorrect password")
             conn.close()
             return
-        
+
         userCheck = userCheck["user"]
-        
+
         cursor = conn.cursor()
         _ = shared.executeQuery(
-            cursor, 
+            cursor,
             'UPDATE "session" SET "uID" = ? WHERE "sID" = ?',
             (int(userCheck.uID.iloc[0]), sessionID),
         )
         conn.commit()
         conn.close()
-        
+
         # Clear the input fields
         ui.update_text_area("lUsername", value="")
         ui.update_text_area("lPassword", value="")
@@ -131,14 +132,14 @@ def login_server(
             ui.notification_show("Username already exists")
             conn.close()
             return
-        
+
         if shared.personalInfo:
             # Check if the personal information is long enough
             fName = input.cFirstName().strip()
             lName = input.cLastName().strip()
             email = input.cEmail().strip()
 
-            if  len(fName) == 0:
+            if len(fName) == 0:
                 ui.notification_show("First name cannot be empty")
                 conn.close()
                 return
@@ -167,7 +168,7 @@ def login_server(
 
         # Create the user
         hashed = bcrypt.hashpw(input.cPassword().encode("utf-8"), bcrypt.gensalt())
-        
+
         if shared.personalInfo:
             newuID = shared.executeQuery(
                 cursor,
@@ -232,5 +233,5 @@ def login_server(
     def _():
         ui.modal_show(ui.modal(login_reset_ui("login_reset")))
         _ = login_reset_server("login_reset", postgresUser=postgresUser)
-    
+
     return user

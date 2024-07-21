@@ -363,4 +363,3 @@ def modalMsg(content, title="Info"):
         footer=ui.TagList(ui.modal_button("Close")),
     )
     ui.modal_show(m)
-

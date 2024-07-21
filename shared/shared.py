@@ -48,7 +48,9 @@ vectorDB = os.path.normpath(config["localStorage"]["duckDB"])
 sqliteDB = os.path.normpath(config["localStorage"]["sqliteDB"])
 postgresAccorns = "accorns"
 postgresScuirrel = "scuirrel"
-personalInfo = any(config["auth"]["personalInfo"] == x for x in ["True", "true", "T", 1])
+personalInfo = any(
+    config["auth"]["personalInfo"] == x for x in ["True", "true", "T", 1]
+)
 validEmail = config["auth"]["validEmail"]
 
 # Create the parent directory for the sqliteDB if it does not exist
@@ -277,8 +279,11 @@ def generate_hash_list(n=1):
 
     return hash_values
 
+
 # Generate access codes and add them to the database
-def generate_access_codes(cursor, creatorID, adminLevel = None, n = 1, userID = None, note=""):
+def generate_access_codes(
+    cursor, creatorID, adminLevel=None, n=1, userID=None, note=""
+):
     note = None if note.strip() == "" else note
 
     # Check if n and unID are set
@@ -294,11 +299,9 @@ def generate_access_codes(cursor, creatorID, adminLevel = None, n = 1, userID = 
         raise ValueError(
             f"The adminLevel must be an integer between 0 and {max(adminLevels.keys())}"
         )
-    
+
     if not creatorID:
-        raise ValueError(
-            "Please provide the uID of the user generating the codes"
-        )
+        raise ValueError("Please provide the uID of the user generating the codes")
 
     codes = []
     x = n
@@ -334,6 +337,7 @@ def generate_access_codes(cursor, creatorID, adminLevel = None, n = 1, userID = 
     # Return a data frame
     return pd.DataFrame({"accessCode": codes, "role": role, "note": note})
 
+
 # Check if the access code has not been used yet
 def accessCodeCheck(conn, accessCode, uID=None):
     # Check the access code (must be valid and not used yet)
@@ -347,33 +351,41 @@ def accessCodeCheck(conn, accessCode, uID=None):
         code = pandasQuery(
             conn,
             'SELECT * FROM "accessCode" WHERE "code" = ? AND "uID_user" = ? AND used IS NULL',
-            (accessCode,int(uID)),
+            (accessCode, int(uID)),
         )
 
     return None if code.shape[0] == 0 else code
 
+
 # check user authentication
 def authCheck(conn, username, password):
-
     checkUser = pandasQuery(
         conn,
         'SELECT * FROM "user" WHERE "username" = ? AND "username" != \'anonymous\'',
         (username,),
     )
 
-    if checkUser.shape[0] == 0:        
+    if checkUser.shape[0] == 0:
         return {"user": None, "password_check": None, "admin_check": None}
 
-    password_check = True if checkpw(password.encode("utf-8"), checkUser.password.iloc[0].encode("utf-8")) else False
+    password_check = (
+        True
+        if checkpw(password.encode("utf-8"), checkUser.password.iloc[0].encode("utf-8"))
+        else False
+    )
     checkUser.drop(columns=["password"], inplace=True)
 
-    return {"user": checkUser, "password_check": password_check, "adminLevel": int(checkUser.adminLevel.iloc[0])}
+    return {
+        "user": checkUser,
+        "password_check": password_check,
+        "adminLevel": int(checkUser.adminLevel.iloc[0]),
+    }
 
 
-def inputNotification(session, id, message = "Error", show = True, colour = "red"):
+def inputNotification(session, id, message="Error", show=True, colour="red"):
     msgId = id + "_msg"
     ui.remove_ui(nsID(msgId, session, True))
-    
+
     if show:
         ui.insert_ui(
             HTML(
@@ -382,5 +394,5 @@ def inputNotification(session, id, message = "Error", show = True, colour = "red
             nsID(id, session, True),
             "afterEnd",
         )
-        
+
     return
