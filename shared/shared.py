@@ -15,6 +15,9 @@ import pandas as pd
 import toml
 import warnings
 from regex import search as re_search
+from bcrypt import checkpw
+import secrets
+import string
 
 # Llamaindex
 from llama_index.llms.openai import OpenAI
@@ -23,11 +26,13 @@ from llama_index.vector_stores.duckdb import DuckDBVectorStore
 from llama_index.vector_stores.postgres import PGVectorStore
 
 # Shiny
-from shiny import reactive
+from shiny import reactive, ui, Session
+from htmltools import HTML
 
 # --- VARIABLES ---
 
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+adminLevels = {1: "User", 2: "Instructor", 3: "Admin"}
 
 with open(os.path.join(curDir, "shared_config.toml"), "r") as f:
     config = toml.load(f)
@@ -43,6 +48,8 @@ vectorDB = os.path.normpath(config["localStorage"]["duckDB"])
 sqliteDB = os.path.normpath(config["localStorage"]["sqliteDB"])
 postgresAccorns = "accorns"
 postgresScuirrel = "scuirrel"
+personalInfo = any(config["auth"]["personalInfo"] == x for x in ["True", "true", "T", 1])
+validEmail = config["auth"]["validEmail"]
 
 # Create the parent directory for the sqliteDB if it does not exist
 if not os.path.exists(os.path.dirname(sqliteDB)):
@@ -244,13 +251,136 @@ def passCheck(password, password2):
     return None
 
 
-# Check if the access code has not been used yet
-def accessCodeCheck(conn, accessCode):
-    # Check the access code (must be valid and not used yet)
-    code = pandasQuery(
-        conn,
-        'SELECT * FROM "accessCode" WHERE "code" = ? AND "used" IS NULL',
-        (accessCode,),
+# Generate a hash from a string
+def generate_hash():
+    alphanumeric_characters = string.ascii_letters + string.digits
+    hash_parts = []
+    for _ in range(3):
+        hash_part = "".join(secrets.choice(alphanumeric_characters) for _ in range(3))
+        hash_parts.append(hash_part)
+    return "-".join(hash_parts)
+
+
+# Generate a list of unique hash values
+def generate_hash_list(n=1):
+    hash_values = []
+    for _ in range(n):
+        hash_value = generate_hash()
+        hash_values.append(hash_value)
+
+    # CHeck if all the hash values are unique otherwise generate new hash values
+    while len(hash_values) != len(set(hash_values)):
+        # Only generate the number of hash values that are not unique
+        hash_values = list(set(hash_values)) + generate_hash_list(
+            n - len(set(hash_values))
+        )
+
+    return hash_values
+
+# Generate access codes and add them to the database
+def generate_access_codes(cursor, creatorID, adminLevel = None, n = 1, userID = None, note=""):
+    note = None if note.strip() == "" else note
+
+    # Check if n and unID are set
+    if userID is not None:
+        n = 1
+        adminLevel = None
+        userID = int(userID)
+    elif not isinstance(adminLevel, int):
+        raise ValueError(
+            "Please provide the adminLevel of the user generating the codes"
+        )
+    elif adminLevel < 0 or adminLevel > max(adminLevels.keys()):
+        raise ValueError(
+            f"The adminLevel must be an integer between 0 and {max(adminLevels.keys())}"
+        )
+    
+    if not creatorID:
+        raise ValueError(
+            "Please provide the uID of the user generating the codes"
+        )
+
+    codes = []
+    x = n
+    while len(codes) < n:
+        codes = tuple(codes + (generate_hash_list(x)))
+        # Check if the accessCode does not exist in the database
+        executeQuery(
+            cursor,
+            'SELECT "code" FROM "accessCode" WHERE "code" IN ({})'.format(
+                ",".join(["?"] * len(codes))
+            ),
+            codes,
+        )
+        existing_codes = cursor.fetchall()
+
+        if existing_codes:
+            # remove the existing codes from the list
+            codes = [code for code in codes if code not in existing_codes[0]]
+            x = n - len(codes)
+
+    # Insert the new codes into the database
+    _ = executeQuery(
+        cursor,
+        'INSERT INTO "accessCode"("code", "uID_creator", "uID_user", "adminLevel", "created", "note") VALUES(?, ?, ?, ?, ?, ?)',
+        [(code, int(creatorID), userID, adminLevel, dt(), note) for code in codes],
     )
 
+    if isinstance(adminLevel, int):
+        role = ["anonymous", "user", "instructor", "admin"][adminLevel]
+    else:
+        role = None
+
+    # Return a data frame
+    return pd.DataFrame({"accessCode": codes, "role": role, "note": note})
+
+# Check if the access code has not been used yet
+def accessCodeCheck(conn, accessCode, uID=None):
+    # Check the access code (must be valid and not used yet)
+    if uID is None:
+        code = pandasQuery(
+            conn,
+            'SELECT * FROM "accessCode" WHERE "code" = ? AND "used" IS NULL',
+            (accessCode,),
+        )
+    else:
+        code = pandasQuery(
+            conn,
+            'SELECT * FROM "accessCode" WHERE "code" = ? AND "uID_user" = ? AND used IS NULL',
+            (accessCode,int(uID)),
+        )
+
     return None if code.shape[0] == 0 else code
+
+# check user authentication
+def authCheck(conn, username, password):
+
+    checkUser = pandasQuery(
+        conn,
+        'SELECT * FROM "user" WHERE "username" = ? AND "username" != \'anonymous\'',
+        (username,),
+    )
+
+    if checkUser.shape[0] == 0:        
+        return {"user": None, "password_check": None, "admin_check": None}
+
+    password_check = True if checkpw(password.encode("utf-8"), checkUser.password.iloc[0].encode("utf-8")) else False
+    checkUser.drop(columns=["password"], inplace=True)
+
+    return {"user": checkUser, "password_check": password_check, "adminLevel": int(checkUser.adminLevel.iloc[0])}
+
+
+def inputNotification(session, id, message = "Error", show = True, colour = "red"):
+    msgId = id + "_msg"
+    ui.remove_ui(nsID(msgId, session, True))
+    
+    if show:
+        ui.insert_ui(
+            HTML(
+                f"<div id={nsID(msgId, session)} style='color: {colour}'>{message}</div>"
+            ),
+            nsID(id, session, True),
+            "afterEnd",
+        )
+        
+    return

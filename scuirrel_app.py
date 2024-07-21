@@ -71,7 +71,7 @@ def server(input, output, session):
 
     # Login screen
     user = login_server(
-        "login", postgresUser=shared.postgresScuirrel, sessionID=sID, minAdminLevel=2
+        "login", postgresUser=shared.postgresScuirrel, sessionID=sID, minAdminLevel=1
     )
     # General feedback module
     _ = feedback_server("feedback", sID=sID, postgresUser=shared.postgresScuirrel)
@@ -80,7 +80,7 @@ def server(input, output, session):
     @render.ui
     @reactive.event(user)
     def scuirrelTabs():
-        if user.get()["adminLevel"] < 2 or user.get()["adminLevel"] is None:
+        if user.get()["adminLevel"] < 1 or user.get()["adminLevel"] is None:
             return ui.TagList(
                 ui.navset_pill(
                     # TAB 1 - HOME & LOGIN - shown before login

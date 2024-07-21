@@ -7,11 +7,8 @@ import pandas as pd
 from io import BytesIO
 
 import shared.shared as shared
-import ACCORNS.accorns_shared as accorns_shared
 
 # ---- VARS & FUNCTIONS ----
-
-adminLevels = {1: "User", 2: "Instructor", 3: "Admin"}
 
 
 def getAccessCodes(uID, adminLevel):
@@ -19,18 +16,18 @@ def getAccessCodes(uID, adminLevel):
     # Admins can see all codes, instructors only their own
     if adminLevel < 3:
         query = (
-            f'SELECT * FROM "accessCode" WHERE "uID_creator" = {uID} AND "used" IS NULL'
+            f'SELECT * FROM "accessCode" WHERE "uID_creator" = {uID} AND "used" IS NULL AND "adminLevel" IS NOT NULL'
         )
         result = shared.pandasQuery(conn, query=query)
         result = result[["code", "adminLevel", "created", "note"]]
     else:
-        query = 'SELECT * FROM "accessCode" WHERE "used" IS NULL'
+        query = 'SELECT * FROM "accessCode" WHERE "used" IS NULL AND "adminLevel" IS NOT NULL'
         result = shared.pandasQuery(conn, query=query)
         result = result.drop(columns=["uID_user", "used"])
 
     conn.close()
 
-    result["adminLevel"] = [adminLevels[i] for i in result["adminLevel"]]
+    result["adminLevel"] = [shared.adminLevels[i] for i in result["adminLevel"]]
     return result
 
 
@@ -54,6 +51,9 @@ def user_management_ui():
                 "input.generateCodes > 0",
                 ui.download_link("downloadCodes", "Download as CSV"),
             ),
+        ),
+        ui.card(
+            ui.card_header("Password reset codes"), ui.output_data_frame("resetTable")
         ),
         ui.card(
             ui.card_header("Unused access codes"), ui.output_data_frame("codesTable")
@@ -82,22 +82,42 @@ def user_management_server(input: Inputs, output: Outputs, session: Session, use
         ui.update_select(
             "role",
             choices={
-                key: adminLevels[key]
-                for key in adminLevels
+                key: shared.adminLevels[key]
+                for key in shared.adminLevels
                 if key <= user.get()["adminLevel"]
             },
         )
 
+    # Render the table with the reset codes for the users who requested a password reset
+    @render.data_frame
+    def resetTable():
+        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
+        resetTable = shared.pandasQuery(
+            conn,
+            ('SELECT u."username", a."code" AS \'resetCode\', u."fName", u."lName", u."email"'
+             'FROM "accessCode" AS a, "user" AS u WHERE a."uID_user" = u."uID" '
+             'AND a."adminLevel" IS NULL AND a."used" IS NULL'
+             ))
+        conn.close()
+
+        return render.DataTable(resetTable, width="100%", height="auto")
+    
+    # Generate new access codes
     @reactive.calc
     @reactive.event(input.generateCodes)
     def newAccessCodes():
         req(user.get()["uID"] != 1)
-        newCodes = accorns_shared.generate_access_codes(
+        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
+        cursor = conn.cursor()
+        newCodes = shared.generate_access_codes(
+            cursor = cursor,
             n=input.numCodes(),
-            uID=user.get()["uID"],
+            creatorID=user.get()["uID"],
             adminLevel=int(input.role()),
             note=input.note(),
         )
+        conn.commit()
+        conn.close()
         accessCodes.set(
             getAccessCodes(uID=user.get()["uID"], adminLevel=user.get()["adminLevel"])
         )
@@ -112,9 +132,9 @@ def user_management_server(input: Inputs, output: Outputs, session: Session, use
         with BytesIO() as buf:
             newAccessCodes().to_csv(buf, index=False)
             yield buf.getvalue()
-
+      
     @render.data_frame
     def codesTable():
-        return render.DataTable(accessCodes(), width="100%")
+        return render.DataTable(accessCodes(), width="100%", height="auto")
 
     return

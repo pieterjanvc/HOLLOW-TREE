@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS "user" (
 	"username" TEXT UNIQUE,
   "password" TEXT, 
   "adminLevel" INTEGER DEFAULT 0,
+  "fName" TEXT,
+  "lName" TEXT,
   "email" TEXT,
   "created" TEXT,
   "modified" TEXT
