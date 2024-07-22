@@ -4,12 +4,14 @@
 # -- General
 import bcrypt
 from re import search as re_search
+from re import compile as re_compile
 
 # -- Shiny
 from shiny import Inputs, Outputs, Session, module, reactive, ui
 from htmltools import HTML
 
 import shared.shared as shared
+from modules.login_reset_module import login_reset_ui, login_reset_server
 
 
 # --- UI
@@ -22,7 +24,7 @@ def login_ui():
                 ui.input_text("lUsername", "Username"),
                 ui.input_password("lPassword", "Password"),
                 ui.input_action_button("login", "Login", width="200px"),
-                ui.input_action_link("showReset", "Reset password", width="250px"),
+                ui.input_action_link("showReset", "Reset password"),
             ),
             ui.card(
                 ui.card_header("Create an account"),
@@ -30,23 +32,16 @@ def login_ui():
                         and has not been extensively tested for security. We recommend
                         you create a unique password for this you are not using anywhere else</i>"""),
                 ui.input_text("cUsername", "Username"),
+                ui.panel_conditional(
+                    "true" if shared.personalInfo else "false",
+                    ui.input_text("cFirstName", "First name"),
+                    ui.input_text("cLastName", "Last name"),
+                    ui.input_text("cEmail", "Email"),
+                ),
                 ui.input_password("cPassword", "Password"),
                 ui.input_password("cPassword2", "Repeat password"),
                 ui.input_text("cAccessCode", "Access code"),
                 ui.input_action_button("createAccount", "Create", width="200px"),
-            ),
-            ui.panel_conditional(
-                "input.showReset > 0",
-                ui.card(
-                    ui.card_header("Reset password"),
-                    HTML("""<p><i>You will need to request a new access code from your 
-                            administrator before resetting your password.</i></p>"""),
-                    ui.input_text("rUsername", "Username"),
-                    ui.input_password("rPassword", "New password"),
-                    ui.input_password("rPassword2", "Repeat new password"),
-                    ui.input_text("rAccessCode", "Access code"),
-                    ui.input_action_button("reset", "Reset password", width="250px"),
-                ),
             ),
             col_widths=6,
         )
@@ -73,47 +68,44 @@ def login_server(
     @reactive.effect
     @reactive.event(input.login)
     def _():
-        username = input.lUsername()
-        password = input.lPassword().encode("utf-8")
         conn = shared.appDBConn(postgresUser=postgresUser)
-        checkUser = shared.pandasQuery(
-            conn,
-            'SELECT * FROM "user" WHERE "username" = ? AND "username" != \'anonymous\'',
-            (username,),
-        )
+        userCheck = shared.authCheck(conn, input.lUsername(), input.lPassword())
 
-        if checkUser.shape[0] == 1:
-            if bcrypt.checkpw(password, checkUser.password.iloc[0].encode("utf-8")):
-                if int(checkUser.adminLevel.iloc[0]) < minAdminLevel:
-                    ui.notification_show(
-                        "You do not have the required permissions to access this application"
-                    )
-                    conn.close()
-                    return
-
-                ui.notification_show("Logged in successfully")
-                cursor = conn.cursor()
-                _ = shared.executeQuery(
-                    cursor,
-                    'UPDATE "session" SET "uID" = ? WHERE "sID" = ?',
-                    (int(checkUser.uID.iloc[0]), sessionID),
-                )
-                conn.commit()
-            else:
-                ui.notification_show("Incorrect password")
-                conn.close()
-                return
-        else:
+        if userCheck["user"] is None:
             ui.notification_show("Invalid username")
             conn.close()
             return
 
+        if userCheck["adminLevel"] < minAdminLevel:
+            ui.notification_show(
+                "You do not have the required permissions to access this application"
+            )
+            conn.close()
+            return
+
+        if not userCheck["password_check"]:
+            ui.notification_show("Incorrect password")
+            conn.close()
+            return
+
+        userCheck = userCheck["user"]
+
+        cursor = conn.cursor()
+        _ = shared.executeQuery(
+            cursor,
+            'UPDATE "session" SET "uID" = ? WHERE "sID" = ?',
+            (int(userCheck.uID.iloc[0]), sessionID),
+        )
+        conn.commit()
         conn.close()
+
         # Clear the input fields
         ui.update_text_area("lUsername", value="")
         ui.update_text_area("lPassword", value="")
 
-        user.set(checkUser.to_dict(orient="records")[0])
+        user.set(userCheck.to_dict(orient="records")[0])
+
+        return
 
     # Create an account
     @reactive.effect
@@ -141,6 +133,25 @@ def login_server(
             conn.close()
             return
 
+        if shared.personalInfo:
+            # Check if the personal information is long enough
+            fName = input.cFirstName().strip()
+            lName = input.cLastName().strip()
+            email = input.cEmail().strip()
+
+            if len(fName) == 0:
+                ui.notification_show("First name cannot be empty")
+                conn.close()
+                return
+            if len(lName) == 0:
+                ui.notification_show("Last name cannot be empty")
+                conn.close()
+                return
+            if re_search(shared.validEmail, email) is None:
+                ui.notification_show("Invalid email address")
+                conn.close()
+                return
+
         # Check the password
         pCheck = shared.passCheck(input.cPassword(), input.cPassword2())
         if pCheck:
@@ -157,19 +168,38 @@ def login_server(
 
         # Create the user
         hashed = bcrypt.hashpw(input.cPassword().encode("utf-8"), bcrypt.gensalt())
-        newuID = shared.executeQuery(
-            cursor,
-            'INSERT INTO "user" ("username", "password", "adminLevel", "created", "modified")'
-            "VALUES(?, ?, ?, ?, ?)",
-            (
-                username,
-                hashed.decode("utf-8"),
-                int(code["adminLevel"].iloc[0]),
-                shared.dt(),
-                shared.dt(),
-            ),
-            lastRowId="uID",
-        )
+
+        if shared.personalInfo:
+            newuID = shared.executeQuery(
+                cursor,
+                'INSERT INTO "user" ("username", "password", "adminLevel", "created", "modified", "fName", "lName", "email")'
+                "VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    username,
+                    hashed.decode("utf-8"),
+                    int(code["adminLevel"].iloc[0]),
+                    shared.dt(),
+                    shared.dt(),
+                    fName,
+                    lName,
+                    email,
+                ),
+                lastRowId="uID",
+            )
+        else:
+            newuID = shared.executeQuery(
+                cursor,
+                'INSERT INTO "user" ("username", "password", "adminLevel", "created", "modified")'
+                "VALUES(?, ?, ?, ?, ?)",
+                (
+                    username,
+                    hashed.decode("utf-8"),
+                    int(code["adminLevel"].iloc[0]),
+                    shared.dt(),
+                    shared.dt(),
+                ),
+                lastRowId="uID",
+            )
 
         # Update the access code to show it has been used
         _ = shared.executeQuery(
@@ -199,64 +229,9 @@ def login_server(
 
     # Reset password
     @reactive.effect
-    @reactive.event(input.reset)
+    @reactive.event(input.showReset)
     def _():
-        username = input.rUsername()
-        accessCode = input.rAccessCode()
-
-        # Check if the username already exists
-        conn = shared.appDBConn(postgresUser=postgresUser)
-        cursor = conn.cursor()
-        user = shared.pandasQuery(
-            conn,
-            'SELECT * FROM "user" WHERE "username" = ?',
-            (username,),
-        )
-
-        if user.shape[0] == 0:
-            ui.notification_show("This username does not exist")
-            conn.close()
-            return
-
-        uID = int(user["uID"].iloc[0])
-
-        # Check the password
-        pCheck = shared.passCheck(input.rPassword(), input.rPassword2())
-        if pCheck:
-            ui.notification_show(pCheck)
-            return
-
-        # Check the access code
-        code = shared.accessCodeCheck(conn, accessCode)
-
-        if code is None:
-            ui.notification_show("Invalid access code")
-            conn.close()
-            return
-
-        # Update the password
-        hashed = bcrypt.hashpw(input.rPassword().encode("utf-8"), bcrypt.gensalt())
-        _ = shared.executeQuery(
-            cursor,
-            'UPDATE "user" SET "password" = ?, "modified" = ? WHERE "uID" = ?',
-            (hashed.decode("utf-8"), shared.dt(), uID),
-        )
-
-        # Update the access code to show it has been used
-        _ = shared.executeQuery(
-            cursor,
-            'UPDATE "accessCode" SET "uID_user" = ?, "used" = ? WHERE "code" = ?',
-            (uID, shared.dt(), accessCode),
-        )
-        conn.commit()
-        conn.close()
-
-        # Clear the input fields
-        ui.update_text_area("rUsername", value="")
-        ui.update_text_area("rPassword", value="")
-        ui.update_text_area("rPassword2", value="")
-        ui.update_text_area("rAccessCode", value="")
-
-        ui.notification_show("Password reset successfully, please login again")
+        ui.modal_show(ui.modal(login_reset_ui("login_reset")))
+        _ = login_reset_server("login_reset", postgresUser=postgresUser)
 
     return user

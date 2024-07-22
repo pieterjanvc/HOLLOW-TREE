@@ -16,3 +16,7 @@ port = 5432
 gptModel = "gpt-3.5-turbo-0125"  # use gpt-3.5-turbo-0125 or gpt-4
 # Make sure OPENAI_API_KEY is set as environment variable
 # Make sure OPENAI_ORGANIZATION is set as environment variable
+
+[auth]
+personalInfo = "False" # If True, will collect name and email
+validEmail = "^[\\w.-]+@([\\w-]+\\.)+[\\w-]{2,4}$" # which email addresses can register
