@@ -3,6 +3,7 @@
 # ******************************************
 
 import shared.shared as shared
+from SCUIRREL.scuirrel_shared import endDiscussion
 
 from modules.login_module import login_server, login_ui
 from modules.chat_module import chat_ui, chat_server
@@ -110,33 +111,35 @@ application, please use the access code provided by your administrator to create
             )
 
     # Server functions for the different tabs are found in their respective modules
-    _ = chat_server("chat", user=user, sID=sID)
+    chat = chat_server("chat", user=user, sID=sID)
 
     # Code to run at the END of the session (i.e. when user disconnects)
     _ = session.on_ended(lambda: theEnd())
 
     # Function to run at the end of the session (when user disconnects)
     def theEnd():
-        # Add logs to the database after user exits
-        conn = shared.appDBConn(postgresUser=shared.postgresScuirrel)
-        cursor = conn.cursor()
-        # Register the end of the session and if an error occurred, log it
-        errMsg = traceback.format_exc().strip()
+        with reactive.isolate():
+            # Add logs to the database after user exits
+            conn = shared.appDBConn(postgresUser=shared.postgresScuirrel)
+            cursor = conn.cursor()
+            endDiscussion(cursor, chat["dID"].get(), chat["messages"].get())
+            # Register the end of the session and if an error occurred, log it
+            errMsg = traceback.format_exc().strip()
 
-        if errMsg == "NoneType: None":
-            _ = shared.executeQuery(
-                cursor,
-                'UPDATE "session" SET "end" = ? WHERE "sID" = ?',
-                (shared.dt(), sID),
-            )
-        else:
-            _ = shared.executeQuery(
-                cursor,
-                'UPDATE "session" SET "end" = ?, "error" = ? WHERE "sID" = ?',
-                (shared.dt(), errMsg, sID),
-            )
-        conn.commit()
-        conn.close()
+            if errMsg == "NoneType: None":
+                _ = shared.executeQuery(
+                    cursor,
+                    'UPDATE "session" SET "end" = ? WHERE "sID" = ?',
+                    (shared.dt(), sID),
+                )
+            else:
+                _ = shared.executeQuery(
+                    cursor,
+                    'UPDATE "session" SET "end" = ?, "error" = ? WHERE "sID" = ?',
+                    (shared.dt(), errMsg, sID),
+                )
+            conn.commit()
+            conn.close()
 
     return
 

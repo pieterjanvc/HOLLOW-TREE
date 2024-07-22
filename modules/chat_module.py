@@ -392,4 +392,5 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
         ui.modal_remove()
         ui.notification_show("Feedback successfully submitted!", duration=3)
 
-    return
+    return {"dID": discussionID, "messages": messages}
+
