@@ -14,10 +14,13 @@ CREATE TABLE IF NOT EXISTS "user" (
 DROP TABLE IF EXISTS "group";
 CREATE TABLE "group" (
   "gID" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "name" TEXT,
+  "sID" INTEGER,
+  "group" TEXT,
   "created" TEXT,
   "modified" TEXT,
-  "description" TEXT
+  "description" TEXT,
+  FOREIGN KEY("sID") REFERENCES "session"("sID") 
+    ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 DROP TABLE IF EXISTS "group_member";
@@ -51,7 +54,8 @@ CREATE TABLE "group_topic" (
 DROP TABLE IF EXISTS "accessCode";
 CREATE TABLE IF NOT EXISTS "accessCode" (
 	"aID" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "code" TEXT UNIQUE,  
+  "code" TEXT,
+  "codeType" INTEGER, 
 	"uID_creator" INTEGER, 
   "uID_user" INTEGER, 
   "gID" INTEGER,

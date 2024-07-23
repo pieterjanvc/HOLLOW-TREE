@@ -3,6 +3,7 @@
 # This module is used to manage groups of users and topics
 
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui, req
+from htmltools import HTML
 from io import BytesIO
 
 import shared.shared as shared
@@ -11,24 +12,11 @@ import shared.shared as shared
 
 # ---- VARS & FUNCTIONS ----
 
-
-def getAccessCodes(uID, adminLevel):
-    conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
-    # Admins can see all codes, instructors only their own
-    if adminLevel < 3:
-        query = f'SELECT * FROM "accessCode" WHERE "uID_creator" = {uID} AND "used" IS NULL AND "adminLevel" IS NOT NULL'
-        result = shared.pandasQuery(conn, query=query)
-        result = result[["code", "adminLevel", "created", "note"]]
-    else:
-        query = 'SELECT * FROM "accessCode" WHERE "used" IS NULL AND "adminLevel" IS NOT NULL'
-        result = shared.pandasQuery(conn, query=query)
-        result = result.drop(columns=["uID_user", "used"])
-
-    conn.close()
-
-    result["adminLevel"] = [shared.adminLevels[i] for i in result["adminLevel"]]
-    return result
-
+accessCodesQuery  =('SELECT u."username" AS \'creator\', a.* ' 
+                    'FROM "accessCode" AS \'a\', "group" AS \'g\', "user" AS \'u\' ' 
+                    'WHERE a."gID" = g."gID" AND a."uID_creator" = u."uID" AND a."used" IS NULL AND a."gID" = ?')
+groupQuery = ('SELECT * FROM "group" WHERE "gID" IN ('
+             'SELECT "gID" FROM "group_member" WHERE "uID" = ?)')
 
 # ---- UI ----
 
@@ -38,7 +26,7 @@ def groups_ui():
         # Generate access codes to create new users or update passwords
         ui.card(
             ui.card_header("Groups"),
-            ui.input_select("group", "Group", choices={}),
+            ui.input_select("gID", "Group", choices={}),
             ui.input_action_button("newGroup", "New group", width="180px"),
         ),       
         ui.card(
@@ -47,9 +35,22 @@ def groups_ui():
                 ui.input_action_button("delMember", "Remove selected member from group", width="340px"),
             ),
         ui.card(
-            ui.card_header("Unused group codes"),
-            ui.output_data_frame("codesTable"),
+            ui.card_header("Generate group access codes"),
+            ui.input_numeric(
+                "numCodes", "Number of codes to generate", value=1, min=1, max=500
+            ),
+            ui.input_select("role", "Role", choices={1: "User", 2: "Admin"}),
+            ui.input_text("note", "(optional) Reason for generating codes"),
             ui.input_action_button("generateCodes", "Generate new codes", width="230px"),
+            ui.output_data_frame("newCodesTable"),
+            ui.panel_conditional(
+                "input.generateCodes > 0",
+                ui.download_link("downloadGroupCodes", "Download as CSV"),
+            ),            
+        ),
+        ui.card(
+            ui.card_header("Unused group access codes"),
+            ui.output_data_frame("codesTable"),
         ),
     ]
 
@@ -58,11 +59,11 @@ def groups_ui():
 
 
 @module.server
-def groups_server(input: Inputs, output: Outputs, session: Session, user, postgresUser):
+def groups_server(input: Inputs, output: Outputs, session: Session, sID, user, postgresUser):
     
     # Set reactive variables
-    conn = shared.appDBConn(postgresUser=postgresUser)
-    groups = reactive.value(shared.pandasQuery(conn, 'SELECT * FROM "group"'))
+    conn = shared.appDBConn(postgresUser=postgresUser)    
+    groups = reactive.value(shared.pandasQuery(conn,'SELECT * FROM "group" WHERE gID = NULL'))
     members = reactive.value(shared.pandasQuery(
             conn,
             (
@@ -72,16 +73,32 @@ def groups_server(input: Inputs, output: Outputs, session: Session, user, postgr
             ),
         ))
     groupTopics = reactive.value(shared.pandasQuery(conn, 'SELECT * FROM "group_topic"'))
-    groupCodes = reactive.value(shared.pandasQuery(
-            conn,
-            (
-                'SELECT a.* '
-                'FROM "accessCode" AS \'a\', "group" AS \'g\' '
-                'WHERE a."gID" = g."gID" AND a."used" IS NULL AND a."gID" = NULL'
-            ),
-        ))  
-    conn.close() 
+    groupCodes = reactive.value()  
+    conn.close()
+    
+    @reactive.effect
+    @reactive.event(user)
+    def _():
+        conn = shared.appDBConn(postgresUser=postgresUser)
+        groups.set(shared.pandasQuery(conn, groupQuery, params=(int(user.get()["uID"]),)))        
+        conn.close()
 
+    # Update group list
+    @reactive.effect
+    @reactive.event(groups, ignore_init=True)
+    def _():        
+        ui.update_select("gID", choices=dict(zip(groups.get()["gID"].to_list(), groups.get()["group"].to_list())))
+        return
+    
+    @reactive.effect
+    def _():
+        conn = shared.appDBConn(postgresUser=postgresUser)
+        groupCodes.set(
+            shared.pandasQuery(conn, accessCodesQuery, params=(int(input.gID()),))
+        )
+        conn.close()
+        return
+    
     # Members table
     @render.data_frame
     def membersTable():
@@ -89,78 +106,101 @@ def groups_server(input: Inputs, output: Outputs, session: Session, user, postgr
     
     @render.data_frame
     def codesTable():
-        return render.DataTable(groupCodes(), width="100%", height="auto")
+        return render.DataTable(groupCodes()[["creator","code","adminLevel","created", "note"]], width="100%", height="auto")
+    
 
-    # backup
-    # @reactive.effect
-    # @reactive.event(user)
-    # def _():
-    #     groupCodes.set(
-    #         getAccessCodes(uID=user.get()["uID"], adminLevel=user.get()["adminLevel"])
-    #     )
-    #     return
+    # --- Add Group - modal popup
+    @reactive.effect
+    @reactive.event(input.newGroup)
+    def _():
+        m = ui.modal(
+            ui.tags.p(
+                HTML(
+                    "Create a new group to organize users and topics. (e.g. for a class, project, or team)"
+                )
+            ),
+            ui.input_text("ngGroup", "New group:", width="100%"),
+            ui.input_text("ngDescr", "Description (optional):", width="100%"),
+            title="Add a new group",
+            easy_close=True,
+            size="l",
+            footer=ui.TagList(
+                ui.input_action_button("ngAdd", "Add"), ui.modal_button("Cancel")
+            ),
+        )
+        ui.modal_show(m)
 
-    # @reactive.effect
-    # @reactive.event(user)
-    # def _():
-    #     ui.update_select(
-    #         "role",
-    #         choices={
-    #             key: shared.adminLevels[key]
-    #             for key in shared.adminLevels
-    #             if key <= user.get()["adminLevel"]
-    #         },
-    #     )
+    # When add button is clicked
+    @reactive.effect
+    @reactive.event(input.ngAdd)
+    def _():
+        # Only proceed if the input is valid
+        if not shared.inputCheck(input.ngGroup(), 3):
+            shared.inputNotification(session, "ngGroup", "Please enter a group name of at least 3 characters")
+            return
 
-    # # Render the table with the reset codes for the users who requested a password reset
-    # @render.data_frame
-    # def resetTable():
-    #     conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
-    #     resetTable = shared.pandasQuery(
-    #         conn,
-    #         (
-    #             'SELECT u."username", a."code" AS \'resetCode\', u."fName", u."lName", u."email"'
-    #             'FROM "accessCode" AS a, "user" AS u WHERE a."uID_user" = u."uID" '
-    #             'AND a."adminLevel" IS NULL AND a."used" IS NULL'
-    #         ),
-    #     )
-    #     conn.close()
+        # Add new topic to DB
+        conn = shared.appDBConn(postgresUser=postgresUser)
+        cursor = conn.cursor()
+        gID = shared.executeQuery(
+            cursor,
+            'INSERT INTO "group"("sID", "group", "created", "modified", "description")'
+            "VALUES(?, ?, ?, ?, ?)",
+            (sID, input.ngGroup(), shared.dt(), shared.dt(), input.ngDescr()),
+            lastRowId="gID",
+        )
+        _ = shared.executeQuery(
+            cursor,
+            'INSERT INTO "group_member"("gID", "uID", "adminLevel", "added")'
+            "VALUES(?, ?, ?, ?)",
+            (gID, int(user.get()["uID"]), 2, shared.dt()),
+        )
 
-    #     return render.DataTable(resetTable, width="100%", height="auto")
+        newGroups = shared.pandasQuery(
+            conn, 
+            groupQuery,
+            params=(int(user.get()["uID"]),),
+        )
+        conn.commit()
+        conn.close()
 
-    # # Generate new access codes
-    # @reactive.calc
-    # @reactive.event(input.generateCodes)
-    # def newgroupCodes():
-    #     req(user.get()["uID"] != 1)
-    #     conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
-    #     cursor = conn.cursor()
-    #     newCodes = shared.generate_access_codes(
-    #         cursor=cursor,
-    #         n=input.numCodes(),
-    #         creatorID=user.get()["uID"],
-    #         adminLevel=int(input.role()),
-    #         note=input.note(),
-    #     )
-    #     conn.commit()
-    #     conn.close()
-    #     groupCodes.set(
-    #         getAccessCodes(uID=user.get()["uID"], adminLevel=user.get()["adminLevel"])
-    #     )
-    #     return newCodes
+        groups.set(newGroups)
+        ui.modal_remove()
 
-    # @render.data_frame
-    # def newCodesTable():
-    #     return newgroupCodes()
+    
+    # Generate new access codes
+    @reactive.calc
+    @reactive.event(input.generateCodes)
+    def newgroupCodes():
+        req(user.get()["uID"] != 1)
+        conn = shared.appDBConn(postgresUser=postgresUser)
+        cursor = conn.cursor()
+        newCodes = shared.generate_access_codes(
+            cursor=cursor,
+            codeType=2,
+            gID=int(input.gID()),
+            n=input.numCodes(),
+            creatorID=user.get()["uID"],
+            adminLevel=int(input.role()),
+            note=input.note(),
+        )
+        
+        groupCodes.set(
+            shared.pandasQuery(conn, accessCodesQuery, params=(int(input.gID()),))
+        )
+        conn.commit()
+        conn.close()
 
-    # @render.download(filename="hollow-tree_groupCodes.csv")
-    # async def downloadCodes():
-    #     with BytesIO() as buf:
-    #         newgroupCodes().to_csv(buf, index=False)
-    #         yield buf.getvalue()
+        return newCodes
 
-    # @render.data_frame
-    # def codesTable():
-    #     return render.DataTable(groupCodes(), width="100%", height="auto")
+    @render.data_frame
+    def newCodesTable():
+        return newgroupCodes()
+
+    @render.download(filename="hollow-tree_groupCodes.csv")
+    async def downloadGroupCodes():
+        with BytesIO() as buf:
+            newgroupCodes().to_csv(buf, index=False)
+            yield buf.getvalue()
 
     return

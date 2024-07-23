@@ -35,10 +35,13 @@ CREATE TABLE "user" (
 
 CREATE TABLE "group" (
   "gID" SERIAL PRIMARY KEY,
-  "name" TEXT,
+  "sID" INTEGER,
+  "group" TEXT,
   "created" TEXT,
   "modified" TEXT,
-  "description" TEXT
+  "description" TEXT,
+  FOREIGN KEY("sID") REFERENCES "session"("sID") 
+    ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE group_member(
@@ -69,7 +72,8 @@ CREATE TABLE group_topic(
 
 CREATE TABLE "accessCode" (
 	"aID" SERIAL PRIMARY KEY,
-  "code" TEXT UNIQUE,
+  "code" TEXT,
+  "codeType" INTEGER, 
 	"uID_creator" INTEGER, 
   "uID_user" INTEGER,
   "gID" INTEGER, 

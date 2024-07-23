@@ -159,7 +159,7 @@ def login_server(
             conn.close()
             return
 
-        code = shared.accessCodeCheck(conn, accessCode)
+        code = shared.accessCodeCheck(conn = conn, accessCode = accessCode, codeType = 0)
 
         if code is None:
             ui.notification_show("Invalid access code")
