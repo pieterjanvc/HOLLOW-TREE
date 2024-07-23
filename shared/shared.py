@@ -356,11 +356,12 @@ def accessCodeCheck(conn, accessCode, codeType, uID=None):
     elif codeType == 2:
         code = pandasQuery(
             conn,
-            'SELECT * FROM "accessCode" WHERE "code" = ? AND "codeType" = 2 AND "uID_user" = ? AND used IS NULL',
-            (accessCode, int(uID)),
+            'SELECT * FROM "accessCode" WHERE "code" = ? AND "codeType" = 2 AND used IS NULL',
+            (accessCode, ),
         )
     else:
-        raise ValueError("Please provide a valid codeType")
+        raise ValueError("Please provide a valid codeType. " + 
+                         ' '.join(f'{key}: {value}' for key, value in codeTypes.items()))
 
     return None if code.shape[0] == 0 else code
 

@@ -3,10 +3,11 @@
 # This module is used to manage groups of users and topics
 
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui, req
-from htmltools import HTML
+from htmltools import HTML, div
 from io import BytesIO
 
 import shared.shared as shared
+from modules.group_join_module import group_join_server, group_join_ui
 
 # idea for widget: https://assets.justinmind.com/support/wp-content/uploads/2016/07/Sorted-lists-anim.gif
 
@@ -27,7 +28,10 @@ def groups_ui():
         ui.card(
             ui.card_header("Groups"),
             ui.input_select("gID", "Group", choices={}),
-            ui.input_action_button("newGroup", "New group", width="180px"),
+            div(
+                ui.input_action_button("newGroup", "New group", width="180px"),
+                group_join_ui("joinGroup"),
+                ),
         ),       
         ui.card(
                 ui.card_header("Members"),
@@ -75,6 +79,24 @@ def groups_server(input: Inputs, output: Outputs, session: Session, sID, user, p
     groupTopics = reactive.value(shared.pandasQuery(conn, 'SELECT * FROM "group_topic"'))
     groupCodes = reactive.value()  
     conn.close()
+
+    newGroup = group_join_server("joinGroup", user=user, groups = groups, postgresUser=postgresUser)
+
+    @reactive.effect
+    @reactive.event(newGroup)
+    def _():
+        if newGroup() is None:
+            return
+        
+        conn = shared.appDBConn(postgresUser=postgresUser)
+        newGroups = shared.pandasQuery(
+            conn, 
+            groupQuery,
+            params=(int(user.get()["uID"]),),
+        )
+        conn.close()
+        groups.set(newGroups)
+        return
     
     @reactive.effect
     @reactive.event(user)
@@ -92,6 +114,9 @@ def groups_server(input: Inputs, output: Outputs, session: Session, sID, user, p
     
     @reactive.effect
     def _():
+        if not input.gID():
+            return
+        
         conn = shared.appDBConn(postgresUser=postgresUser)
         groupCodes.set(
             shared.pandasQuery(conn, accessCodesQuery, params=(int(input.gID()),))

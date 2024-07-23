@@ -81,7 +81,7 @@ def user_management_server(input: Inputs, output: Outputs, session: Session, use
             choices={
                 key: shared.adminLevels[key]
                 for key in shared.adminLevels
-                if key <= user.get()["adminLevel"]
+                if key <= user.get()["adminLevel"] and key != 0
             },
         )
 
