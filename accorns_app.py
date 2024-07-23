@@ -14,6 +14,7 @@ from modules.vectorDB_management_module import (
 )
 from modules.quiz_generation_module import quiz_generation_ui, quiz_generation_server
 from modules.feedback_module import feedback_ui, feedback_server
+from modules.groups_module import groups_ui, groups_server
 
 # -- General
 import os
@@ -127,15 +128,17 @@ def server(input, output, session):
                         value="vTab",
                     ),
                     # TAB 3 - TOPICS
+                    ui.nav_panel("Groups", groups_ui("groups"), value="tTab"),
+                    # TAB 4 - TOPICS
                     ui.nav_panel("Topics", topics_ui("topics"), value="tTab"),
-                    # TAB 4 - QUIZ QUESTIONS
+                    # TAB 5 - QUIZ QUESTIONS
                     ui.nav_panel(
                         "Quiz Questions",
                         # Select a topic and a question with options to add or archive
                         quiz_generation_ui("quizGeneration"),
                         value="qTab",
                     ),
-                    # TAB 5 - USER MANAGEMENT
+                    # TAB 6 - USER MANAGEMENT
                     ui.nav_panel(
                         "User Management", user_management_ui("testUI"), value="uTab"
                     ),
@@ -144,6 +147,7 @@ def server(input, output, session):
 
     # Server functions for the different tabs are found in their respective modules
     topics, concepts = topics_server("topics", sID=sID, user=user)
+    _ = groups_server("groups", user=user, postgresUser=shared.postgresAccorns)
     _ = user_management_server("testUI", user=user)
     index, files = vectorDB_management_server("vectorDB", user=user)
     _ = quiz_generation_server(

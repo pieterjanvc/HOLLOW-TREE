@@ -33,18 +33,6 @@ CREATE TABLE "user" (
   "modified" TEXT
 );
 
-CREATE TABLE "accessCode" (
-	"aID" SERIAL PRIMARY KEY,
-  "code" TEXT UNIQUE,
-	"uID_creator" INTEGER, 
-  "uID_user" INTEGER, 
-  "adminLevel" INTEGER DEFAULT 0,
-  "created" TEXT,
-  "used" TEXT,
-  "note" TEXT
-);
-
-
 CREATE TABLE "group" (
   "gID" SERIAL PRIMARY KEY,
   "name" TEXT,
@@ -57,10 +45,43 @@ CREATE TABLE group_member(
   "gmID" SERIAL PRIMARY KEY,
   "uID" INTEGER,
   "gID" INTEGER,
-  "isAdmin" INTEGER DEFAULT 0,
+  "added" TEXT,
+  "adminLevel" INTEGER DEFAULT 0,
   FOREIGN KEY("uID") REFERENCES "user"("uID") 
     ON DELETE CASCADE ON UPDATE CASCADE,
   FOREIGN KEY("gID") REFERENCES "group"("gID") 
+    ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE group_topic(
+  "gtID" SERIAL PRIMARY KEY,
+  "gID" INTEGER,
+  "tID" INTEGER,
+  "uID" INTEGER,
+  "added" TEXT,
+  FOREIGN KEY("uID") REFERENCES "user"("uID") 
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("gID") REFERENCES "group"("gID") 
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("tID") REFERENCES "topic"("tID") 
+    ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE "accessCode" (
+	"aID" SERIAL PRIMARY KEY,
+  "code" TEXT UNIQUE,
+	"uID_creator" INTEGER, 
+  "uID_user" INTEGER,
+  "gID" INTEGER, 
+  "adminLevel" INTEGER DEFAULT 0,
+  "created" TEXT,
+  "used" TEXT,
+  "note" TEXT,
+  FOREIGN KEY("uID_creator") REFERENCES "user"("uID")
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("uID_user") REFERENCES "user"("uID")
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("gID") REFERENCES "group"("gID")
     ON DELETE CASCADE ON UPDATE CASCADE
 );
 
