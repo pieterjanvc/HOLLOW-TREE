@@ -8,10 +8,10 @@ import SCUIRREL.scuirrel_shared as scuirrel_shared
 # -- General
 import json
 from html import escape
-import os
+import pandas as pd
 
 # -- Shiny
-from shiny import Inputs, Outputs, Session, module, reactive, ui
+from shiny import Inputs, Outputs, Session, module, reactive, ui, render
 from htmltools import HTML, div
 
 
@@ -31,18 +31,20 @@ def chat_ui():
                      research purposes so don't share any personal information and keep to the topic at hand.</i></p>"""),
                 id="about",
             ),
-            ui.card(
+            ui.card(                
                 ui.card_header("Pick a topic"),
-                ui.input_select("selTopic", None, choices=[], width="600px"),
-                div(
-                    ui.input_action_button(
-                        "startConversation",
-                        "Start conversation",
-                        width="200px",
-                        style="display: inline-block;",
-                    ),
-                    quiz_ui("quiz"),
-                ),
+                ui.input_select("gID", "Group", choices={1: "Demo"} if shared.addDemo else {}, width="400px"),
+                ui.panel_conditional("input.gID",
+                    ui.input_select("selTopic", "Topic", choices=[], width="400px"),
+                    div(
+                        ui.input_action_button(
+                            "startConversation",
+                            "Start conversation",
+                            width="200px",
+                            style="display: inline-block;",
+                        ),
+                        quiz_ui("quiz"),
+                    )),
                 id="topicSelection",
             ),
             ui.panel_conditional(
@@ -117,13 +119,49 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
             )
 
     # When a new user signs in, show / update the relevant topics
-    @reactive.calc
+    @reactive.effect
     @reactive.event(user)
-    def topics():
-        # Get all active topics - TODO: add a filter specific users
+    def _():
         conn = shared.appDBConn(shared.postgresScuirrel)
-        topics = shared.pandasQuery(conn, 'SELECT * FROM "topic" WHERE "archived" = 0')
-        conn.close()
+        # If demo mode is enabled, add a demo group        
+        includeDemo = ' OR g."gID" = 1' if shared.addDemo else ""
+        
+        groups = shared.pandasQuery(
+            conn, 
+            'SELECT g."gID", g."group" FROM group_member AS \'m\', "group" AS \'g\' '
+            f'WHERE m."uID" = ? AND m."gID" = g."gID" {includeDemo} ORDER BY g."group"',
+            (user.get()["uID"],))
+        conn.close()       
+        
+        ui.update_select(
+            "gID", choices=dict(zip(groups["gID"].tolist(), groups["group"].tolist()))
+        )
+       
+
+        return topics
+    
+    # When a new user signs in, show / update the relevant topics
+    @reactive.calc
+    @reactive.event(input.gID)
+    def topics():
+        conn = shared.appDBConn(shared.postgresScuirrel)
+        # # If demo mode is enabled, add a demo topic
+        # if input.gID == 1 and shared.addDemo:
+        #     topic = shared.pandasQuery(
+        #         conn,
+        #         'SELECT * FROM "topic" WHERE "tID" = 1'
+        #     )
+        #     conn.close() 
+        #     return topic
+        
+        # Return all topics for a group        
+        topics = shared.pandasQuery(
+            conn, 
+            ('SELECT t.* FROM TOPIC AS \'t\', "group_topic" AS \'gt\' '
+            'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0'
+            'ORDER BY t."topic"'), 
+            (int(input.gID),))
+        conn.close()        
 
         return topics
 

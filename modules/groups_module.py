@@ -32,29 +32,31 @@ def groups_ui():
                 ui.input_action_button("newGroup", "New group", width="180px"),
                 group_join_ui("joinGroup"),
                 ),
-        ),       
-        ui.card(
-                ui.card_header("Members"),
-                ui.output_data_frame("membersTable"),
-                ui.input_action_button("delMember", "Remove selected member from group", width="340px"),
-            ),
-        ui.card(
-            ui.card_header("Generate group access codes"),
-            ui.input_numeric(
-                "numCodes", "Number of codes to generate", value=1, min=1, max=500
-            ),
-            ui.input_select("role", "Role", choices={1: "User", 2: "Admin"}),
-            ui.input_text("note", "(optional) Reason for generating codes"),
-            ui.input_action_button("generateCodes", "Generate new codes", width="230px"),
-            ui.output_data_frame("newCodesTable"),
-            ui.panel_conditional(
-                "input.generateCodes > 0",
-                ui.download_link("downloadGroupCodes", "Download as CSV"),
-            ),            
         ),
-        ui.card(
-            ui.card_header("Unused group access codes"),
-            ui.output_data_frame("codesTable"),
+        ui.panel_conditional("input.gID",      
+            ui.card(
+                    ui.card_header("Members"),
+                    ui.output_data_frame("membersTable"),
+                    ui.input_action_button("delMember", "Remove selected member from group", width="340px"),
+                ),
+            ui.card(
+                ui.card_header("Generate group access codes"),
+                ui.input_numeric(
+                    "numCodes", "Number of codes to generate", value=1, min=1, max=500
+                ),
+                ui.input_select("role", "Role", choices={1: "User", 2: "Admin"}),
+                ui.input_text("note", "(optional) Reason for generating codes"),
+                ui.input_action_button("generateCodes", "Generate new codes", width="230px"),
+                ui.output_data_frame("newCodesTable"),
+                ui.panel_conditional(
+                    "input.generateCodes > 0",
+                    ui.download_link("downloadGroupCodes", "Download as CSV"),
+                ),            
+            ),
+            ui.card(
+                ui.card_header("Unused group access codes"),
+                ui.output_data_frame("codesTable"),
+            ),
         ),
     ]
 

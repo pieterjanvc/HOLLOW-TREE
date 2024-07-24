@@ -2,7 +2,7 @@
 # ------------------------------------
 # This module has a button that will allow a user to join a group with a valid group access code
 
-from shiny import Inputs, Outputs, Session, module, reactive, render, ui, req
+from shiny import Inputs, Outputs, Session, module, reactive, ui, req
 from htmltools import HTML
 from io import BytesIO
 
