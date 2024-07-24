@@ -57,7 +57,9 @@ def topics_ui():
 
 # --- Server ---
 @module.server
-def topics_server(input: Inputs, output: Outputs, session: Session, sID, user, groups, postgresUser):
+def topics_server(
+    input: Inputs, output: Outputs, session: Session, sID, user, groups, postgresUser
+):
     topics = reactive.value(None)
     concepts = reactive.value(None)
 
@@ -65,22 +67,28 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user, g
     @reactive.event(groups)
     def _():
         ui.update_select(
-            "gID", choices=dict(zip(groups.get()["gID"].tolist(), groups.get()["group"].tolist()))
+            "gID",
+            choices=dict(
+                zip(groups.get()["gID"].tolist(), groups.get()["group"].tolist())
+            ),
         )
 
     @reactive.effect
     @reactive.event(input.gID)
     def _():
-        #req(user.get()["uID"] != 1)
+        # req(user.get()["uID"] != 1)
 
         # Get all active topics from the accorns database
         conn = shared.appDBConn(postgresUser=postgresUser)
         activeTopics = shared.pandasQuery(
-            conn, 
-            ('SELECT t.* FROM "topic" AS \'t\', "group_topic" AS \'gt\' '
-            'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '
-            'ORDER BY t."topic"'), 
-            (int(input.gID()),))
+            conn,
+            (
+                "SELECT t.* FROM \"topic\" AS 't', \"group_topic\" AS 'gt' "
+                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '
+                'ORDER BY t."topic"'
+            ),
+            (int(input.gID()),),
+        )
         conn.close()
 
         ui.update_select(
@@ -146,11 +154,14 @@ def topics_server(input: Inputs, output: Outputs, session: Session, sID, user, g
             (int(input.gID()), tID, int(user.get()["uID"]), dt),
         )
         newTopics = shared.pandasQuery(
-            conn, 
-            ('SELECT t.* FROM "topic" AS \'t\', "group_topic" AS \'gt\' '
-            'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '
-            'ORDER BY t."topic"'), 
-            (int(input.gID()),))
+            conn,
+            (
+                "SELECT t.* FROM \"topic\" AS 't', \"group_topic\" AS 'gt' "
+                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '
+                'ORDER BY t."topic"'
+            ),
+            (int(input.gID()),),
+        )
         conn.commit()
         conn.close()
 

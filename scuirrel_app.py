@@ -122,7 +122,7 @@ application, please use the access code provided by your administrator to create
             # Add logs to the database after user exits
             conn = shared.appDBConn(postgresUser=shared.postgresScuirrel)
             cursor = conn.cursor()
-            
+
             if chat["dID"].get() != 0:
                 endDiscussion(cursor, chat["dID"].get(), chat["messages"].get())
 

@@ -85,7 +85,7 @@ def dt():
 
 # Check if the input is of sufficient length
 def inputCheck(input, nChar=6):
-    if re_search(fr"(?=(.*[a-zA-Z0-9]){{{nChar},}}).*", input):
+    if re_search(rf"(?=(.*[a-zA-Z0-9]){{{nChar},}}).*", input):
         return True
     else:
         False
@@ -283,7 +283,7 @@ def generate_hash_list(n=1):
 
 # Generate access codes and add them to the database
 def generate_access_codes(
-    cursor, codeType, creatorID, gID = None, adminLevel=None, n=1, userID=None, note=""
+    cursor, codeType, creatorID, gID=None, adminLevel=None, n=1, userID=None, note=""
 ):
     note = None if note.strip() == "" else note
 
@@ -300,7 +300,7 @@ def generate_access_codes(
         raise ValueError(
             f"The adminLevel must be an integer between 0 and {max(adminLevels.keys())}"
         )
-    
+
     if gID is not None:
         gID = int(gID)
 
@@ -329,13 +329,20 @@ def generate_access_codes(
     # Insert the new codes into the database
     _ = executeQuery(
         cursor,
-        ('INSERT INTO "accessCode"("code", "codeType", "uID_creator", "uID_user", "gID", "adminLevel", "created", "note")' 
-        'VALUES(?, ?, ?, ?, ?, ?, ?, ?)'),
-        [(code, int(codeType), int(creatorID), userID, gID, adminLevel, dt(), note) for code in codes],
-    )   
+        (
+            'INSERT INTO "accessCode"("code", "codeType", "uID_creator", "uID_user", "gID", "adminLevel", "created", "note")'
+            "VALUES(?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
+        [
+            (code, int(codeType), int(creatorID), userID, gID, adminLevel, dt(), note)
+            for code in codes
+        ],
+    )
 
     # Return a data frame
-    return pd.DataFrame({codeTypes[codeType]: codes, "adminLevel": adminLevel, "note": note})
+    return pd.DataFrame(
+        {codeTypes[codeType]: codes, "adminLevel": adminLevel, "note": note}
+    )
 
 
 # Check if the access code has not been used yet
@@ -357,11 +364,13 @@ def accessCodeCheck(conn, accessCode, codeType, uID=None):
         code = pandasQuery(
             conn,
             'SELECT * FROM "accessCode" WHERE "code" = ? AND "codeType" = 2 AND used IS NULL',
-            (accessCode, ),
+            (accessCode,),
         )
     else:
-        raise ValueError("Please provide a valid codeType. " + 
-                         ' '.join(f'{key}: {value}' for key, value in codeTypes.items()))
+        raise ValueError(
+            "Please provide a valid codeType. "
+            + " ".join(f"{key}: {value}" for key, value in codeTypes.items())
+        )
 
     return None if code.shape[0] == 0 else code
 

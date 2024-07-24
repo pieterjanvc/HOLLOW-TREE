@@ -50,7 +50,8 @@ def user_management_ui():
             ),
         ),
         ui.card(
-            ui.card_header("Password reset requests"), ui.output_data_frame("resetTable")
+            ui.card_header("Password reset requests"),
+            ui.output_data_frame("resetTable"),
         ),
         ui.card(
             ui.card_header("Unused access codes"), ui.output_data_frame("codesTable")
@@ -62,7 +63,9 @@ def user_management_ui():
 
 
 @module.server
-def user_management_server(input: Inputs, output: Outputs, session: Session, user, postgresUser):
+def user_management_server(
+    input: Inputs, output: Outputs, session: Session, user, postgresUser
+):
     accessCodes = reactive.value()
 
     @reactive.effect

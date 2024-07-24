@@ -17,20 +17,23 @@ from htmltools import HTML, div
 
 
 # ---- VARS & FUNCTIONS ----
-def groupQuery(uID, postgresUser, demo = shared.addDemo):
+def groupQuery(uID, postgresUser, demo=shared.addDemo):
     includeDemo = ' OR g."gID" = 1' if demo else ""
     conn = shared.appDBConn(postgresUser)
     getGroups = shared.pandasQuery(
         conn,
-        ('SELECT g."gID", g."group" ' 
-             'FROM group_member AS \'m\', "group_topic" AS \'t\', "group" AS \'g\' '
+        (
+            'SELECT g."gID", g."group" '
+            "FROM group_member AS 'm', \"group_topic\" AS 't', \"group\" AS 'g' "
             'WHERE m."uID" = ? AND m."gID" = g."gID" AND t."gID" = g."gID" '
             'AND t."tID" IN (SELECT DISTINCT "tID" FROM "concept" WHERE "archived" = 0) '
-            f'{includeDemo} ORDER BY g."group"'),
+            f'{includeDemo} ORDER BY g."group"'
+        ),
         (uID,),
     )
     conn.close()
     return getGroups
+
 
 # --- UI
 @module.ui
@@ -48,15 +51,24 @@ def chat_ui():
                      research purposes so don't share any personal information and keep to the topic at hand.</i></p>"""),
                 id="about",
             ),
-            ui.card(                
+            ui.card(
                 ui.card_header("Pick a topic"),
                 div(
-                    div(ui.input_select("gID", "Group", choices={}), **{"class": "makeInline"}),
-                    group_join_ui("joinGroup"),
+                    div(
+                        ui.input_select("gID", "Group", choices={}),
+                        **{"class": "makeInline"},
                     ),
-                ui.panel_conditional("input.gID",
-                    div(div(ui.input_select("selTopic", "Topic", choices=[], width="auto"), **{"class": "makeInline"}),
-                    
+                    group_join_ui("joinGroup"),
+                ),
+                ui.panel_conditional(
+                    "input.gID",
+                    div(
+                        div(
+                            ui.input_select(
+                                "selTopic", "Topic", choices=[], width="auto"
+                            ),
+                            **{"class": "makeInline"},
+                        ),
                         ui.input_action_button(
                             "startConversation",
                             "Start conversation",
@@ -64,7 +76,8 @@ def chat_ui():
                             style="display: inline-block;",
                         ),
                         quiz_ui("quiz"),
-                    )),
+                    ),
+                ),
                 id="topicSelection",
             ),
             ui.panel_conditional(
@@ -85,7 +98,7 @@ def chat_ui():
                     id="chatWindow",
                     **{"class": "chatWindow"},
                     height="45vh",
-                ),            
+                ),
                 # User input, send button and wait message
                 ui.card(
                     ui.input_text_area(
@@ -113,7 +126,9 @@ def chat_ui():
 
 
 @module.server
-def chat_server(input: Inputs, output: Outputs, session: Session, user, sID, postgresUser):
+def chat_server(
+    input: Inputs, output: Outputs, session: Session, user, sID, postgresUser
+):
     # Reactive variables
     discussionID = reactive.value(0)  # Current conversation
     conceptIndex = reactive.value(0)  # Current concept index to discuss
@@ -123,7 +138,9 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID, pos
 
     # The quiz question popup is a separate module
     _ = quiz_server("quiz", tID=input.selTopic, sID=sID, user=user)
-    newGroup = group_join_server("joinGroup", user=user, groups=groups, postgresUser=postgresUser)
+    newGroup = group_join_server(
+        "joinGroup", user=user, groups=groups, postgresUser=postgresUser
+    )
 
     @reactive.effect
     @reactive.event(newGroup)
@@ -133,14 +150,16 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID, pos
 
         groups.set(groupQuery(user.get()["uID"], postgresUser))
         return
-    
+
     @reactive.effect
     @reactive.event(groups)
     def _():
         ui.update_select(
-            "gID", choices=dict(zip(groups.get()["gID"].tolist(), groups.get()["group"].tolist()))
-        ) 
-    
+            "gID",
+            choices=dict(
+                zip(groups.get()["gID"].tolist(), groups.get()["group"].tolist())
+            ),
+        )
 
     # Update a custom, simple progress bar
     def progressBar(id, percent):
@@ -161,26 +180,28 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID, pos
     @reactive.effect
     @reactive.event(user)
     def _():
-
         getGroups = groupQuery(user.get()["uID"], postgresUser)
-        groups.set(getGroups)             
+        groups.set(getGroups)
 
         return
-    
+
     # When a new user signs in, show / update the relevant topics
     @reactive.calc
     @reactive.event(input.gID)
     def topics():
         conn = shared.appDBConn(postgresUser)
-        
-        # Return all topics for a group        
+
+        # Return all topics for a group
         topics = shared.pandasQuery(
-            conn, 
-            ('SELECT t.* FROM "topic" AS \'t\', "group_topic" AS \'gt\' '
-            'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '            
-            'ORDER BY t."topic"'), 
-            (int(input.gID()),))
-        conn.close()        
+            conn,
+            (
+                "SELECT t.* FROM \"topic\" AS 't', \"group_topic\" AS 'gt' "
+                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '
+                'ORDER BY t."topic"'
+            ),
+            (int(input.gID()),),
+        )
+        conn.close()
 
         return topics
 

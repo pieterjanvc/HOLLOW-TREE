@@ -130,7 +130,10 @@ def login_reset_server(
 
         # Check the access code
         code = shared.accessCodeCheck(
-            conn=conn, accessCode=accessCode, codeType = 1, uID=checkUser["user"]["uID"].iloc[0]
+            conn=conn,
+            accessCode=accessCode,
+            codeType=1,
+            uID=checkUser["user"]["uID"].iloc[0],
         )
 
         invalid = code is None
