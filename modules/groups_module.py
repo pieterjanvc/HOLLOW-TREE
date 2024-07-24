@@ -230,4 +230,4 @@ def groups_server(input: Inputs, output: Outputs, session: Session, sID, user, p
             newgroupCodes().to_csv(buf, index=False)
             yield buf.getvalue()
 
-    return
+    return groups

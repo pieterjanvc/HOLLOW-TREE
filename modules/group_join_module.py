@@ -12,7 +12,8 @@ import shared.shared as shared
 def group_join_ui():
     return [
         # Generate access codes to create new users or update passwords
-        ui.input_action_button("joinGroup", "Join group", width="180px"),
+        ui.input_action_button("joinGroup", "Join group", 
+                               width="180px", inline=True),
     ]
 
 

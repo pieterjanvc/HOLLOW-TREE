@@ -2,6 +2,7 @@
 # -------------------------
 
 from modules.quiz_module import quiz_ui, quiz_server
+from modules.group_join_module import group_join_server, group_join_ui
 import shared.shared as shared
 import SCUIRREL.scuirrel_shared as scuirrel_shared
 
@@ -14,6 +15,22 @@ import pandas as pd
 from shiny import Inputs, Outputs, Session, module, reactive, ui, render
 from htmltools import HTML, div
 
+
+# ---- VARS & FUNCTIONS ----
+def groupQuery(uID, postgresUser, demo = shared.addDemo):
+    includeDemo = ' OR g."gID" = 1' if demo else ""
+    conn = shared.appDBConn(postgresUser)
+    getGroups = shared.pandasQuery(
+        conn,
+        ('SELECT g."gID", g."group" ' 
+             'FROM group_member AS \'m\', "group_topic" AS \'t\', "group" AS \'g\' '
+            'WHERE m."uID" = ? AND m."gID" = g."gID" AND t."gID" = g."gID" '
+            'AND t."tID" IN (SELECT DISTINCT "tID" FROM "concept" WHERE "archived" = 0) '
+            f'{includeDemo} ORDER BY g."group"'),
+        (uID,),
+    )
+    conn.close()
+    return getGroups
 
 # --- UI
 @module.ui
@@ -33,10 +50,13 @@ def chat_ui():
             ),
             ui.card(                
                 ui.card_header("Pick a topic"),
-                ui.input_select("gID", "Group", choices={1: "Demo"} if shared.addDemo else {}, width="400px"),
+                div(
+                    div(ui.input_select("gID", "Group", choices={}), **{"class": "makeInline"}),
+                    group_join_ui("joinGroup"),
+                    ),
                 ui.panel_conditional("input.gID",
-                    ui.input_select("selTopic", "Topic", choices=[], width="400px"),
-                    div(
+                    div(div(ui.input_select("selTopic", "Topic", choices=[], width="auto"), **{"class": "makeInline"}),
+                    
                         ui.input_action_button(
                             "startConversation",
                             "Start conversation",
@@ -65,27 +85,27 @@ def chat_ui():
                     id="chatWindow",
                     **{"class": "chatWindow"},
                     height="45vh",
+                ),            
+                # User input, send button and wait message
+                ui.card(
+                    ui.input_text_area(
+                        "newChat",
+                        "",
+                        value="",
+                        width="100%",
+                        spellcheck=True,
+                        resize=False,
+                        placeholder="Type your message here...",
+                    ),
+                    ui.input_action_button("send", "Send", width="100px"),
+                    style="display: none;",
+                    id="chatIn",
                 ),
-            ),
-            # User input, send button and wait message
-            ui.card(
-                ui.input_text_area(
-                    "newChat",
-                    "",
-                    value="",
-                    width="100%",
-                    spellcheck=True,
-                    resize=False,
-                    placeholder="Type your message here...",
+                ui.card(
+                    HTML("<p><i>Scuirrel is foraging for an answer ...</i></p>"),
+                    id="waitResp",
+                    style="display: none;",
                 ),
-                ui.input_action_button("send", "Send", width="100px"),
-                style="display: none;",
-                id="chatIn",
-            ),
-            ui.card(
-                HTML("<p><i>Scuirrel is foraging for an answer ...</i></p>"),
-                id="waitResp",
-                style="display: none;",
             ),
             col_widths=12,
         )
@@ -93,15 +113,34 @@ def chat_ui():
 
 
 @module.server
-def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
+def chat_server(input: Inputs, output: Outputs, session: Session, user, sID, postgresUser):
     # Reactive variables
     discussionID = reactive.value(0)  # Current conversation
     conceptIndex = reactive.value(0)  # Current concept index to discuss
     messages = reactive.value(None)  # Raw chat messages
+    groups = reactive.value(None)  # User's groups
     botLog = reactive.value(None)  # Chat sent to the LLM
 
     # The quiz question popup is a separate module
     _ = quiz_server("quiz", tID=input.selTopic, sID=sID, user=user)
+    newGroup = group_join_server("joinGroup", user=user, groups=groups, postgresUser=postgresUser)
+
+    @reactive.effect
+    @reactive.event(newGroup)
+    def _():
+        if newGroup() is None:
+            return
+
+        groups.set(groupQuery(user.get()["uID"], postgresUser))
+        return
+    
+    @reactive.effect
+    @reactive.event(groups)
+    def _():
+        ui.update_select(
+            "gID", choices=dict(zip(groups.get()["gID"].tolist(), groups.get()["group"].tolist()))
+        ) 
+    
 
     # Update a custom, simple progress bar
     def progressBar(id, percent):
@@ -122,45 +161,25 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
     @reactive.effect
     @reactive.event(user)
     def _():
-        conn = shared.appDBConn(shared.postgresScuirrel)
-        # If demo mode is enabled, add a demo group        
-        includeDemo = ' OR g."gID" = 1' if shared.addDemo else ""
-        
-        groups = shared.pandasQuery(
-            conn, 
-            'SELECT g."gID", g."group" FROM group_member AS \'m\', "group" AS \'g\' '
-            f'WHERE m."uID" = ? AND m."gID" = g."gID" {includeDemo} ORDER BY g."group"',
-            (user.get()["uID"],))
-        conn.close()       
-        
-        ui.update_select(
-            "gID", choices=dict(zip(groups["gID"].tolist(), groups["group"].tolist()))
-        )
-       
 
-        return topics
+        getGroups = groupQuery(user.get()["uID"], postgresUser)
+        groups.set(getGroups)             
+
+        return
     
     # When a new user signs in, show / update the relevant topics
     @reactive.calc
     @reactive.event(input.gID)
     def topics():
-        conn = shared.appDBConn(shared.postgresScuirrel)
-        # # If demo mode is enabled, add a demo topic
-        # if input.gID == 1 and shared.addDemo:
-        #     topic = shared.pandasQuery(
-        #         conn,
-        #         'SELECT * FROM "topic" WHERE "tID" = 1'
-        #     )
-        #     conn.close() 
-        #     return topic
+        conn = shared.appDBConn(postgresUser)
         
         # Return all topics for a group        
         topics = shared.pandasQuery(
             conn, 
-            ('SELECT t.* FROM TOPIC AS \'t\', "group_topic" AS \'gt\' '
-            'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0'
+            ('SELECT t.* FROM "topic" AS \'t\', "group_topic" AS \'gt\' '
+            'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '            
             'ORDER BY t."topic"'), 
-            (int(input.gID),))
+            (int(input.gID()),))
         conn.close()        
 
         return topics
@@ -182,7 +201,7 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
     @reactive.event(input.startConversation)
     def _():
         tID = int(topics()[topics()["tID"] == int(input.selTopic())].iloc[0]["tID"])
-        conn = shared.appDBConn(shared.postgresScuirrel)
+        conn = shared.appDBConn(postgresUser)
         cursor = conn.cursor()
 
         # Save the logs for the previous discussion (if any) adn wipe the chat window
@@ -232,7 +251,7 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
     # Get the concepts related to the topic
     @reactive.calc
     def concepts():
-        conn = shared.appDBConn(shared.postgresScuirrel)
+        conn = shared.appDBConn(postgresUser)
         concepts = shared.pandasQuery(
             conn,
             f'SELECT * FROM "concept" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0 ORDER BY "order"',
@@ -403,7 +422,7 @@ def chat_server(input: Inputs, output: Outputs, session: Session, user, sID):
         # Because multiple issues can be submitted for a single conversation, we have to commit to the
         # DB immediately or it would become harder to keep track of TODO
         # This means we add a temp mID which will be updated in the end
-        conn = shared.appDBConn(shared.postgresScuirrel)
+        conn = shared.appDBConn(postgresUser)
         cursor = conn.cursor()
         fcID = shared.executeQuery(
             cursor,

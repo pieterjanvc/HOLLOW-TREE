@@ -146,8 +146,8 @@ def server(input, output, session):
             )
 
     # Server functions for the different tabs are found in their respective modules
-    topics, concepts = topics_server("topics", sID=sID, user=user)
-    _ = groups_server("groups", sID = sID, user=user, postgresUser=shared.postgresAccorns)
+    groups = groups_server("groups", sID = sID, user=user, postgresUser=shared.postgresAccorns)
+    topics, concepts = topics_server("topics", sID=sID, user=user, groups=groups, postgresUser=shared.postgresAccorns)
     _ = user_management_server("testUI", user=user, postgresUser=shared.postgresAccorns)
     index, files = vectorDB_management_server("vectorDB", user=user)
     _ = quiz_generation_server(
