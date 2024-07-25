@@ -26,7 +26,7 @@ from llama_index.vector_stores.duckdb import DuckDBVectorStore
 from llama_index.vector_stores.postgres import PGVectorStore
 
 # Shiny
-from shiny import reactive, ui, Session
+from shiny import reactive, ui
 from htmltools import HTML
 
 # --- VARIABLES ---

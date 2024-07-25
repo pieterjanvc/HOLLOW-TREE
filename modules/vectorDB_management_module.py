@@ -5,7 +5,7 @@ import shared.shared as shared
 import ACCORNS.accorns_shared as accorns_shared
 
 # -- General
-import os
+import asyncio
 
 # -- Shiny
 from shiny import Inputs, Outputs, Session, module, reactive, ui, render, req
@@ -65,7 +65,7 @@ def vectorDB_management_ui():
 
 # --- Server ---
 @module.server
-def vectorDB_management_server(input: Inputs, output: Outputs, session: Session, user):
+def vectorDB_management_server(input: Inputs, output: Outputs, session: Session, user, pool):
     conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
     files = shared.pandasQuery(conn, query='SELECT * FROM "file"')
     conn.close()
@@ -109,10 +109,7 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
             "afterEnd",
         )
 
-    # Add the file to the vector database
-    @reactive.extended_task
-    async def updateVectorDB(newFile, vectorDB, storageFolder, newFileName):
-        print("Start adding file...")
+    def updateVectorDB_task(newFile, vectorDB, storageFolder, newFileName):
         return accorns_shared.addFileToDB(
             newFile=newFile,
             shinyToken=session.id,
@@ -120,6 +117,12 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
             storageFolder=storageFolder,
             newFileName=newFileName,
         )
+
+    # Add the file to the vector database
+    @reactive.extended_task
+    async def updateVectorDB(newFile, vectorDB, storageFolder, newFileName):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(pool, updateVectorDB_task, newFile, vectorDB, storageFolder, newFileName)
 
     # Process the result of adding the file to the vector database
     @reactive.effect
