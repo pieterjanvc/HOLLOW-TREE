@@ -68,7 +68,7 @@ def login_reset_server(
         # Check if there are any existing, unused reset codes
         existing = shared.pandasQuery(
             conn,
-            'SELECT * FROM "accessCode" WHERE "uID_user" = ? AND "adminLevel" IS NULL AND "used" IS NULL',
+            'SELECT * FROM "accessCode" WHERE "uID_user" = ? AND "codeType" = 1 AND "used" IS NULL',
             (uID,),
         )
 
@@ -130,7 +130,10 @@ def login_reset_server(
 
         # Check the access code
         code = shared.accessCodeCheck(
-            conn=conn, accessCode=accessCode, uID=checkUser["user"]["uID"].iloc[0]
+            conn=conn,
+            accessCode=accessCode,
+            codeType=1,
+            uID=checkUser["user"]["uID"].iloc[0],
         )
 
         invalid = code is None

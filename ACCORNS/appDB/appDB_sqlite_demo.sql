@@ -1,5 +1,8 @@
 -- INSERT DEMO DATA
-INSERT INTO topic("topic", "created", "modified")
+INSERT INTO "group" ("group", "created", "modified")
+VALUES('Demo', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+INSERT INTO "topic" ("topic", "created", "modified")
 VALUES('The central dogma of molecular biology', 
   CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
@@ -24,3 +27,6 @@ INSERT INTO "concept" ("tID", "order", "concept", "created", "modified")
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
   (1,10,'In summary: The central dogma states that DNA makes RNA makes Protein',
   CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+
+INSERT INTO "group_topic" ("gID", "tID", "added")
+VALUES(1, 1, CURRENT_TIMESTAMP);

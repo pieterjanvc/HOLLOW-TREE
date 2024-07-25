@@ -11,25 +11,16 @@ CREATE TABLE IF NOT EXISTS "user" (
   "modified" TEXT
 );
 
-DROP TABLE IF EXISTS "accessCode";
-CREATE TABLE IF NOT EXISTS "accessCode" (
-	"aID" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "code" TEXT UNIQUE,
-	"uID_creator" INTEGER, 
-  "uID_user" INTEGER, 
-  "adminLevel" INTEGER DEFAULT 0,
-  "created" TEXT,
-  "used" TEXT,
-  "note" TEXT
-);
-
 DROP TABLE IF EXISTS "group";
 CREATE TABLE "group" (
   "gID" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "name" TEXT,
+  "sID" INTEGER,
+  "group" TEXT,
   "created" TEXT,
   "modified" TEXT,
-  "description" TEXT
+  "description" TEXT,
+  FOREIGN KEY("sID") REFERENCES "session"("sID") 
+    ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 DROP TABLE IF EXISTS "group_member";
@@ -37,10 +28,46 @@ CREATE TABLE "group_member" (
   "gmID" INTEGER PRIMARY KEY AUTOINCREMENT,
   "uID" INTEGER,
   "gID" INTEGER,
-  "isAdmin" INTEGER DEFAULT 0,
+  "added" TEXT,
+  "adminLevel" INTEGER DEFAULT 0,
   FOREIGN KEY("uID") REFERENCES "user"("uID") 
     ON DELETE CASCADE ON UPDATE CASCADE,
   FOREIGN KEY("gID") REFERENCES "group"("gID") 
+    ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+DROP TABLE IF EXISTS "group_topic";
+CREATE TABLE "group_topic" (
+  "gtID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "gID" INTEGER,
+  "tID" INTEGER,
+  "uID" INTEGER,
+  "added" TEXT,
+  FOREIGN KEY("uID") REFERENCES "user"("uID") 
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("gID") REFERENCES "group"("gID") 
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("tID") REFERENCES "topic"("tID") 
+    ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+DROP TABLE IF EXISTS "accessCode";
+CREATE TABLE IF NOT EXISTS "accessCode" (
+	"aID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "code" TEXT,
+  "codeType" INTEGER, 
+	"uID_creator" INTEGER, 
+  "uID_user" INTEGER, 
+  "gID" INTEGER,
+  "adminLevel" INTEGER DEFAULT 0,
+  "created" TEXT,
+  "used" TEXT,
+  "note" TEXT,
+  FOREIGN KEY("uID_creator") REFERENCES "user"("uID")
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("uID_user") REFERENCES "user"("uID")
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY("gID") REFERENCES "group"("gID")
     ON DELETE CASCADE ON UPDATE CASCADE
 );
 

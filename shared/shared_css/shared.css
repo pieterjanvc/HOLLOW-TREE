@@ -43,6 +43,10 @@ body {
     background-color: transparent; /* see which row in a table is selected */
 }
 
+.makeInline {
+    display: inline-block;
+}
+
 thead, tbody, tfoot, tr, td, th {
     border-bottom: 1px solid #dadada; /* row dividers */
 }

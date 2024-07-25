@@ -111,7 +111,7 @@ application, please use the access code provided by your administrator to create
             )
 
     # Server functions for the different tabs are found in their respective modules
-    chat = chat_server("chat", user=user, sID=sID)
+    chat = chat_server("chat", user=user, sID=sID, postgresUser=shared.postgresScuirrel)
 
     # Code to run at the END of the session (i.e. when user disconnects)
     _ = session.on_ended(lambda: theEnd())
@@ -122,7 +122,10 @@ application, please use the access code provided by your administrator to create
             # Add logs to the database after user exits
             conn = shared.appDBConn(postgresUser=shared.postgresScuirrel)
             cursor = conn.cursor()
-            endDiscussion(cursor, chat["dID"].get(), chat["messages"].get())
+
+            if chat["dID"].get() != 0:
+                endDiscussion(cursor, chat["dID"].get(), chat["messages"].get())
+
             # Register the end of the session and if an error occurred, log it
             errMsg = traceback.format_exc().strip()
 
