@@ -115,7 +115,7 @@ def server(input, output, session):
                         ),
                         login_ui("login"),
                     ),
-                    id="tab",
+                    id="preLoginTabs",
                 )
             )
         else:
@@ -129,7 +129,7 @@ def server(input, output, session):
                         value="vTab",
                     ),
                     # TAB 3 - TOPICS
-                    ui.nav_panel("Groups", groups_ui("groups"), value="tTab"),
+                    ui.nav_panel("Groups", groups_ui("groups"), value="gTab"),
                     # TAB 4 - TOPICS
                     ui.nav_panel("Topics", topics_ui("topics"), value="tTab"),
                     # TAB 5 - QUIZ QUESTIONS
@@ -143,6 +143,7 @@ def server(input, output, session):
                     ui.nav_panel(
                         "User Management", user_management_ui("testUI"), value="uTab"
                     ),
+                    id="postLoginTabs",
                 )
             )
 

@@ -8,7 +8,14 @@ app = create_app_fixture("dummy_app/test_app.py")
 def test_basic_app(page: Page, app: ShinyAppProc):
     page.goto(app.url)
     txt = controller.OutputText(page, "txt")
-    slider = controller.InputSlider(page, "n")
-    slider.set("55")
-    txt.expect_value("n*2 is 110")
+    textBox = controller.InputText(page, "txtBox")
+    textBox.set("Hello")
+    txt.expect_value("Hello")
+    textBox.set("test")
+    txt.expect_value("tet")
+    # slider = controller.InputSlider(page, "n")
+    # slider.set("1")
+    # txt.expect_value("n*2 is 0")
+
+
 
