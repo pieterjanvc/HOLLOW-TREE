@@ -3,6 +3,8 @@ from shiny.run import ShinyAppProc
 from playwright.sync_api import Page
 from shiny.pytest import create_app_fixture
 
+pytest_plugins = ["tests.testDBs"]
+
 app = create_app_fixture("dummy_app/test_app.py")
 
 def test_basic_app(page: Page, app: ShinyAppProc):
