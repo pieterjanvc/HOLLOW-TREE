@@ -65,7 +65,9 @@ def vectorDB_management_ui():
 
 # --- Server ---
 @module.server
-def vectorDB_management_server(input: Inputs, output: Outputs, session: Session, user, pool):
+def vectorDB_management_server(
+    input: Inputs, output: Outputs, session: Session, user, pool
+):
     conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
     files = shared.pandasQuery(conn, query='SELECT * FROM "file"')
     conn.close()
@@ -122,7 +124,9 @@ def vectorDB_management_server(input: Inputs, output: Outputs, session: Session,
     @reactive.extended_task
     async def updateVectorDB(newFile, vectorDB, storageFolder, newFileName):
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(pool, updateVectorDB_task, newFile, vectorDB, storageFolder, newFileName)
+        return await loop.run_in_executor(
+            pool, updateVectorDB_task, newFile, vectorDB, storageFolder, newFileName
+        )
 
     # Process the result of adding the file to the vector database
     @reactive.effect

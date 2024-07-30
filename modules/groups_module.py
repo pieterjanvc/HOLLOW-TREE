@@ -23,7 +23,9 @@ groupQuery = (
     'SELECT "gID" FROM "group_member" WHERE "uID" = ?)'
 )
 # Ignore the anonymous group
-groupAdminLevels = {k: shared.groupAdminLevels[k] for k in list(shared.groupAdminLevels.keys())[1:]}
+groupAdminLevels = {
+    k: shared.groupAdminLevels[k] for k in list(shared.groupAdminLevels.keys())[1:]
+}
 # ---- UI ----
 
 

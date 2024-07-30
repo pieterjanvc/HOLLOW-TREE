@@ -17,10 +17,11 @@ from shiny import Inputs, Outputs, Session, module, reactive, ui, render
 from htmltools import HTML, div
 
 
-
 # ---- VARS & FUNCTIONS ----
 def groupQuery(uID, postgresUser, demo=shared.addDemo):
-    includeDemo = 'UNION SELECT "gID", "group" FROM "group" WHERE "gID" = 1 ' if demo else ""
+    includeDemo = (
+        'UNION SELECT "gID", "group" FROM "group" WHERE "gID" = 1 ' if demo else ""
+    )
     conn = shared.appDBConn(postgresUser)
     getGroups = shared.pandasQuery(
         conn,
@@ -286,7 +287,6 @@ def chat_server(
     @reactive.effect
     @reactive.event(input.send)
     def _():
-
         newChat = input.newChat()
         # Ignore empty chat
         if (newChat == "") | (newChat.isspace()):
@@ -302,7 +302,7 @@ def chat_server(
             isBot=0,
             cID=int(concepts().iloc[conceptIndex.get()]["cID"]),
             content=newChat,
-        )        
+        )
         ui.insert_ui(
             HTML(
                 f"<div class='userChat talk-bubble' onclick='chatSelection(this,{msg.id - 1})'><p>{escape(newChat)}</p></div>"
@@ -318,12 +318,12 @@ def chat_server(
             botLog.get() + "\n---- NEW RESPONSE FROM STUDENT ----\n" + newChat
         )
         # Send the message to the LLM for processing
-        botResponse(topic, concepts(), conceptIndex.get(), conversation)    
-    
+        botResponse(topic, concepts(), conceptIndex.get(), conversation)
+
     def botResponse_task(topic, concepts, cIndex, conversation):
         # Check the student's progress on the current concept based on the last reply (other engine)
         engine = scuirrel_shared.progressCheckEngine(
-            conversation, topic, concepts, cIndex, postgresUser = postgresUser
+            conversation, topic, concepts, cIndex, postgresUser=postgresUser
         )
         tries = 0
         while tries < 3:
@@ -349,12 +349,14 @@ def chat_server(
             resp = str(engine.query(conversation))
 
         return {"resp": resp, "eval": eval}
-    
+
     # Async Shiny task waiting for LLM reply
     @reactive.extended_task
-    async def botResponse(topic, concepts, cIndex, conversation):        
+    async def botResponse(topic, concepts, cIndex, conversation):
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(pool, botResponse_task, topic, concepts, cIndex, conversation)        
+        return await loop.run_in_executor(
+            pool, botResponse_task, topic, concepts, cIndex, conversation
+        )
 
     # Processing LLM responses
     @reactive.effect

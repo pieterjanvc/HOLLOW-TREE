@@ -89,9 +89,17 @@ def quiz_generation_ui():
 # --- Server ---
 @module.server
 def quiz_generation_server(
-    input: Inputs, output: Outputs, session: Session, sID, index, user, topicsx, groups, postgresUser, pool
-): 
-
+    input: Inputs,
+    output: Outputs,
+    session: Session,
+    sID,
+    index,
+    user,
+    topicsx,
+    groups,
+    postgresUser,
+    pool,
+):
     topics = reactive.value(None)
 
     @reactive.effect
@@ -120,13 +128,13 @@ def quiz_generation_server(
             ),
             (int(input.gID()),),
         )
-        conn.close()        
+        conn.close()
 
         ui.update_select(
             "qtID", choices=dict(zip(activeTopics["tID"], activeTopics["topic"]))
         )
 
-        topics.set(activeTopics)           
+        topics.set(activeTopics)
 
     @render.ui
     def quizQuestionPreview():
@@ -294,7 +302,7 @@ def quiz_generation_server(
     @reactive.extended_task
     async def botResponse(quizEngine, info, cID):
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(pool, botResponse_task, quizEngine, info, cID)        
+        return await loop.run_in_executor(pool, botResponse_task, quizEngine, info, cID)
 
     # Processing LLM response
     @reactive.effect
@@ -376,7 +384,7 @@ def quiz_generation_server(
         else:
             shared.elementDisplay("qID", "s", session)
             shared.elementDisplay("qArchive", "s", session)
-        
+
         # Update the UI
         ui.update_select("qID", choices=dict(zip(q["qID"], q["question"])))
 

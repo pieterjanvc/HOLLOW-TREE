@@ -141,7 +141,9 @@ def server(input, output, session):
                     ),
                     # TAB 6 - USER MANAGEMENT
                     ui.nav_panel(
-                        "User Management", user_management_ui("userManagement"), value="uTab"
+                        "User Management",
+                        user_management_ui("userManagement"),
+                        value="uTab",
                     ),
                     id="postLoginTabs",
                 )
@@ -154,10 +156,19 @@ def server(input, output, session):
     topics, concepts = topics_server(
         "topics", sID=sID, user=user, groups=groups, postgresUser=shared.postgresAccorns
     )
-    _ = user_management_server("userManagement", user=user, postgresUser=shared.postgresAccorns)
+    _ = user_management_server(
+        "userManagement", user=user, postgresUser=shared.postgresAccorns
+    )
     index, files = vectorDB_management_server("vectorDB", user=user, pool=pool)
     _ = quiz_generation_server(
-        "quizGeneration", sID=sID, index=index, user=user, topicsx = topics, groups=groups, postgresUser = shared.postgresAccorns,pool=pool
+        "quizGeneration",
+        sID=sID,
+        index=index,
+        user=user,
+        topicsx=topics,
+        groups=groups,
+        postgresUser=shared.postgresAccorns,
+        pool=pool,
     )
 
     # Code to run at the END of the session (i.e. when user disconnects)

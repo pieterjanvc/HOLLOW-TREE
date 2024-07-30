@@ -348,13 +348,12 @@ def generate_access_codes(
 
 # Check if the access code has not been used yet
 def accessCodeCheck(conn, accessCode, codeType, uID=None, minAdminLevel=0):
-
     # Check the access code (must be valid and not used yet)
     if codeType == 0:
         code = pandasQuery(
             conn,
             'SELECT * FROM "accessCode" WHERE "code" = ? AND "codeType" = 0 AND "used" IS NULL AND "adminLevel" >= ?',
-            (accessCode,int(minAdminLevel)),
+            (accessCode, int(minAdminLevel)),
         )
     elif codeType == 1:
         code = pandasQuery(
@@ -366,7 +365,7 @@ def accessCodeCheck(conn, accessCode, codeType, uID=None, minAdminLevel=0):
         code = pandasQuery(
             conn,
             'SELECT * FROM "accessCode" WHERE "code" = ? AND "codeType" = 2 AND used IS NULL AND "adminLevel" >= ?',
-            (accessCode,int(minAdminLevel)),
+            (accessCode, int(minAdminLevel)),
         )
     else:
         raise ValueError(

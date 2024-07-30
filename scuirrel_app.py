@@ -114,7 +114,9 @@ application, please use the access code provided by your administrator to create
             )
 
     # Server functions for the different tabs are found in their respective modules
-    chat = chat_server("chat", user=user, sID=sID, postgresUser=shared.postgresScuirrel, pool=pool)
+    chat = chat_server(
+        "chat", user=user, sID=sID, postgresUser=shared.postgresScuirrel, pool=pool
+    )
 
     # Code to run at the END of the session (i.e. when user disconnects)
     _ = session.on_ended(lambda: theEnd())

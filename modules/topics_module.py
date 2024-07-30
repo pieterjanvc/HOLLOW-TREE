@@ -27,7 +27,8 @@ def topics_ui():
                         ui.input_action_button(
                             "tArchive", "Archive selected", width="180px"
                         ),
-                    )),
+                    ),
+                ),
             ),
             # Table of concepts per topic with option to add, edit or archive
             ui.panel_conditional(
@@ -68,13 +69,14 @@ def topics_server(
     @reactive.effect
     @reactive.event(groups)
     def _():
-
         if groups.get().shape[0] == 0:
-            shared.inputNotification(session, "gID", "Create a group (groups tab) before adding topics")
+            shared.inputNotification(
+                session, "gID", "Create a group (groups tab) before adding topics"
+            )
             return
         else:
             shared.inputNotification(session, "gID", show=False)
-        
+
         ui.update_select(
             "gID",
             choices=dict(
@@ -366,13 +368,13 @@ def topics_server(
         # Add new topic to DB
         order = concepts.get()["order"].tolist()
         order = 1 if len(order) == 0 else max(order) + 1
-        
+
         conn = shared.appDBConn(postgresUser=postgresUser)
         cursor = conn.cursor()
         _ = shared.executeQuery(
             cursor,
             'INSERT INTO "concept"("sID", "tID", "order", "concept", "created", "modified") VALUES(?, ?, ?, ?, ?, ?)',
-            (sID, input.tID(), int(order) ,input.ncInput(), shared.dt(), shared.dt()),
+            (sID, input.tID(), int(order), input.ncInput(), shared.dt(), shared.dt()),
         )
         conceptList = shared.pandasQuery(
             conn,

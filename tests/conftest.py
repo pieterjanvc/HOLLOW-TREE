@@ -14,20 +14,31 @@ vectorDB = os.path.join(curDir, "..", "appData", "vectordb.duckdb")
 testDB = os.path.join(curDir, "..", "appData", "accorns-test.db")
 scuirrelOnlyDB = os.path.join(curDir, "..", "appData", "scuirrelOnly-test.db")
 
+
 # Add a command line option to save the database after the test
 def pytest_addoption(parser):
     parser.addoption(
-        "--save", action="store_true", default=False, help="Save the database after the test with unique name"
+        "--save",
+        action="store_true",
+        default=False,
+        help="Save the database after the test with unique name",
     )
     parser.addoption(
-        "--newVectorDB", action="store_true", default=False, help="Test vector database file insertion"
+        "--newVectorDB",
+        action="store_true",
+        default=False,
+        help="Test vector database file insertion",
     )
     parser.addoption(
-        "--scuirrelOnly", action="store_true", default=False, help="Test SCUIRREL only (test database must be present)"
+        "--scuirrelOnly",
+        action="store_true",
+        default=False,
+        help="Test SCUIRREL only (test database must be present)",
     )
     parser.addoption(
         "--accornsOnly", action="store_true", default=False, help="Test ACCORNS only"
     )
+
 
 @pytest.fixture
 def cmdopt(request):
@@ -35,12 +46,12 @@ def cmdopt(request):
         "save": request.config.getoption("--save"),
         "newVectorDB": request.config.getoption("--newVectorDB"),
         "scuirrelOnly": request.config.getoption("--scuirrelOnly"),
-        "accornsOnly": request.config.getoption("--accornsOnly")
-        }
+        "accornsOnly": request.config.getoption("--accornsOnly"),
+    }
+
 
 # Code to run before and after the test session
 def pytest_sessionstart(session):
-
     if session.config.getoption("--scuirrelOnly"):
         if not os.path.exists(testDB):
             raise ConnectionError(
@@ -48,29 +59,27 @@ def pytest_sessionstart(session):
             )
         copyfile(testDB, appDB)
         return
-    
+
     # Backup existing databases
     if os.path.exists(appDB):
-            os.rename(appDB, appDB + ".bak")
+        os.rename(appDB, appDB + ".bak")
     if os.path.exists(vectorDB):
-            copyfile(vectorDB, vectorDB + ".bak")
-    
-    
+        copyfile(vectorDB, vectorDB + ".bak")
+
 
 def pytest_sessionfinish(session, exitstatus):
-    
     if session.config.getoption("--scuirrelOnly"):
         if os.path.exists(scuirrelOnlyDB):
             os.remove(scuirrelOnlyDB)
         os.rename(appDB, scuirrelOnlyDB)
 
-        return  
-    
+        return
+
     # Rename the test database to accorns-test.db and the original database back to accorns.db
-    #overwrite last test database if needed
+    # overwrite last test database if needed
     if os.path.exists(testDB):
         os.remove(testDB)
-    
+
     if session.config.getoption("--save"):
         os.rename(appDB, f"appData/accorns-test_{int(datetime.now().timestamp())}.db")
     else:
@@ -78,11 +87,12 @@ def pytest_sessionfinish(session, exitstatus):
 
     if os.path.exists(appDB + ".bak"):
         os.rename(appDB + ".bak", appDB)
-    
+
     # Restore the original vector database
     if os.path.exists(vectorDB + ".bak"):
         os.remove(vectorDB)
         os.rename(vectorDB + ".bak", vectorDB)
+
 
 @contextmanager
 def appDBConn(remoteAppDB=False, postgresHost="localhost"):
@@ -99,14 +109,15 @@ def appDBConn(remoteAppDB=False, postgresHost="localhost"):
             raise ConnectionError(
                 "The app database was not found. Please run ACCORNS first"
             )
-        conn =  sqlite3.connect(appDB)
-    
+        conn = sqlite3.connect(appDB)
+
     try:
         yield conn
     finally:
         conn.close()
 
-def dbQuery(conn, query, params=(),insert = False, remoteAppDB=False):
+
+def dbQuery(conn, query, params=(), insert=False, remoteAppDB=False):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         if insert:
@@ -114,10 +125,8 @@ def dbQuery(conn, query, params=(),insert = False, remoteAppDB=False):
             _ = cursor.execute(query, params)
             conn.commit()
             return
-        else: 
+        else:
             query = query.replace("?", "%s") if remoteAppDB else query
             q = pd.read_sql_query(sql=query, con=conn, params=params)
-    
+
     return q
-
-
