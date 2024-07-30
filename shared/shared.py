@@ -32,7 +32,8 @@ from htmltools import HTML
 # --- VARIABLES ---
 
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
-adminLevels = {0: "anonymous", 1: "User", 2: "Instructor", 3: "Admin"}
+adminLevels = {0: "Anonymous", 1: "User", 2: "Instructor", 3: "Admin"}
+groupAdminLevels = {0: "Anonymous", 1: "User", 2: "Admin"}
 codeTypes = {0: "accessCode", 1: "resetCode", 2: "groupCode"}
 
 with open(os.path.join(curDir, "shared_config.toml"), "r") as f:
@@ -346,13 +347,14 @@ def generate_access_codes(
 
 
 # Check if the access code has not been used yet
-def accessCodeCheck(conn, accessCode, codeType, uID=None):
+def accessCodeCheck(conn, accessCode, codeType, uID=None, minAdminLevel=0):
+
     # Check the access code (must be valid and not used yet)
     if codeType == 0:
         code = pandasQuery(
             conn,
-            'SELECT * FROM "accessCode" WHERE "code" = ? AND "codeType" = 0 AND "used" IS NULL',
-            (accessCode,),
+            'SELECT * FROM "accessCode" WHERE "code" = ? AND "codeType" = 0 AND "used" IS NULL AND "adminLevel" >= ?',
+            (accessCode,int(minAdminLevel)),
         )
     elif codeType == 1:
         code = pandasQuery(
@@ -363,8 +365,8 @@ def accessCodeCheck(conn, accessCode, codeType, uID=None):
     elif codeType == 2:
         code = pandasQuery(
             conn,
-            'SELECT * FROM "accessCode" WHERE "code" = ? AND "codeType" = 2 AND used IS NULL',
-            (accessCode,),
+            'SELECT * FROM "accessCode" WHERE "code" = ? AND "codeType" = 2 AND used IS NULL AND "adminLevel" >= ?',
+            (accessCode,int(minAdminLevel)),
         )
     else:
         raise ValueError(

@@ -14,6 +14,9 @@ from shutil import move
 import toml
 from urllib.request import urlretrieve
 from tempfile import TemporaryDirectory
+import nest_asyncio
+
+nest_asyncio.apply()
 
 # -- Llamaindex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext

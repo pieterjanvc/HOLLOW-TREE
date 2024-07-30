@@ -22,7 +22,8 @@ groupQuery = (
     'SELECT * FROM "group" WHERE "gID" IN ('
     'SELECT "gID" FROM "group_member" WHERE "uID" = ?)'
 )
-
+# Ignore the anonymous group
+groupAdminLevels = {k: shared.groupAdminLevels[k] for k in list(shared.groupAdminLevels.keys())[1:]}
 # ---- UI ----
 
 
@@ -52,7 +53,7 @@ def groups_ui():
                 ui.input_numeric(
                     "numCodes", "Number of codes to generate", value=1, min=1, max=500
                 ),
-                ui.input_select("role", "Role", choices={1: "User", 2: "Admin"}),
+                ui.input_select("role", "Role", choices=groupAdminLevels),
                 ui.input_text("note", "(optional) Reason for generating codes"),
                 ui.input_action_button(
                     "generateCodes", "Generate new codes", width="230px"

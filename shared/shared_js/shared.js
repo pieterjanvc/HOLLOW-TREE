@@ -26,7 +26,7 @@ function hideShow(x, element) {
 
 Shiny.addCustomMessageHandler("hideShow", function(x) {
 
-    if (document.getElementById(x.id)) {
+    if (document.getElementById(x.id)) {        
         hideShow(x.effect,document.getElementById(x.id));
         // Check for elements with a "for" attribute with the same ID (e.g. select box labels)
         if (document.querySelector('[for="' + x.id + '"]')) {

@@ -6,9 +6,11 @@ import warnings
 import sqlite3
 import psycopg2
 from contextlib import contextmanager
+from shutil import copyfile
 
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 appDB = os.path.join(curDir, "..", "appData", "accorns.db")
+vectorDB = os.path.join(curDir, "..", "appData", "vectordb.duckdb")
 testDB = os.path.join(curDir, "..", "appData", "accorns-test.db")
 
 # Add a command line option to save the database after the test
@@ -16,16 +18,24 @@ def pytest_addoption(parser):
     parser.addoption(
         "--save", action="store_true", default=False, help="Save the database after the test with unique name"
     )
+    parser.addoption(
+        "--testVectorDB", action="store_true", default=False, help="Test vector database file insertion"
+    )
 
 @pytest.fixture
-def save(request):
-    return request.config.getoption("--save")
+def cmdopt(request):
+    return {
+        "save": request.config.getoption("--save"),
+        "testVectorDB": request.config.getoption("--testVectorDB")
+        }
 
 # Code to run before and after the test session
 def pytest_sessionstart(session):
-    print("pytest_sessionstart")
+    # Backup existing databases
     if os.path.exists(appDB):
             os.rename(appDB, appDB + ".bak")
+    if os.path.exists(vectorDB):
+            copyfile(vectorDB, vectorDB + ".bak")
 
 def pytest_sessionfinish(session, exitstatus):
     # Rename the test database to accorns-test.db and the original database back to accorns.db
@@ -40,6 +50,11 @@ def pytest_sessionfinish(session, exitstatus):
 
     if os.path.exists(appDB + ".bak"):
         os.rename(appDB + ".bak", appDB)
+    
+    # Restore the original vector database
+    if os.path.exists(vectorDB + ".bak"):
+        os.remove(vectorDB)
+        os.rename(vectorDB + ".bak", vectorDB)
 
 @contextmanager
 def appDBConn(remoteAppDB=False, postgresHost="localhost"):

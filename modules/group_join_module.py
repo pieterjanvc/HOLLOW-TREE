@@ -56,6 +56,12 @@ def group_join_server(
             conn.close()
             return None
 
+        invalid = code["adminLevel"].iloc[0] < 2
+        if invalid:
+            shared.inputNotification(session, "accessCode", "This access code only allows to join groups as a user in SCUIRREL")
+            conn.close()
+            return None
+
         invalid = groups.get()[groups.get()["gID"] == int(code["gID"].iloc[0])]
         if invalid.shape[0] > 0:
             shared.inputNotification(

@@ -18,14 +18,16 @@ def topics_ui():
             ui.card(
                 ui.card_header("Topic"),
                 ui.input_select("gID", "Group", choices={}, width="400px"),
-                ui.input_select("tID", "Pick a topic", choices=[], width="400px"),
-                div(
-                    ui.input_action_button("tAdd", "Add new", width="180px"),
-                    ui.input_action_button("tEdit", "Edit selected", width="180px"),
-                    ui.input_action_button(
-                        "tArchive", "Archive selected", width="180px"
-                    ),
-                ),
+                ui.panel_conditional(
+                    "input.gID",
+                    ui.input_select("tID", "Pick a topic", choices=[], width="400px"),
+                    div(
+                        ui.input_action_button("tAdd", "Add new", width="180px"),
+                        ui.input_action_button("tEdit", "Edit selected", width="180px"),
+                        ui.input_action_button(
+                            "tArchive", "Archive selected", width="180px"
+                        ),
+                    )),
             ),
             # Table of concepts per topic with option to add, edit or archive
             ui.panel_conditional(
@@ -66,6 +68,13 @@ def topics_server(
     @reactive.effect
     @reactive.event(groups)
     def _():
+
+        if groups.get().shape[0] == 0:
+            shared.inputNotification(session, "gID", "Create a group (groups tab) before adding topics")
+            return
+        else:
+            shared.inputNotification(session, "gID", show=False)
+        
         ui.update_select(
             "gID",
             choices=dict(
@@ -355,12 +364,15 @@ def topics_server(
             return
 
         # Add new topic to DB
+        order = concepts.get()["order"].tolist()
+        order = 1 if len(order) == 0 else max(order) + 1
+        
         conn = shared.appDBConn(postgresUser=postgresUser)
         cursor = conn.cursor()
         _ = shared.executeQuery(
             cursor,
-            'INSERT INTO "concept"("sID", "tID", "concept", "created", "modified") VALUES(?, ?, ?, ?, ?)',
-            (sID, input.tID(), input.ncInput(), shared.dt(), shared.dt()),
+            'INSERT INTO "concept"("sID", "tID", "order", "concept", "created", "modified") VALUES(?, ?, ?, ?, ?, ?)',
+            (sID, input.tID(), int(order) ,input.ncInput(), shared.dt(), shared.dt()),
         )
         conceptList = shared.pandasQuery(
             conn,
