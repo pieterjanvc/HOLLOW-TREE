@@ -100,7 +100,7 @@ application, please use the access code provided by your administrator to create
                         ),
                         login_ui("login"),
                     ),
-                    id="tab",
+                    id="preLoginTabs",
                 )
             )
         else:
@@ -109,6 +109,7 @@ application, please use the access code provided by your administrator to create
                 ui.navset_pill(
                     # TAB 2 - CHAT
                     ui.nav_panel("SCUIRREL", chat_ui("chat"), value="cTab"),
+                    id="postLoginTabs",
                 )
             )
 

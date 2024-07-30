@@ -19,18 +19,24 @@ curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 #   pytest tests\test_accorns.py 
 #       Optional arguments:
 #       --headed (browser is visible)
-#       --slowmo 200 (slow down every action by 500ms to see what's happening)
+#       --slowmo 200 (slows down every action by x ms to better see what's happening)
 #       --save (save timestamped database, otherwise overwrite previous test database)
-#       --testVectorDB (test the vector database, uses more GPT tokens)
+#       --newVectorDB (test the vector database, uses more GPT tokens)
+#       --scuirrelOnly (test SCUIRREL only, requires existing test database)
+#       --accornsOnly (test ACCORNS only)
 
 
 # Initialise Shiny app
-app = create_app_fixture("../accorns_app.py")
+accornsApp = create_app_fixture(os.path.join(curDir,"..","accorns_app.py"))
 
-def test_accorns(page: Page, app: ShinyAppProc, cmdopt):
+def test_accorns(page: Page, accornsApp: ShinyAppProc, cmdopt):
+
+    # Ignore this test if the scuirrelOnly flag is set
+    if cmdopt["scuirrelOnly"]:
+        return
     
     #Start app
-    page.goto(app.url)
+    page.goto(accornsApp.url)
     page.wait_for_load_state("networkidle")
 
     with appDBConn() as conn:
@@ -100,7 +106,7 @@ def test_accorns(page: Page, app: ShinyAppProc, cmdopt):
         controller.OutputDataFrame(page, "vectorDB-filesTable").select_rows([0])
         controller.OutputUi(page, "vectorDB-fileInfo").expect_container_tag("div")
         
-        if cmdopt["testVectorDB"]:
+        if cmdopt["newVectorDB"]:
             controller.InputFile(page, "vectorDB-newFile").set(os.path.join(curDir, "testData", "MendelianInheritance.txt"),
                                                     expect_complete_timeout=10000)
             # If successful, the file will be added to the table
@@ -156,11 +162,27 @@ def test_accorns(page: Page, app: ShinyAppProc, cmdopt):
         controller.NavPanel(page, id = "postLoginTabs", data_value="qTab").click(timeout=10000)
         
         # Add a new quiz question
-        if cmdopt["testVectorDB"]:
+        if cmdopt["newVectorDB"]:
             controller.InputActionButton(page, "quizGeneration-qGenerate").click(timeout=10000)
             page.get_by_text(re.compile("Correct answer:"), exact=False).wait_for(timeout=10000) 
             q = dbQuery(conn, 'SELECT "optionA" FROM "question"')
             controller.InputText(page, "quizGeneration-rqOA").expect_value(q["optionA"].iloc[0])
+        else:
+            dbQuery(
+                conn,
+                ('INSERT INTO "question" ("qID", "sID", "tID", "cID", "question",' 
+                 '"answer", "archived", "created", "modified", "optionA", "explanationA",' 
+                 '"optionB", "explanationB", "optionC", "explanationC", "optionD", "explanationD")' 
+                 'VALUES (\'1\', \'1\', \'2\', \'11\',' 
+                 '\'What was Gregor Mendel\'\'s occupation in the nineteenth century?\',' 
+                 '\'A\', \'0\', \'2024-07-30 10:27:34\', \'2024-07-30 10:27:34\',' 
+                 '\'Monk\',\'Correct! Gregor Mendel was a nineteenth-century Moravian monk who' 
+                 'conducted hybridization experiments with pea plants.\', \'Scientist\',' 
+                 '\'Incorrect. While Gregor Mendel is known for his scientific work, his occupation' 
+                 'was actually a monk.\', \'Farmer\', \'Incorrect. Gregor Mendel was not a farmer;' 
+                 'he was a monk who conducted experiments with pea plants.\', \'Politician\',' 
+                 '\'Incorrect. Gregor Mendel was not a politician; he was a monk who made significant' 
+                 'contributions to the field of genetics.\');'), insert=True)
 
         # End the session and start new one
         page.reload()
@@ -220,7 +242,7 @@ def test_accorns(page: Page, app: ShinyAppProc, cmdopt):
         controller.InputActionButton(page, "groups-joinGroup-joinGroup").click(timeout=10000)
         controller.InputText(page, "groups-joinGroup-accessCode").set(accessCodes["code"].iloc[4], timeout=10000)
         controller.InputActionButton(page, "groups-joinGroup-submitJoin").click(timeout=10000)
-        page.get_by_text("This access code only allows to join groups as a user in SCUIRREL").wait_for(timeout=10000)
+        page.get_by_text("This access code only allows you to join this group as a user in SCUIRREL").wait_for(timeout=10000)
         controller.InputText(page, "groups-joinGroup-accessCode").set(accessCodes["code"].iloc[5], timeout=10000)
         controller.InputActionButton(page, "groups-joinGroup-submitJoin").click(timeout=10000)
         controller.InputSelect(page, "groups-gID").expect_selected("2", timeout=10000)
@@ -232,9 +254,48 @@ def test_accorns(page: Page, app: ShinyAppProc, cmdopt):
         assert q["uID"].iloc[0] == 2
         assert not q.loc[:, q.columns != 'error'].iloc[0].isna().any()
 
-        
+# Initialise Shiny app
+scuirrelApp = create_app_fixture(os.path.join(curDir,"..","scuirrel_app.py"))
 
+def test_scuirrel(page: Page, scuirrelApp: ShinyAppProc, cmdopt):
 
+    # Ignore this test if the scuirrelOnly flag is set
+    if cmdopt["accornsOnly"]:
+        return
+    
+    #Start app
+    page.goto(scuirrelApp.url)
+    page.wait_for_load_state("networkidle")       
 
+    with appDBConn() as conn:
+        #LOGIN TAB      
+        controller.InputText(page, "login-lUsername").set("testUser", timeout=10000)
+        controller.InputPassword(page, "login-lPassword").set("user123ABC!", timeout=10000)
+        controller.InputActionButton(page, "login-login").click(timeout=10000)
+        # Check if all the tabs are visible
+        controller.NavsetPill(page, id = "postLoginTabs").expect_nav_values(["cTab"])
 
+        # Join a group
+        accessCodes = dbQuery(conn, 'SELECT * FROM "accessCode" WHERE "aID" = 5')
+        controller.InputActionButton(page, "chat-joinGroup-joinGroup").click(timeout=10000)
+        controller.InputText(page, "chat-joinGroup-accessCode").set(accessCodes["code"].iloc[0], timeout=10000)
+        controller.InputActionButton(page, "chat-joinGroup-submitJoin").click(timeout=10000)
+        controller.InputSelect(page, "chat-gID").set("2", timeout=10000)
 
+        # Chat with SCUIRREL
+        controller.InputActionButton(page, "chat-startConversation").click(timeout=10000)
+        page.get_by_text(re.compile(r"What do you already know about this?"), exact=False).wait_for(timeout=15000)
+        controller.InputTextArea(page, "chat-newChat").set("I don't know much about this yet", timeout=10000)
+        controller.InputActionButton(page, "chat-send").click(timeout=10000)
+        page.get_by_text("Scuirrel is foraging for an answer ...").wait_for(timeout=15000)
+        page.locator('[onclick="chatSelection(this,2)"]').wait_for(state="visible", timeout=10000)        
+        controller.InputTextArea(page, "chat-newChat").set("Gregor Mendel was a nineteenth-century monk", timeout=10000)
+        controller.InputActionButton(page, "chat-send").click(timeout=10000)
+        page.get_by_text("Well done! It seems you have demonstrated understanding of everything we wanted you to know about: Mendelian Inheritance").wait_for(timeout=15000)
+
+        # Take a quiz question
+        q = dbQuery(conn, 'SELECT * FROM "question" WHERE "qID" = 1')
+        controller.InputActionButton(page, "chat-quiz-quizQuestion").click(timeout=10000)
+        controller.InputRadioButtons(page, "chat-quiz-quizOptions").set(q["answer"].iloc[0], timeout=10000)
+        controller.InputActionButton(page, "chat-quiz-checkAnswer").click(timeout=10000)
+        page.get_by_text(q["explanation" + q["answer"].iloc[0]].iloc[0]).wait_for(timeout=10000)

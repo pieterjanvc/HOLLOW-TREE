@@ -56,9 +56,9 @@ def group_join_server(
             conn.close()
             return None
 
-        invalid = code["adminLevel"].iloc[0] < 2
+        invalid = code["adminLevel"].iloc[0] < 2 and postgresUser == shared.postgresAccorns
         if invalid:
-            shared.inputNotification(session, "accessCode", "This access code only allows to join groups as a user in SCUIRREL")
+            shared.inputNotification(session, "accessCode", "This access code only allows you to join this group as a user in SCUIRREL")
             conn.close()
             return None
 
