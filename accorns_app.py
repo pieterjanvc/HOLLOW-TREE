@@ -19,6 +19,7 @@ from modules.groups_module import groups_ui, groups_server
 # -- General
 import os
 import traceback
+import concurrent.futures
 
 # -- Shiny
 from shiny import App, reactive, render, ui
@@ -26,14 +27,14 @@ from htmltools import HTML
 
 # The following is needed to prevent async issues when inserting new data in vector DB
 # https://github.com/run-llama/llama_index/issues/9978
-import nest_asyncio
-
-nest_asyncio.apply()
+# import nest_asyncio
+# nest_asyncio.apply()
 
 # ----------- SHINY APP -----------
 # *********************************
 
 uID = reactive.value(0)  # if registered admins make reactive later
+pool = concurrent.futures.ThreadPoolExecutor()
 
 # --- SETUP and CHECKS ---
 # Generate local databases if needed
@@ -114,7 +115,7 @@ def server(input, output, session):
                         ),
                         login_ui("login"),
                     ),
-                    id="tab",
+                    id="preLoginTabs",
                 )
             )
         else:
@@ -128,7 +129,7 @@ def server(input, output, session):
                         value="vTab",
                     ),
                     # TAB 3 - TOPICS
-                    ui.nav_panel("Groups", groups_ui("groups"), value="tTab"),
+                    ui.nav_panel("Groups", groups_ui("groups"), value="gTab"),
                     # TAB 4 - TOPICS
                     ui.nav_panel("Topics", topics_ui("topics"), value="tTab"),
                     # TAB 5 - QUIZ QUESTIONS
@@ -140,8 +141,11 @@ def server(input, output, session):
                     ),
                     # TAB 6 - USER MANAGEMENT
                     ui.nav_panel(
-                        "User Management", user_management_ui("testUI"), value="uTab"
+                        "User Management",
+                        user_management_ui("userManagement"),
+                        value="uTab",
                     ),
+                    id="postLoginTabs",
                 )
             )
 
@@ -152,10 +156,19 @@ def server(input, output, session):
     topics, concepts = topics_server(
         "topics", sID=sID, user=user, groups=groups, postgresUser=shared.postgresAccorns
     )
-    _ = user_management_server("testUI", user=user, postgresUser=shared.postgresAccorns)
-    index, files = vectorDB_management_server("vectorDB", user=user)
+    _ = user_management_server(
+        "userManagement", user=user, postgresUser=shared.postgresAccorns
+    )
+    index, files = vectorDB_management_server("vectorDB", user=user, pool=pool)
     _ = quiz_generation_server(
-        "quizGeneration", sID=sID, index=index, topics=topics, user=user
+        "quizGeneration",
+        sID=sID,
+        index=index,
+        user=user,
+        topicsx=topics,
+        groups=groups,
+        postgresUser=shared.postgresAccorns,
+        pool=pool,
     )
 
     # Code to run at the END of the session (i.e. when user disconnects)
@@ -187,3 +200,4 @@ def server(input, output, session):
 
 
 app = App(app_ui, server)
+app.on_shutdown(pool.shutdown)

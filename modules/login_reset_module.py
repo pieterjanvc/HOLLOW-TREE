@@ -85,7 +85,9 @@ def login_reset_server(
             return
 
         # Generate a new reset code
-        code = shared.generate_access_codes(cursor=cursor, creatorID=uID, userID=uID)
+        code = shared.generate_access_codes(
+            cursor=cursor, codeType=1, creatorID=uID, userID=uID
+        )
         conn.commit()
         conn.close()
 

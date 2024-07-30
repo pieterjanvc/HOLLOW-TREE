@@ -10,6 +10,7 @@ import SCUIRREL.scuirrel_shared as scuirrel_shared
 import json
 from html import escape
 import pandas as pd
+import asyncio
 
 # -- Shiny
 from shiny import Inputs, Outputs, Session, module, reactive, ui, render
@@ -18,7 +19,9 @@ from htmltools import HTML, div
 
 # ---- VARS & FUNCTIONS ----
 def groupQuery(uID, postgresUser, demo=shared.addDemo):
-    includeDemo = ' OR g."gID" = 1' if demo else ""
+    includeDemo = (
+        'UNION SELECT "gID", "group" FROM "group" WHERE "gID" = 1 ' if demo else ""
+    )
     conn = shared.appDBConn(postgresUser)
     getGroups = shared.pandasQuery(
         conn,
@@ -127,7 +130,7 @@ def chat_ui():
 
 @module.server
 def chat_server(
-    input: Inputs, output: Outputs, session: Session, user, sID, postgresUser
+    input: Inputs, output: Outputs, session: Session, user, sID, postgresUser, pool
 ):
     # Reactive variables
     discussionID = reactive.value(0)  # Current conversation
@@ -292,17 +295,13 @@ def chat_server(
         # Prevent new chat whilst LLM is working and show waiting message
         shared.elementDisplay("waitResp", "s", session)
         shared.elementDisplay("chatIn", "h", session)
+
         # Add the user message
         msg = messages.get()
         msg.add_message(
             isBot=0,
             cID=int(concepts().iloc[conceptIndex.get()]["cID"]),
             content=newChat,
-        )
-        messages.set(msg)
-        # Generate chat logs
-        conversation = (
-            botLog.get() + "\n---- NEW RESPONSE FROM STUDENT ----\n" + newChat
         )
         ui.insert_ui(
             HTML(
@@ -313,15 +312,18 @@ def chat_server(
         botLog.set(botLog.get() + f"\n--- STUDENT:\n{newChat}")
         topic = topics()[topics()["tID"] == int(input.selTopic())].iloc[0]["topic"]
         scrollElement(".chatWindow .card-body")
+        messages.set(msg)
+        # Generate chat logs
+        conversation = (
+            botLog.get() + "\n---- NEW RESPONSE FROM STUDENT ----\n" + newChat
+        )
         # Send the message to the LLM for processing
         botResponse(topic, concepts(), conceptIndex.get(), conversation)
 
-    # Async Shiny task waiting for LLM reply
-    @reactive.extended_task
-    async def botResponse(topic, concepts, cIndex, conversation):
+    def botResponse_task(topic, concepts, cIndex, conversation):
         # Check the student's progress on the current concept based on the last reply (other engine)
         engine = scuirrel_shared.progressCheckEngine(
-            conversation, topic, concepts, cIndex
+            conversation, topic, concepts, cIndex, postgresUser=postgresUser
         )
         tries = 0
         while tries < 3:
@@ -347,6 +349,14 @@ def chat_server(
             resp = str(engine.query(conversation))
 
         return {"resp": resp, "eval": eval}
+
+    # Async Shiny task waiting for LLM reply
+    @reactive.extended_task
+    async def botResponse(topic, concepts, cIndex, conversation):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            pool, botResponse_task, topic, concepts, cIndex, conversation
+        )
 
     # Processing LLM responses
     @reactive.effect

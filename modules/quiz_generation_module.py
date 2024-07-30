@@ -7,6 +7,7 @@ import ACCORNS.accorns_shared as accorns_shared
 # -- General
 import pandas as pd
 import json
+import asyncio
 
 # -- Shiny
 from shiny import Inputs, Outputs, Session, module, reactive, ui, render
@@ -25,6 +26,7 @@ def quiz_generation_ui():
         ui.card(
             ui.card_header("Questions by Topic"),
             # Dropdown of topics and questions per topic
+            ui.input_select("gID", "Group", choices={}),
             ui.input_select("qtID", "Pick a topic", choices=[], width="400px"),
             ui.input_select("qID", "Question", choices=[], width="400px"),
             # Buttons to add or archive questions and message when busy generating
@@ -87,15 +89,52 @@ def quiz_generation_ui():
 # --- Server ---
 @module.server
 def quiz_generation_server(
-    input: Inputs, output: Outputs, session: Session, sID, index, topics, user
+    input: Inputs,
+    output: Outputs,
+    session: Session,
+    sID,
+    index,
+    user,
+    topicsx,
+    groups,
+    postgresUser,
+    pool,
 ):
-    # Set the topics
+    topics = reactive.value(None)
+
     @reactive.effect
-    @reactive.event(topics)
+    @reactive.event(groups)
     def _():
         ui.update_select(
-            "qtID", choices=dict(zip(topics.get()["tID"], topics.get()["topic"]))
+            "gID",
+            choices=dict(
+                zip(groups.get()["gID"].tolist(), groups.get()["group"].tolist())
+            ),
         )
+
+    @reactive.effect
+    @reactive.event(input.gID, topicsx)
+    def _():
+        # req(user.get()["uID"] != 1)
+
+        # Get all active topics from the accorns database
+        conn = shared.appDBConn(postgresUser=postgresUser)
+        activeTopics = shared.pandasQuery(
+            conn,
+            (
+                "SELECT t.* FROM \"topic\" AS 't', \"group_topic\" AS 'gt' "
+                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '
+                'ORDER BY t."topic"'
+            ),
+            (int(input.gID()),),
+        )
+        conn.close()
+
+        ui.update_select(
+            "qtID", choices=dict(zip(activeTopics["tID"], activeTopics["topic"]))
+        )
+
+        topics.set(activeTopics)
 
     @render.ui
     def quizQuestionPreview():
@@ -242,9 +281,7 @@ def quiz_generation_server(
 
         botResponse(quizEngine(), info, cID)
 
-    # Async Shiny task waiting for LLM reply
-    @reactive.extended_task
-    async def botResponse(quizEngine, info, cID):
+    def botResponse_task(quizEngine, info, cID):
         # Given the LLM output might not be correct format (or fails to convert to a DF, try again if needed)
         valid = False
         tries = 0
@@ -260,6 +297,12 @@ def quiz_generation_server(
                 tries += 1
 
         return {"resp": resp, "cID": cID}
+
+    # Async Shiny task waiting for LLM reply
+    @reactive.extended_task
+    async def botResponse(quizEngine, info, cID):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(pool, botResponse_task, quizEngine, info, cID)
 
     # Processing LLM response
     @reactive.effect
@@ -334,6 +377,14 @@ def quiz_generation_server(
             f'SELECT "qID", "question" FROM "question" WHERE "tID" = {int(input.qtID())} AND "archived" = 0',
         )
         conn.close()
+
+        if q.shape[0] == 0:
+            shared.elementDisplay("qID", "h", session)
+            shared.elementDisplay("qArchive", "h", session)
+        else:
+            shared.elementDisplay("qID", "s", session)
+            shared.elementDisplay("qArchive", "s", session)
+
         # Update the UI
         ui.update_select("qID", choices=dict(zip(q["qID"], q["question"])))
 

@@ -12,6 +12,7 @@ from modules.feedback_module import feedback_ui, feedback_server
 # General
 import os
 import traceback
+import concurrent.futures
 
 # -- Shiny
 from shiny import App, reactive, render, ui
@@ -28,6 +29,7 @@ if shared.remoteAppDB:
 # ********************
 
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+pool = concurrent.futures.ThreadPoolExecutor()
 
 # --- UI LAYOUT ---
 # Add some JS so that pressing enter can send the message too
@@ -98,7 +100,7 @@ application, please use the access code provided by your administrator to create
                         ),
                         login_ui("login"),
                     ),
-                    id="tab",
+                    id="preLoginTabs",
                 )
             )
         else:
@@ -107,11 +109,14 @@ application, please use the access code provided by your administrator to create
                 ui.navset_pill(
                     # TAB 2 - CHAT
                     ui.nav_panel("SCUIRREL", chat_ui("chat"), value="cTab"),
+                    id="postLoginTabs",
                 )
             )
 
     # Server functions for the different tabs are found in their respective modules
-    chat = chat_server("chat", user=user, sID=sID, postgresUser=shared.postgresScuirrel)
+    chat = chat_server(
+        "chat", user=user, sID=sID, postgresUser=shared.postgresScuirrel, pool=pool
+    )
 
     # Code to run at the END of the session (i.e. when user disconnects)
     _ = session.on_ended(lambda: theEnd())
@@ -148,3 +153,4 @@ application, please use the access code provided by your administrator to create
 
 
 app = App(app_ui, server)
+app.on_shutdown(pool.shutdown)

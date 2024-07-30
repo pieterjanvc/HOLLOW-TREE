@@ -217,21 +217,19 @@ def login_server(
         conn.commit()
         conn.close()
 
-        user.set(newUser.to_dict(orient="records")[0])
-
         # Clear the input fields
         ui.update_text_area("cUsername", value="")
         ui.update_text_area("cPassword", value="")
         ui.update_text_area("cPassword2", value="")
         ui.update_text_area("cAccessCode", value="")
 
-        ui.notification_show("Account created successfully")
+        ui.notification_show("Account created successfully. Please login")
 
     # Reset password
     @reactive.effect
     @reactive.event(input.showReset)
     def _():
-        ui.modal_show(ui.modal(login_reset_ui("login_reset")))
-        _ = login_reset_server("login_reset", postgresUser=postgresUser)
+        ui.modal_show(ui.modal(login_reset_ui("loginReset")))
+        _ = login_reset_server("loginReset", postgresUser=postgresUser)
 
     return user

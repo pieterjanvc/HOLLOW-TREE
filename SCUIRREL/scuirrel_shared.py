@@ -151,7 +151,7 @@ interesting
 
 
 # Monitoring Agent - Adapt the chat engine to the topic
-def progressCheckEngine(conversation, topic, concepts, cIndex):
+def progressCheckEngine(conversation, topic, concepts, cIndex, postgresUser):
     cDone = (
         ""
         if cIndex == 0
@@ -212,7 +212,7 @@ Please output your score in the following format:"""
     ]
     refine_template = ChatPromptTemplate(chat_refine_msgs)
 
-    index = shared.getIndex("scuirrel", postgresUser=shared.postgresScuirrel)
+    index = shared.getIndex("scuirrel", postgresUser=postgresUser)
 
     return index.as_query_engine(
         text_qa_template=text_qa_template,
