@@ -122,7 +122,7 @@ def quiz_generation_server(
         activeTopics = shared.pandasQuery(
             conn,
             (
-                "SELECT t.* FROM \"topic\" AS 't', \"group_topic\" AS 'gt' "
+                "SELECT t.* FROM \"topic\" AS t, \"group_topic\" AS gt "
                 'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '
                 'ORDER BY t."topic"'
             ),

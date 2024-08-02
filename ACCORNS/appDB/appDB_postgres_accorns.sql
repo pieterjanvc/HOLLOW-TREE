@@ -33,6 +33,28 @@ CREATE TABLE "user" (
   "modified" TEXT
 );
 
+CREATE TABLE "session" (
+	"sID" SERIAL PRIMARY KEY,
+  "uID" INTEGER,
+  "appID" INTEGER,
+  "start" TEXT,
+  "end" TEXT,
+  "shinyToken" TEXT,
+  "error" TEXT,
+	FOREIGN KEY("uID") REFERENCES "user"("uID") 
+		ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE "topic" (
+	"tID" SERIAL PRIMARY KEY,
+  "sID" INTEGER,
+	"topic" TEXT,
+  "archived" INTEGER DEFAULT 0,
+  "created" TEXT,
+  "modified" TEXT,
+  "description" TEXT
+);
+
 CREATE TABLE "group" (
   "gID" SERIAL PRIMARY KEY,
   "sID" INTEGER,
@@ -87,28 +109,6 @@ CREATE TABLE "accessCode" (
     ON DELETE CASCADE ON UPDATE CASCADE,
   FOREIGN KEY("gID") REFERENCES "group"("gID")
     ON DELETE CASCADE ON UPDATE CASCADE
-);
-
-CREATE TABLE "session" (
-	"sID" SERIAL PRIMARY KEY,
-  "uID" INTEGER,
-  "appID" INTEGER,
-  "start" TEXT,
-  "end" TEXT,
-  "shinyToken" TEXT,
-  "error" TEXT,
-	FOREIGN KEY("uID") REFERENCES "user"("uID") 
-		ON DELETE CASCADE ON UPDATE CASCADE
-);
-
-CREATE TABLE "topic" (
-	"tID" SERIAL PRIMARY KEY,
-  "sID" INTEGER,
-	"topic" TEXT,
-  "archived" INTEGER DEFAULT 0,
-  "created" TEXT,
-  "modified" TEXT,
-  "description" TEXT
 );
 
 CREATE TABLE "concept" (

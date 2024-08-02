@@ -7,16 +7,15 @@
 from shiny.playwright import controller
 from shiny.run import ShinyAppProc
 from playwright.sync_api import Page
-from shiny.pytest import create_app_fixture
 from conftest import appDBConn, dbQuery
 import pytest
 import os
 import re
 
-curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+curDir = os.path.dirname(os.path.realpath(__file__))
 
 # Run the test with the following commands:
-#   pytest tests\test_accorns.py
+#   pytest tests\test_apps.py
 #       Optional arguments:
 #       --headed (browser is visible)
 #       --slowmo 200 (slows down every action by x ms to better see what's happening)
@@ -24,22 +23,26 @@ curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 #       --newVectorDB (test the vector database, uses more GPT tokens)
 #       --scuirrelOnly (test SCUIRREL only, requires existing test database)
 #       --accornsOnly (test ACCORNS only)
-
+#       --publishPostgres (generate publishing directories and test with the postgres database)
+#
+# pytest tests\test_apps.py --headed --slowmo 200
 
 # Initialise Shiny app
-accornsApp = create_app_fixture(os.path.join(curDir, "..", "accorns_app.py"))
+# @pytest.fixture
+# def accornsApp():
+#      create_app_fixture(os.path.join(curDir, "..", "accorns_app.py"))
 
+def test_accorns(cmdopt, page, accornsApp):
 
-def test_accorns(page: Page, accornsApp: ShinyAppProc, cmdopt):
     # Ignore this test if the scuirrelOnly flag is set
-    if cmdopt["scuirrelOnly"]:
+    if cmdopt["scuirrelOnly"] and not cmdopt["publishPostgres"]:
         return
-
+    
     # Start app
     page.goto(accornsApp.url)
     page.wait_for_load_state("networkidle")
 
-    with appDBConn() as conn:
+    with appDBConn(remoteAppDB = cmdopt["publishPostgres"]) as conn:
         # Request reset admin password
         controller.InputActionLink(page, "login-showReset").click(timeout=10000)
         controller.InputText(page, "login-loginReset-rUsername").set(
@@ -360,21 +363,19 @@ def test_accorns(page: Page, accornsApp: ShinyAppProc, cmdopt):
         assert q["uID"].iloc[0] == 2
         assert not q.loc[:, q.columns != "error"].iloc[0].isna().any()
 
-
-# Initialise Shiny app
-scuirrelApp = create_app_fixture(os.path.join(curDir, "..", "scuirrel_app.py"))
+ # Initialise Shiny app
 
 
-def test_scuirrel(page: Page, scuirrelApp: ShinyAppProc, cmdopt):
+def test_scuirrel(page, scuirrelApp, cmdopt):
     # Ignore this test if the scuirrelOnly flag is set
-    if cmdopt["accornsOnly"]:
-        return
+    if cmdopt["accornsOnly"] and not cmdopt["publishPostgres"]:
+        return  
 
     # Start app
     page.goto(scuirrelApp.url)
     page.wait_for_load_state("networkidle")
 
-    with appDBConn() as conn:
+    with appDBConn(remoteAppDB = cmdopt["publishPostgres"]) as conn:
         # LOGIN TAB
         controller.InputText(page, "login-lUsername").set("testUser", timeout=10000)
         controller.InputPassword(page, "login-lPassword").set(
@@ -434,3 +435,16 @@ def test_scuirrel(page: Page, scuirrelApp: ShinyAppProc, cmdopt):
         page.get_by_text(q["explanation" + q["answer"].iloc[0]].iloc[0]).wait_for(
             timeout=10000
         )
+
+
+# def test_publishing(page: Page, accornsApp: ShinyAppProc, cmdopt):
+    
+#     # Generate the publishing directories
+#     script = (os.path.join(curDir, "..", "publish", "generate_publishing_dir.py") +
+#                " --addDemo --remoteAppDB" )
+#     os.system(script)
+    
+#     # Reset the Postgres database
+#     script = os.path.join(curDir, "..", "ACCORNS", "appDB", f"appDB_postgres_init.{'bat' if os.name == 'nt' else 'sh'}")
+#     os.system(script)
+

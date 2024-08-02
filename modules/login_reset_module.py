@@ -63,7 +63,7 @@ def login_reset_server(
 
         # Generate a new access code to be used for resetting password
         cursor = conn.cursor()
-        uID = checkUser["user"]["uID"].iloc[0]
+        uID = int(checkUser["user"]["uID"].iloc[0])
 
         # Check if there are any existing, unused reset codes
         existing = shared.pandasQuery(
