@@ -14,8 +14,8 @@ from modules.group_join_module import group_join_server, group_join_ui
 # ---- VARS & FUNCTIONS ----
 
 accessCodesQuery = (
-    "SELECT u.\"username\" AS creator, a.* "
-    "FROM \"accessCode\" AS a, \"group\" AS g, \"user\" AS u "
+    'SELECT u."username" AS creator, a.* '
+    'FROM "accessCode" AS a, "group" AS g, "user" AS u '
     'WHERE a."gID" = g."gID" AND a."uID_creator" = u."uID" AND a."used" IS NULL AND a."gID" = ?'
 )
 groupQuery = (
@@ -91,7 +91,7 @@ def groups_server(
             conn,
             (
                 'SELECT m.*, u."username", u."fName", u."lName", u."email" '
-                "FROM \"group\" AS g, \"user\" AS u, \"group_member\" AS m "
+                'FROM "group" AS g, "user" AS u, "group_member" AS m '
                 'WHERE m."gID" = g."gID" AND m."uID" = u."uID" AND g."gID" = NULL'
             ),
         )

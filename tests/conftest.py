@@ -42,7 +42,10 @@ def pytest_addoption(parser):
         "--accornsOnly", action="store_true", default=False, help="Test ACCORNS only"
     )
     parser.addoption(
-        "--publishPostgres", action="store_true", default=False, help="Generate publishing directories and test with the postgres database"
+        "--publishPostgres",
+        action="store_true",
+        default=False,
+        help="Generate publishing directories and test with the postgres database",
     )
 
 
@@ -56,31 +59,40 @@ def cmdopt(request):
         "publishPostgres": request.config.getoption("--publishPostgres"),
     }
 
+
 @pytest.fixture
 def appFiles(request):
     if request.config.getoption("--publishPostgres"):
         return {
-                "ACCORNS": os.path.join(curDir, "..", "publish", "ACCORNS", "app.py"),
-                "SCUIRREL": os.path.join(curDir, "..", "publish", "SCUIRREL", "app.py"),
-            }
-    else:        
+            "ACCORNS": os.path.join(curDir, "..", "publish", "ACCORNS", "app.py"),
+            "SCUIRREL": os.path.join(curDir, "..", "publish", "SCUIRREL", "app.py"),
+        }
+    else:
         return {
-                "ACCORNS": os.path.join(curDir, "..", "accorns_app.py"),
-                "SCUIRREL": os.path.join(curDir, "..", "scuirrel_app.py"),
-            }
+            "ACCORNS": os.path.join(curDir, "..", "accorns_app.py"),
+            "SCUIRREL": os.path.join(curDir, "..", "scuirrel_app.py"),
+        }
+
 
 # Code to run before and after the test session
 def pytest_sessionstart(session):
-
     if session.config.getoption("--publishPostgres"):
         # Generate the publishing directories
-        script = (os.path.join(curDir, "..", "publish", "generate_publishing_dir.py") +
-                " --addDemo --remoteAppDB" )
+        script = (
+            os.path.join(curDir, "..", "publish", "generate_publishing_dir.py")
+            + " --addDemo --remoteAppDB"
+        )
         os.system(script)
-        
+
         # Reset the Postgres database
-        script = os.path.join(curDir, "..", "ACCORNS", "appDB", f"appDB_postgres_init.{'bat' if os.name == 'nt' else 'sh'}")
-        os.system(script)        
+        script = os.path.join(
+            curDir,
+            "..",
+            "ACCORNS",
+            "appDB",
+            f"appDB_postgres_init.{'bat' if os.name == 'nt' else 'sh'}",
+        )
+        os.system(script)
 
     if session.config.getoption("--scuirrelOnly"):
         if not os.path.exists(testDB):
@@ -88,15 +100,15 @@ def pytest_sessionstart(session):
                 "Existing test database was not found. Please run ACCORNS test first"
             )
         copyfile(testDB, appDB)
-        return 
+        return
 
     # Backup existing databases
     if os.path.exists(appDB):
         os.rename(appDB, appDB + ".bak")
     if os.path.exists(vectorDB):
         copyfile(vectorDB, vectorDB + ".bak")
-    
-    return 
+
+    return
 
 
 def pytest_sessionfinish(session, exitstatus):
@@ -163,25 +175,25 @@ def dbQuery(conn, query, params=(), insert=False, remoteAppDB=False):
 
     return q
 
-@pytest.fixture
-def accornsApp(appFiles, request): 
 
+@pytest.fixture
+def accornsApp(appFiles, request):
     if request.config.getoption("--scuirrelOnly"):
         pytest.skip("Skipping ACCORNS test")
-    
-    app = appFiles["ACCORNS"] 
+
+    app = appFiles["ACCORNS"]
     app_purepath_exists = isinstance(app, PurePath) and Path(app).is_file()
     app_path = app if app_purepath_exists else request.path.parent / app
     sa_gen = shiny_app_gen(app_path, timeout_secs=60)
     yield next(sa_gen)
 
+
 @pytest.fixture
 def scuirrelApp(appFiles, request):
-
     if request.config.getoption("--accornsOnly"):
         pytest.skip("Skipping SCUIRREL test")
-    
-    app = appFiles["SCUIRREL"] 
+
+    app = appFiles["SCUIRREL"]
     app_purepath_exists = isinstance(app, PurePath) and Path(app).is_file()
     app_path = app if app_purepath_exists else request.path.parent / app
     sa_gen = shiny_app_gen(app_path, timeout_secs=60)

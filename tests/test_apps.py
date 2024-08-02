@@ -32,17 +32,17 @@ curDir = os.path.dirname(os.path.realpath(__file__))
 # def accornsApp():
 #      create_app_fixture(os.path.join(curDir, "..", "accorns_app.py"))
 
-def test_accorns(cmdopt, page, accornsApp):
 
+def test_accorns(cmdopt, page, accornsApp):
     # Ignore this test if the scuirrelOnly flag is set
     if cmdopt["scuirrelOnly"] and not cmdopt["publishPostgres"]:
         return
-    
+
     # Start app
     page.goto(accornsApp.url)
     page.wait_for_load_state("networkidle")
 
-    with appDBConn(remoteAppDB = cmdopt["publishPostgres"]) as conn:
+    with appDBConn(remoteAppDB=cmdopt["publishPostgres"]) as conn:
         # Request reset admin password
         controller.InputActionLink(page, "login-showReset").click(timeout=10000)
         controller.InputText(page, "login-loginReset-rUsername").set(
@@ -363,19 +363,20 @@ def test_accorns(cmdopt, page, accornsApp):
         assert q["uID"].iloc[0] == 2
         assert not q.loc[:, q.columns != "error"].iloc[0].isna().any()
 
- # Initialise Shiny app
+
+# Initialise Shiny app
 
 
 def test_scuirrel(page, scuirrelApp, cmdopt):
     # Ignore this test if the scuirrelOnly flag is set
     if cmdopt["accornsOnly"] and not cmdopt["publishPostgres"]:
-        return  
+        return
 
     # Start app
     page.goto(scuirrelApp.url)
     page.wait_for_load_state("networkidle")
 
-    with appDBConn(remoteAppDB = cmdopt["publishPostgres"]) as conn:
+    with appDBConn(remoteAppDB=cmdopt["publishPostgres"]) as conn:
         # LOGIN TAB
         controller.InputText(page, "login-lUsername").set("testUser", timeout=10000)
         controller.InputPassword(page, "login-lPassword").set(
@@ -438,13 +439,12 @@ def test_scuirrel(page, scuirrelApp, cmdopt):
 
 
 # def test_publishing(page: Page, accornsApp: ShinyAppProc, cmdopt):
-    
+
 #     # Generate the publishing directories
 #     script = (os.path.join(curDir, "..", "publish", "generate_publishing_dir.py") +
 #                " --addDemo --remoteAppDB" )
 #     os.system(script)
-    
+
 #     # Reset the Postgres database
 #     script = os.path.join(curDir, "..", "ACCORNS", "appDB", f"appDB_postgres_init.{'bat' if os.name == 'nt' else 'sh'}")
 #     os.system(script)
-
