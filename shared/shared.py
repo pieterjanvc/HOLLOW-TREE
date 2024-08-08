@@ -214,14 +214,14 @@ def pandasQuery(conn, query, params=()):
 
 
 # Check if the postgres scuirrel database is available when remoteAppDB is set to True
-def checkRemoteDB():
+def checkRemoteDB(postgresUser):
     try:
-        conn = appDBConn("accorns")
+        conn = appDBConn(postgresUser)
         cursor = conn.cursor()
         _ = executeQuery(cursor, 'SELECT 1 FROM "session"')
         conn.close()
 
-        conn = vectorDBConn("accorns")
+        conn = vectorDBConn(postgresUser)
         cursor = conn.cursor()
         _ = executeQuery(cursor, 'SELECT 1 FROM "file"')
         conn.close()

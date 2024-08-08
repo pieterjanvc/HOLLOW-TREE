@@ -11,6 +11,30 @@ CREATE TABLE IF NOT EXISTS "user" (
   "modified" TEXT
 );
 
+DROP TABLE IF EXISTS "session";
+CREATE TABLE IF NOT EXISTS "session" (
+	"sID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "uID" INTEGER,
+  "appID" INTEGER,
+  "start" TEXT,
+  "end" TEXT,
+  "shinyToken" TEXT,
+  "error" TEXT,
+	FOREIGN KEY("uID") REFERENCES "user"("uID") 
+		ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+DROP TABLE IF EXISTS "topic";
+CREATE TABLE IF NOT EXISTS "topic" (
+	"tID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "sID" INTEGER,
+	"topic" TEXT,
+  "archived" INTEGER DEFAULT 0,
+  "created" TEXT,
+  "modified" TEXT,
+  "description" TEXT
+);
+
 DROP TABLE IF EXISTS "group";
 CREATE TABLE "group" (
   "gID" INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,30 +93,6 @@ CREATE TABLE IF NOT EXISTS "accessCode" (
     ON DELETE CASCADE ON UPDATE CASCADE,
   FOREIGN KEY("gID") REFERENCES "group"("gID")
     ON DELETE CASCADE ON UPDATE CASCADE
-);
-
-DROP TABLE IF EXISTS "session";
-CREATE TABLE IF NOT EXISTS "session" (
-	"sID" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "uID" INTEGER,
-  "appID" INTEGER,
-  "start" TEXT,
-  "end" TEXT,
-  "shinyToken" TEXT,
-  "error" TEXT,
-	FOREIGN KEY("uID") REFERENCES "user"("uID") 
-		ON DELETE CASCADE ON UPDATE CASCADE
-);
-
-DROP TABLE IF EXISTS "topic";
-CREATE TABLE IF NOT EXISTS "topic" (
-	"tID" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "sID" INTEGER,
-	"topic" TEXT,
-  "archived" INTEGER DEFAULT 0,
-  "created" TEXT,
-  "modified" TEXT,
-  "description" TEXT
 );
 
 DROP TABLE IF EXISTS "concept";
