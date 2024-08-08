@@ -37,7 +37,7 @@ args = parser.parse_args()
 # Check which apps to generate
 apps = ["ACCORNS", "SCUIRREL"]
 if args.app not in apps and args.app != "":
-    print("Error: The --app argumnet must be 'SCUIRREL' or 'ACCORNS' of not specified for both")
+    print("Error: The --app argument must be 'SCUIRREL' or 'ACCORNS' or not set for both")
     exit()
 elif args.app != "":
     apps = [args.app]

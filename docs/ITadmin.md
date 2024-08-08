@@ -98,10 +98,10 @@ it:
 rsconnect deploy shiny \
   --server <server URL> \
   --api-key <API key> \
-  --environment <POSTGRES_PASS_SCUIRREL> \
-  --environment <POSTGRES_PASS_ACCORNS> \
-  --environment <OPENAI_API_KEY> \
-  --environment <OPENAI_ORGANIZATION> \
+  --environment POSTGRES_PASS_SCUIRREL=<POSTGRES_PASS_SCUIRREL> \
+  --environment POSTGRES_PASS_ACCORNS=<POSTGRES_PASS_ACCORNS> \
+  --environment OPENAI_API_KEY=<OPENAI_API_KEY> \
+  --environment OPENAI_ORGANIZATION=<OPENAI_ORGANIZATION> \
   ./
 ```
 

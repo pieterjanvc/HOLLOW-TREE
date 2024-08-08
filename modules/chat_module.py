@@ -100,7 +100,7 @@ def chat_ui():
                     div(id=module.resolve_id("conversation")),
                     id="chatWindow",
                     **{"class": "chatWindow"},
-                    height="45vh",
+                    height="75vh",
                 ),
                 # User input, send button and wait message
                 ui.card(
