@@ -1,4 +1,6 @@
-# ACCORNS - Admin Control Center Overseeing RAG Needed for SCUIRREL
+# ACCORNS
+
+### Admin Control Center Organising the Resources Needed by SCUIRREL
 
 This application is the instructor / administrator backend to SCUIRREL.
 
