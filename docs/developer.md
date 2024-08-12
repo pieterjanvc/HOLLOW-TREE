@@ -1,20 +1,21 @@
-# Developing ACCORNS and SCUIRREL
+# Developing ACCORNS and SCUIRREL apps
 
 _For help in setting up the development environment for the ACCORNS and SCUIRREL apps
 and tips on debugging read the [Environment setup guide](extra/dev_env_setup.md)_
 
 ## Software and Libraries
 
-Both ACCORNS an SCUIRREL are Shiny for Python apps using the following important
-libraries:
+Both ACCORNS an SCUIRREL are Shiny for Python apps with the following dependencies:
 
 - The [Llamaindex](https://www.llamaindex.ai/) library is a wrapper for working with
-  various LLMs (e.g. ChatGPT) and implement Retrieval Augmented Generation for
+  various LLMs (e.g. ChatGPT) and implementing Retrieval Augmented Generation for
   increasing query accuracy
 - The [Shiny framework](https://shiny.posit.co/py/) is used for generating the apps' UI
-  and Server components (Shiny Express syntax is used)
-- For a list of all other dependencies, see the [requirements.txt](../requirements.txt)
-  file
+  and Server components (Shiny Core syntax is used)
+- For a list of all other app dependencies, see the
+  [requirements.txt](../requirements.txt) file
+- For a list of additional developer dependencies, see the
+  [requirements_dev.txt](../requirements_dev.txt) file
 
 ## Accessing Large Language Models (LLM) in Python
 
@@ -45,18 +46,18 @@ the repository or hardcoding them anywhere in the code is a serious security ris
 ## App databases
 
 In your local development environment, you have two options for storing an accessing the
-data for the apps, file based database or a (local) PostgreSQL server. Note that once
+data for the apps, a file based database or a (local) PostgreSQL server. Note that once
 you deploy apps you need a remote PostgreSQL server.
 
 ### OPTION 1: File-based storage
 
-_This is the easiest way to set up the repo as everything is created automatically the
+_This is the easiest way to set up the apps as everything is created automatically the
 first time you run the ACCORNS app._
 
-- Make sure the `remoteAppDB = "False"` in the
+- Make sure the `remoteAppDB = False` in the
   [shared/shared_config.py](../shared/shared_config.toml) file
-- The databases will be created in the appDB folder by default (location can be changed
-  in the [shared/shared_config.py](../shared/shared_config.toml) file
+- The databases will be created in the `appDB/` folder by default (location can be
+  changed in the [shared/shared_config.py](../shared/shared_config.toml) file
 - SQLite is used for storing the ACCORNS / SCUIRREL app data and logs
 - DuckDB is used for storing the vectors used for the LLM retrieval augmented generation
 
@@ -76,16 +77,16 @@ _Alternatively, look for the SQL files in the ACCORNS [appDB folder](../ACCORNS/
 
 The following setting are relevant to check before running the apps for the first time:
 
-- In the [shared_config.toml](../shared/shared_config.toml) file, set
-  `addDemo = "False"` if you want to start without the demo data
+- In the [shared_config.toml](../shared/shared_config.toml) file, set `addDemo = False`
+  if you want to start without the demo data
 - In the [accorns_config.toml](../ACCORNS/accorns_config.toml) file, set
   `saveFileCopy = "True"` if you would like to keep a copy of each uploaded file. You
   can also change the location where these files are saved
 
 ## Repo organization
 
-The file organisation is largely dictated by the Shiny for Python framework and Express
-syntax. For more details visit https://shiny.posit.co/py/docs/express-in-depth.html
+The file organisation is largely dictated by the Shiny for Python framework and syntax.
+For more details visit https://shiny.posit.co/py/docs
 
 The root folder contains the following important files and folders:
 
@@ -96,28 +97,52 @@ The root folder contains the following important files and folders:
 - scuirrel_app.py: The main Python Shiny file for the SCUIRREL app
 - SCUIRREL: The folder containing additional SCUIRREL app files
 - shared: The folder containing shared functions and variables between the two apps
+- modules: A folder containing all app modules (tabs). Some modules are app specific and
+  others are shared between the apps.
 - publish: Folder containing the script to generate publishing directories when ready to
-  deploy the apps
+  deploy the apps. The directories will appear in this folder after execution.
 - docs: Folder containing the documentation for the project. The main
-  [README.md](../README.md) file links to these different documentation files
+  [README.md](../README.md) file links to many of these files
 
 The ACCORNS, SCUIRREL, and shared folders all have a similar structure:
 
-- The ACCORNS*shared.py / SCUIRREL_shared.py files contain variables and functions that
-  are shared between app \_sessions* (not apps). To clarify: All code in the main
-  accorns_app.py and scuirrel_app.py files is run for each new session (i.e. every time
-  a user connects), whereas the shared files are only loaded once when the server starts
-- .tolm files contain the settings for each app
+- Files in the `shared/` folder are sourced into both apps, files in `ACCORNS` and
+  `SCUIRREL` only in their respective apps
+- The `accorns_shared.py` / `scuirrel_shared.py` files contain regular Python variables
+  and functions that are sourced into the respective apps at runtime. Both apps source
+  the `shared/shared.py` file. These files do not contain reactive code.
+- .tolm files contain app settings
 - \_css and \_js sub-directories contain the custom CSS and JavaScript files for each of
   the apps (due to a bug in the Shiny for Python framework, each of these files
   currently needs a separate subfolder)
-- To avoid duplication of code between ACCORNS and SCUIRREL during development, the
-  [shared](../shared) folder contains the all of the above which are sourced into both
-  the SCUIRREL and ACCORNS apps (and also only loaded once when the server starts)
 
 Note that this file structure only works for _local development_. When deploying the
-apps, separate folders for each app need to be created containing all the necessary
-files inside it. For more details, see the [IT admin guide](ITadmin.md)
+apps, separate app folders need to be generated. For more details, see the
+[IT admin guide](ITadmin.md)
+
+## Testing the apps
+
+The `tests/` folder contains a `test_apps.py` script that can be run to test major app functionality 
+using the playwright library. To test, run the following command
+
+```
+pytest tests\test_apps.py
+```
+The following arguments (defined in [conftest.py](../tests/conftest.py)) can be set:
+- --headed (browser is visible during test)
+- --slowmo <200> (slows down every action by x ms to better see what's happening)
+- --save (save timestamped database, otherwise overwrite previous test database)
+- --newVectorDB (test the vector database, uses more GPT tokens)
+- --scuirrelOnly (test SCUIRREL only, requires existing test database)
+- --accornsOnly (test ACCORNS only)
+- --publishPostgres (test generating publishing directories and test with the postgres database)
+
+Initial testing found that the testing can error out due to not obeying timeouts when writing text. To
+avoid these errors (most of the time) run the test headed and a slowmo of 200
+
+```
+pytest tests\test_apps.py --headed --slowmo 200
+```
 
 ## Notes on specific coding implementations
 

@@ -1,4 +1,6 @@
-# SCUIRREL - Science Concept Understanding with Interactive Research RAG Educational LLM
+# SCUIRREL
+
+### Science Concept Understanding via Interactive Reinforcing Review by Educational Large-language-model
 
 This is the main application through which students will interact with the LLM (i.e.
 SCUIRREL) on topics created and configured by instructors.

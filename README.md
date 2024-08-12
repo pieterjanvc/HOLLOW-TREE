@@ -12,7 +12,7 @@ accomplish this goal:
 
 ## SCUIRREL - Student facing app
 
-### Science Concept Understanding with Interactive Research RAG Educational LLM
+### **S**cience **C**oncept **U**nderstanding via **I**nteractive **R**einforcing **R**eview by **E**ducational **L**arge-language-model
 
 This is the student facing application where users will interact with the LLM (i.e.
 SCUIRREL) to explore the concepts of a specific topic by means of a guided conversation.
@@ -21,7 +21,7 @@ test their knowledge
 
 ## ACCORNS - Instructor facing app
 
-### Admin Control Center Overseeing RAG Needed for SCUIRREL
+### **A**dmin **C**ontrol **C**enter **O**rganising the **R**esources **N**eeded by **S**CUIRREL
 
 This application is the backend to SCUIRREL where instructors can set-up, manage and
 monitor the topics and concepts that SCUIRREL will be able to discuss with students.

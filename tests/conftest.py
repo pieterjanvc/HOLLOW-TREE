@@ -80,7 +80,7 @@ def pytest_sessionstart(session):
         # Generate the publishing directories
         script = (
             os.path.join(curDir, "..", "publish", "generate_publishing_dir.py")
-            + " --addDemo --remoteAppDB"
+            + " --addDemo"
         )
         os.system(script)
 

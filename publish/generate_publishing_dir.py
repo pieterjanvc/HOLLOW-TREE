@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser(description='Command line arguments for the pub
 parser.add_argument('--app', default = "", type=str, help='App to generate (SCUIRREL or ACCORNS)')
 
 # Setitngs
-parser.add_argument('--remoteAppDB', action='store_true', help='Use postgres databases for the app')
+parser.add_argument('--localDB', action='store_true', help='Use file-based databases for the app (not compatible with online deployment)')
 parser.add_argument('--addDemo', action='store_true', help='Add the demo to the app')
 parser.add_argument('--personalInfo', action='store_true', help='Require personal information when signing up')
 
@@ -169,7 +169,7 @@ for toGenerate in apps:
     #p = "C:/Users/pj/Documents/LocalProjects/HOLLOW-TREE/publish/ACCORNS/shared_config.toml"
     
     # Modify values in the config
-    config['general']['remoteAppDB'] = args.remoteAppDB
+    config['general']['remoteAppDB'] = False if args.localDB else True
     config['general']['addDemo'] = args.addDemo
     config['auth']['personalInfo'] = args.personalInfo
     config['localStorage']['sqliteDB'] = args.sqliteDB
