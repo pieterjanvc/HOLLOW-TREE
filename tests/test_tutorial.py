@@ -1,8 +1,9 @@
 # *************************************
-# ----------- TEST ACCORNS -----------
+# ----------- APP TUTORIALS -----------
 # *************************************
-# https://shiny.posit.co/py/docs/end-to-end-testing.html
-# https://shiny.posit.co/py/api/testing/
+
+
+# pytest tests\test_tutorial.py --headed --slowmo 200 --record 
 
 from shiny.playwright import controller
 from shiny.run import ShinyAppProc
@@ -98,12 +99,11 @@ def test_accorns(cmdopt, page, accornsApp):
         features of the app."""
         addSubtitle(page, subt)
 
-        subt = """Let's start by creating an account"""
-        addSubtitle(page, subt) 
-
-        subt = """Before you can create an account, you need an access code provided by
-          an administrator. Let's say we have an access code 'W4t-00k-gTR'. 
-          On the right side of the login page, fill out the sigh up form and provide the access code"""
+        subt = """Let's start by creating an account. This will allow you access to both
+        ACCORNS and SCUIRREL providing you have the right access code.You will receive 
+        an access code via an administrator or other instructor.  
+        Let's say we have an access code 'W4t-00k-gTR'. On the right side of the login page, 
+        fill out the sigh up form and provide the access code"""
         addSubtitle(page, subt) 
 
         controller.InputText(page, "login-cUsername").set("topInstructor", timeout=10000)
@@ -135,11 +135,11 @@ def test_accorns(cmdopt, page, accornsApp):
         page.wait_for_timeout(1000)
         controller.InputActionButton(page, "login-login").click(timeout=10000)
 
-        subt = """ACCORNS is used to manage SCUIRREL. Please refer to the SCUIRREL tutorial if needed. 
-        The first thing to do in ACCORNS is to add new course materials to the database.
-        These files will be used by SCUIRREL to guide students through the learning process
-        by providing the AI with relevant background information. 
-        To upload a new file, simply click on the 'New file' button and choose 
+        subt = """The first thing to do when you are setting up ACCORNS is to add new 
+        reference materials to the database. These files will be used by SCUIRREL to 
+        guide students through the learning process by providing the AI with relevant 
+        background information on topics you'll create later. 
+        To upload a new file, simply click on the 'Pick a file' button and choose 
         a file from your computer. You can upload different types of text files like PDF, DOCX, and TXT files."""
         addSubtitle(page, subt)    
        
@@ -154,7 +154,7 @@ def test_accorns(cmdopt, page, accornsApp):
             expect_complete_timeout=10000,
         )
         subt = """Depending on the size of the file, uploading and processing may take some time. 
-        After a file is uploaded, you can view the file information by 
+        After a file has been processed, you can view the file information by 
         clicking on the file name in the table at the top of the page"""
         addSubtitle(page, subt)          
         
@@ -162,7 +162,7 @@ def test_accorns(cmdopt, page, accornsApp):
         subt = """You can now see a summary of the file information being displayed. 
         Let's now start creating some new topics that can reviewed
          by students in SCUIRREL based on the uploaded materials"""
-        addSubtitle(page, subt)
+        addSubtitle(page, subt)        
 
         subt = """Before we get started with this, we need to create a new group to 
         organize the topics"""
@@ -192,7 +192,7 @@ def test_accorns(cmdopt, page, accornsApp):
             timeout=10000
         )
 
-        subt = """You can compare a topic to a short bookchapter you want SCUIRREL to 
+        subt = """You can compare a topic to a short book chapter you want SCUIRREL to 
         review with a student in a short conversation (e.g. about 5 minutes). 
         To create a new topic, select the group you want to add it to and 
         click the 'Add New' button"""
@@ -217,14 +217,14 @@ def test_accorns(cmdopt, page, accornsApp):
 
         subt = """Each topic is broken down into concepts that SCUIRREL will use to 
         guide the conversation with the student. You can think of concepts as list of 
-        facts or ideas listed in a bookchapter. To add a new concept to the selected topic, 
+        facts or ideas listed in a book chapter. To add a new concept to the selected topic, 
         click the 'Add New' button in the concepts section"""
         addSubtitle(page, subt)
 
         # Add a new concept
         controller.InputActionButton(page, "topics-cAdd").click(timeout=10000)
         subt = """Define the concept in a single sentence (e.g. as a fact). There is no need to provide
-        context as this will be provided by the files you uploaded earlier into teh database"""
+        context as this will be provided by the files you uploaded earlier into the database"""
         addSubtitle(page, subt)       
         controller.InputText(page, "topics-ncInput").set(
             "Gregor Mendel, the father of modern genetics, was a nineteenth-century monk", timeout=10000
@@ -265,49 +265,174 @@ def test_accorns(cmdopt, page, accornsApp):
         #     "Gregor Mendel was a nineteenth-century monk", row=0, col=0
         # )
 
-        # # QUIZ GENERATION TAB
-        # controller.NavPanel(page, id="postLoginTabs", data_value="qTab").click(
-        #     timeout=10000
-        # )
+        subt = """Once you have setup a topic and related concepts, 
+        you can now generate quiz questions to test the student's understanding of the topic. 
+        Let's navigate to the 'Quiz Generation' tab"""
+        addSubtitle(page, subt)
 
-        # # Add a new quiz question
-        # if cmdopt["newVectorDB"]:
-        #     controller.InputActionButton(page, "quizGeneration-qGenerate").click(
-        #         timeout=10000
-        #     )
-        #     page.get_by_text(re.compile("Correct answer:"), exact=False).wait_for(
-        #         timeout=10000
-        #     )
-        #     q = dbQuery(conn, 'SELECT "optionA" FROM "question"')
-        #     controller.InputText(page, "quizGeneration-rqOA").expect_value(
-        #         q["optionA"].iloc[0]
-        #     )
-        # else:
-        #     dbQuery(
-        #         conn,
-        #         (
-        #             'INSERT INTO "question" ("qID", "sID", "tID", "cID", "question",'
-        #             '"answer", "archived", "created", "modified", "optionA", "explanationA",'
-        #             '"optionB", "explanationB", "optionC", "explanationC", "optionD", "explanationD")'
-        #             "VALUES ('1', '1', '2', '11',"
-        #             "'What was Gregor Mendel''s occupation in the nineteenth century?',"
-        #             "'A', '0', '2024-07-30 10:27:34', '2024-07-30 10:27:34',"
-        #             "'Monk','Correct! Gregor Mendel was a nineteenth-century Moravian monk who"
-        #             "conducted hybridization experiments with pea plants.', 'Scientist',"
-        #             "'Incorrect. While Gregor Mendel is known for his scientific work, his occupation"
-        #             "was actually a monk.', 'Farmer', 'Incorrect. Gregor Mendel was not a farmer;"
-        #             "he was a monk who conducted experiments with pea plants.', 'Politician',"
-        #             "'Incorrect. Gregor Mendel was not a politician; he was a monk who made significant"
-        #             "contributions to the field of genetics.');"
-        #         ),
-        #         insert=True,
-        #     )
+        # QUIZ GENERATION TAB
+        controller.NavPanel(page, id="postLoginTabs", data_value="qTab").click(
+            timeout=10000
+        )
 
-        # # End the session and start new one
-        # page.reload()
+        subt = """Start by selecting the group and topic you want to generate quiz questions for.
+        Then, click the 'Generate Quiz' button"""
+        addSubtitle(page, subt)
+        # Add a new quiz question
+        controller.InputActionButton(page, "quizGeneration-qGenerate").click(
+                timeout=10000
+            )
+        subt = """Note that generating quiz questions may take some time and it's
+        possible that the process may fail. In case of failure, you will be notified and 
+        you can try again later. If successful, you will see a summary of the generated 
+        questions along with the option to edit all parts of the question. 
+        After you finished reviewing and editing the questions, you should save your changes"""
+        addSubtitle(page, subt)
 
+        subt = """Now you have setup new materials, it's time to invite student or other 
+        instructors to join your group and engage with what you have created. To do this,
+        navigate to the 'User management' tab"""
+        addSubtitle(page, subt)
+        controller.NavPanel(page, id="postLoginTabs", data_value="uTab").click(
+            timeout=10000
+        )
+
+        subt = """Remember how you used an access code to create your account? 
+        You can generate new access codes for other people to join your group. 
+        Let's start by generating a new access code for students to create and account 
+        with SCUIRREL access. Set the number of codes to generate, the role of the user,
+        and optionally add a note why you are generating the codes"""
+        addSubtitle(page, subt)
+
+        controller.InputNumeric(page, "userManagement-numCodes").set(
+            "10", timeout=10000
+        )
+        page.wait_for_timeout(1000)
+        controller.InputSelect(page, "userManagement-role").set("User", timeout=10000)
+        page.wait_for_timeout(1000)
+        controller.InputText(page, "userManagement-note").set(
+            "Student accounts for GEN101", timeout=10000
+        )
+        page.wait_for_timeout(1000)
+        controller.InputActionButton(page, "userManagement-generateCodes").click(
+            timeout=10000
+        )
+
+        subt = """Once you generated the codes, you can copy or download them to share 
+        with the intended users."""
+        addSubtitle(page, subt)
+
+        controller.DownloadLink(page, "userManagement-downloadCodes").click(
+            timeout=10000
+        )
+
+        subt = """Let's also generate a new access code for a co-instructor to get 
+        access to both ACCORNS and SCUIRREL"""
+        addSubtitle(page, subt)
+
+        controller.InputNumeric(page, "userManagement-numCodes").set(
+            "1", timeout=10000
+        )
+        page.wait_for_timeout(1000)
+        controller.InputSelect(page, "userManagement-role").set("Instructor", timeout=10000)
+        page.wait_for_timeout(1000)
+        controller.InputText(page, "userManagement-note").set(
+            "Instructor account for GEN101", timeout=10000
+        )
+        page.wait_for_timeout(1000)
+        controller.InputActionButton(page, "userManagement-generateCodes").click(
+            timeout=10000
+        )
+
+        subt = """You can keep track of any unclaimed codes in the table on this page.
+        Note that access codes only give you access to the apps itself, but
+        not to the topic groups created by you or other users. To join a group, you need
+        to generate separate group access code. Let's do that now by navigating back 
+        to the 'Groups' tab"""
+        addSubtitle(page, subt)
+
+        controller.NavPanel(page, id="postLoginTabs", data_value="gTab").click(
+            timeout=10000
+        )
+
+        subt = """The process of generating group access codes is identical to generating
+        user access codes. User codes can be used to join your group in SCUIRREL. 
+        Admin codes can be used to join your group in ACCORNS and manage the group and
+        all its topics."""
+        addSubtitle(page, subt)
+
+        # Generate a code for a group join by user and admin
+        controller.InputSelect(page, "groups-role").set("Admin", timeout=10000)
+        page.wait_for_timeout(1000)
+        controller.InputNumeric(page, "groups-numCodes").set("1", timeout=10000)
+        page.wait_for_timeout(1000)
+        controller.InputText(page, "groups-note").set("Co-instructor group access for GEN101", timeout=10000)
+        page.wait_for_timeout(1000)
+        controller.InputActionButton(page, "groups-generateCodes").click(timeout=10000)
+
+        subt = """Once you generated the codes, users can use them to join your group in 
+        SCUIRREL or ACCORNS depending on the role of the code. If you receive a code from
+        another instructor or admin, you can click the 'Join Group' button and provide the code"""
+        addSubtitle(page, subt)
+
+        controller.InputActionButton(page, "groups-joinGroup-joinGroup").click(
+            timeout=10000
+        )
+        page.wait_for_timeout(1000)
+        page.click('button:text("Cancel")')
+
+        subt = """Finally, you can close the app simply by refreshing or closing the page""" 
+        addSubtitle(page, subt)  
+
+        page.reload()
+
+        subt = """You can continue where you left off by logging in again with your account 
+        details. Should you every forget your password, you can request a reset code 
+        by clicking the 'Reset Password' button on the login page""" 
+        addSubtitle(page, subt)            
+
+        controller.InputActionLink(page, "login-showReset").click(timeout=10000)
+        subt = """Provide your username, then click the 'Request Reset Code' button.""" 
+        addSubtitle(page, subt)  
+        controller.InputText(page, "login-loginReset-rUsername").set(
+            "topInstructor", timeout=10000
+        )
+        page.wait_for_timeout(1000)
+        controller.InputActionButton(page, "login-loginReset-request").click(
+            timeout=10000
+        )
+        subt = """You should see a message that a reset code has been created.
+        You now have to reach out to another instructor or admin to get the code.
+        Given we still know our password, let's just look where to get the code by 
+        logging in again""" 
+        addSubtitle(page, subt) 
+        page.locator('"Dismiss"').click(timeout=10000)  # Close the modal
+
+        controller.InputText(page, "login-lUsername").set("topInstructor", timeout=10000)
+        page.wait_for_timeout(300)
+        controller.InputPassword(page, "login-lPassword").set(
+            "instr123ABC!", timeout=10000
+        )
+        page.wait_for_timeout(300)
+        controller.InputActionButton(page, "login-login").click(timeout=10000)
+
+        subt = """Navigate to the 'User management' tab""" 
+        addSubtitle(page, subt)
+        controller.NavPanel(page, id="postLoginTabs", data_value="uTab").click(
+            timeout=10000
+        )
+        subt = """You will now see a table with all requested reset codes you can 
+        share with other users who need to reset their password""" 
+        addSubtitle(page, subt)
         
+        page.wait_for_timeout(1000)
+        page.reload()
 
+        subt = """This concludes the ACCORNS tutorial. If you have any questions,
+        please reach out to the app administrator or read the documentation""" 
+        addSubtitle(page, subt)
+        
+        # page.get_by_text("File info").scroll_into_view_if_needed()
         # # wait 1 second
         # page.wait_for_timeout(1000)
 
@@ -390,48 +515,4 @@ def test_accorns(cmdopt, page, accornsApp):
         # assert q["uID"].iloc[0] == 2
         # assert not q.loc[:, q.columns != "error"].iloc[0].isna().any()
 
-         # # USER MANAGEMENT TAB
-        # controller.NavPanel(page, id="postLoginTabs", data_value="uTab").click(
-        #     timeout=10000
-        # )
-        # # Generate a code for a user, instructor and admin
-        # for user in ["User", "Instructor", "Admin"]:
-        #     controller.InputNumeric(page, "userManagement-numCodes").set(
-        #         "1", timeout=10000
-        #     )
-        #     controller.InputSelect(page, "userManagement-role").set(user, timeout=10000)
-        #     controller.InputText(page, "userManagement-note").set(
-        #         f"test: add {user}", timeout=10000
-        #     )
-        #     controller.InputActionButton(page, "userManagement-generateCodes").click(
-        #         timeout=10000
-        #     )
-
-        # controller.DownloadLink(page, "userManagement-downloadCodes").click(
-        #     timeout=10000
-        # )
-        # controller.OutputDataFrame(page, "userManagement-newCodesTable").expect_nrow(1)
-        # controller.OutputDataFrame(page, "userManagement-codesTable").expect_nrow(3)
-
-        # # Request reset admin password
-        # controller.InputActionLink(page, "login-showReset").click(timeout=10000)
-        # controller.InputText(page, "login-loginReset-rUsername").set(
-        #     "admin", timeout=10000
-        # )
-        # controller.InputActionButton(page, "login-loginReset-request").click(
-        #     timeout=10000
-        # )
-        # page.get_by_text("SUCCESS: Contact an admin to get your reset code").wait_for(
-        #     timeout=10000
-        # )
-        # page.locator('"Dismiss"').click(timeout=10000)  # Close the modal
-
-        # # Generate a code for a group join by user and admin
-        # controller.InputText(page, "groups-note").set("test: add user", timeout=10000)
-        # controller.InputActionButton(page, "groups-generateCodes").click(timeout=10000)
-
-        # controller.InputSelect(page, "groups-role").set("Admin", timeout=10000)
-        # controller.InputNumeric(page, "groups-numCodes").set("1", timeout=10000)
-        # controller.InputText(page, "groups-note").set("test: add admin", timeout=10000)
-        # controller.InputActionButton(page, "groups-generateCodes").click(timeout=10000)
-        # controller.DownloadLink(page, "groups-downloadGroupCodes").click(timeout=10000)
+        
