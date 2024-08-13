@@ -10,6 +10,7 @@ from shutil import copyfile
 from pathlib import Path, PurePath
 from shiny.run._run import shiny_app_gen
 from shiny.run import ShinyAppProc
+from playwright.sync_api import Playwright, Browser, BrowserContext
 
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 appDB = os.path.join(curDir, "..", "appData", "accorns.db")
@@ -47,6 +48,13 @@ def pytest_addoption(parser):
         default=False,
         help="Generate publishing directories and test with the postgres database",
     )
+    parser.addoption(
+        "--record",
+        action="store_true",
+        default=False,
+        help="Record the test session",
+    )
+    
 
 
 @pytest.fixture
@@ -175,6 +183,44 @@ def dbQuery(conn, query, params=(), insert=False, remoteAppDB=False):
 
     return q
 
+@pytest.fixture(scope="session")
+def browser(playwright: Playwright, request) -> Browser:
+    headed = request.config.getoption("--headed") 
+    slowmo = request.config.getoption("--slowmo")  
+
+    launch_options = {}
+    if headed:
+        launch_options['headless'] = False  
+    if slowmo:
+        launch_options['slow_mo'] = slowmo
+
+    return playwright.chromium.launch(**launch_options)
+
+@pytest.fixture(scope="function")
+def context(browser: Browser, request) -> BrowserContext:
+    record = request.config.getoption("--record")
+
+    context_options = {
+        'viewport': {'width': 1280, 'height': 1000}
+    }
+
+    if record:
+        context_options['record_video_size'] = {'width': 1280, 'height': 1000}
+
+    if not record:
+        yield browser.new_context(**context_options)
+        return
+
+    video_dir = os.path.join(os.path.dirname(__file__), "videos")
+    os.makedirs(video_dir, exist_ok=True)
+
+    context_options['record_video_dir'] = video_dir
+
+    context = browser.new_context(**context_options)    
+    
+    yield context
+
+    context.close()
 
 @pytest.fixture
 def accornsApp(appFiles, request):
@@ -185,6 +231,7 @@ def accornsApp(appFiles, request):
     app_purepath_exists = isinstance(app, PurePath) and Path(app).is_file()
     app_path = app if app_purepath_exists else request.path.parent / app
     sa_gen = shiny_app_gen(app_path, timeout_secs=60)
+
     yield next(sa_gen)
 
 
@@ -198,3 +245,4 @@ def scuirrelApp(appFiles, request):
     app_path = app if app_purepath_exists else request.path.parent / app
     sa_gen = shiny_app_gen(app_path, timeout_secs=60)
     yield next(sa_gen)
+
