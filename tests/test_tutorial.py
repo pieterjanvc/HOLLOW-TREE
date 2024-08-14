@@ -12,7 +12,6 @@ from conftest import appDBConn, dbQuery
 import pytest
 import os
 import re
-import pysrt
 from datetime import datetime
 
 curDir = os.path.dirname(os.path.realpath(__file__))
@@ -57,11 +56,12 @@ def addSubtitle(page, text, avg_wpm=150, min_wait_seconds=3, maxChars=135):
                     bottom: 0;
                     left: 0;
                     width: 100%;
-                    background-color: rgba(0, 0, 0, 0.85); /* Semi-transparent background */
+                    background-color: rgba(0, 0, 0, 0.85);
                     color: white;
                     text-align: center;
                     padding: 10px;
                     font-size: 20px;
+                    text-wrap: balance;
                     box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.5);
                     z-index: 9999;
                         }
@@ -74,11 +74,7 @@ def addSubtitle(page, text, avg_wpm=150, min_wait_seconds=3, maxChars=135):
         page.evaluate("document.getElementById('subtitles').remove()")
 
 
-def test_accorns(cmdopt, page, accornsApp):
-    # Ignore this test if the scuirrelOnly flag is set
-    if cmdopt["scuirrelOnly"] and not cmdopt["publishPostgres"]:
-        return
-
+def test_accorns_tutorial(cmdopt, page, accornsApp):
     # Start app
     page.goto(accornsApp.url)
     page.wait_for_load_state("networkidle")         
@@ -103,7 +99,7 @@ def test_accorns(cmdopt, page, accornsApp):
         ACCORNS and SCUIRREL providing you have the right access code.You will receive 
         an access code via an administrator or other instructor.  
         Let's say we have an access code 'W4t-00k-gTR'. On the right side of the login page, 
-        fill out the sigh up form and provide the access code"""
+        fill out the sign up form and provide the access code"""
         addSubtitle(page, subt) 
 
         controller.InputText(page, "login-cUsername").set("topInstructor", timeout=10000)
@@ -362,11 +358,11 @@ def test_accorns(cmdopt, page, accornsApp):
         addSubtitle(page, subt)
 
         # Generate a code for a group join by user and admin
-        controller.InputSelect(page, "groups-role").set("Admin", timeout=10000)
+        controller.InputSelect(page, "groups-role").set("User", timeout=10000)
         page.wait_for_timeout(1000)
-        controller.InputNumeric(page, "groups-numCodes").set("1", timeout=10000)
+        controller.InputNumeric(page, "groups-numCodes").set("5", timeout=10000)
         page.wait_for_timeout(1000)
-        controller.InputText(page, "groups-note").set("Co-instructor group access for GEN101", timeout=10000)
+        controller.InputText(page, "groups-note").set("Student codes for GEN101", timeout=10000)
         page.wait_for_timeout(1000)
         controller.InputActionButton(page, "groups-generateCodes").click(timeout=10000)
 
@@ -515,4 +511,139 @@ def test_accorns(cmdopt, page, accornsApp):
         # assert q["uID"].iloc[0] == 2
         # assert not q.loc[:, q.columns != "error"].iloc[0].isna().any()
 
+def test_scuirrel_tutorial(cmdopt, page, scuirrelApp):
+    # Start app
+    page.goto(scuirrelApp.url)
+    page.wait_for_load_state("networkidle")         
+
+    with appDBConn(remoteAppDB=cmdopt["publishPostgres"]) as conn:
+        # Insert an access code for a new instructor into the database
+        dbQuery(
+            conn,
+            (
+                'INSERT INTO "accessCode" ("code", "codeType", "uID_creator", "adminLevel")'
+                "VALUES ('4Xt-Bb4-487', 0, 2, 1);"
+            ),
+            insert=True,
+        )
         
+        subt = """Welcome! This application allows you to review important topics you are 
+        interested in with the help of an AI named SCUIRREL. The topics have been 
+        carefully curated by real humans, but SCUIRREL will try it's best to take the 
+        time to review them with you at your own pace. In this tutorial, we will go 
+        through the main features of the app."""
+        addSubtitle(page, subt)
+
+        subt = """Let's start by creating an account. You will receive an access code 
+        via an administrator or instructor in order to be able to create an account.  
+        Let's say we have an access code 'W4t-00k-gTR'. On the right side of the login page, 
+        fill out the sign up form and provide the access code"""
+        addSubtitle(page, subt) 
+
+        controller.InputText(page, "login-cUsername").set("topStudent", timeout=10000)
+        page.wait_for_timeout(1000)
+        controller.InputPassword(page, "login-cPassword").set(
+            "user123ABC!", timeout=10000
+        )
+        page.wait_for_timeout(1000)
+        controller.InputPassword(page, "login-cPassword2").set(
+            "user123ABC!", timeout=10000
+        )
+        page.wait_for_timeout(1000)
+        controller.InputText(page, "login-cAccessCode").set(
+            '4Xt-Bb4-487', timeout=10000
+        )
+        page.wait_for_timeout(1000)
+
+        subt = """Click the 'Create Account' button to create your account"""
+        addSubtitle(page, subt)
+        controller.InputActionButton(page, "login-createAccount").click(timeout=10000)
+
+        subt = """Let's now login with the new account details"""
+        addSubtitle(page, subt)        
+
+        # LOGIN TAB
+        controller.InputText(page, "login-lUsername").set("topStudent", timeout=10000)
+        page.wait_for_timeout(1000)
+        controller.InputPassword(page, "login-lPassword").set("user123ABC!", timeout=10000)
+        page.wait_for_timeout(1000)
+        controller.InputActionButton(page, "login-login").click(timeout=10000)
+
+        groupCode = dbQuery(
+            conn,
+            (
+                'SELECT * FROM "accessCode" WHERE "codeType" = 2 AND "used" IS NULL'
+            )
+        )
+
+        groupCode = groupCode["code"].iloc[0]
+
+        subt = f"""After successfully logging in, you will be taken to the main page 
+        where you can see the topics available for review. If you have been given an 
+        additional group access code, you can join this group to see new topics. 
+        Let's start by joining a group for a genetics course with the access code 
+        '{groupCode}' by clicking the 'Join Group' button"""
+        addSubtitle(page, subt)
+
+        # Join a group
+        controller.InputActionButton(page, "chat-joinGroup-joinGroup").click(
+            timeout=10000
+        )
+        subt = """Fill in the access code and join the group"""
+        addSubtitle(page, subt)
+        controller.InputText(page, "chat-joinGroup-accessCode").set(groupCode)
+        page.wait_for_timeout(1000)
+        controller.InputActionButton(page, "chat-joinGroup-submitJoin").click(
+            timeout=10000
+        )
+        subt = """We can now select any of the topics available in the group to review
+        and start the conversation with SCUIRREL"""
+        addSubtitle(page, subt)
+        controller.InputSelect(page, "chat-gID").set("2", timeout=10000)
+        page.wait_for_timeout(500)
+        # Chat with SCUIRREL
+        controller.InputActionButton(page, "chat-startConversation").click(
+            timeout=10000
+        )
+
+        subt = """SCUIRREL will initiate and guide the conversation as it had been set
+        up by instructors to only cover specific concepts related to the topic relevant 
+        to your learning"""
+        addSubtitle(page, subt)
+        page.get_by_text(
+            re.compile(r"What do you already know about this?"), exact=False
+        ).wait_for(timeout=15000)
+        subt = """Simply type in your response and click the 'Send' button to chat"""
+        addSubtitle(page, subt)
+        controller.InputTextArea(page, "chat-newChat").set(
+            "Gregor Mendel was a nineteenth-century monk", timeout=10000
+        )
+        controller.InputActionButton(page, "chat-send").click(timeout=10000)
+        page.get_by_text("Scuirrel is foraging for an answer ...").wait_for(
+            timeout=15000
+        )
+        page.locator('[onclick="chatSelection(this,2)"]').wait_for(
+            state="visible", timeout=10000
+        )
+        subt = """You can continue the conversation and monitor you progress in the bar 
+        at the top of the conversation window"""
+        addSubtitle(page, subt)
+        
+        subt = """If available, you can also take a quiz to test your understanding of 
+        the topic. Simply click the 'Take a quiz question' button to start"""
+        addSubtitle(page, subt)
+
+        # Take a quiz question
+        q = dbQuery(conn, 'SELECT * FROM "question" WHERE "qID" = 1')
+        controller.InputActionButton(page, "chat-quiz-quizQuestion").click(
+            timeout=10000
+        )
+        page.wait_for_timeout(1000)
+        controller.InputRadioButtons(page, "chat-quiz-quizOptions").set(
+            q["answer"].iloc[0], timeout=10000
+        )
+        page.wait_for_timeout(1000)
+        controller.InputActionButton(page, "chat-quiz-checkAnswer").click(timeout=10000)
+        page.get_by_text(q["explanation" + q["answer"].iloc[0]].iloc[0]).wait_for(
+            timeout=10000
+        )

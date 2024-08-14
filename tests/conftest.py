@@ -126,7 +126,7 @@ def pytest_sessionfinish(session, exitstatus):
         os.rename(appDB, scuirrelOnlyDB)
 
         return
-
+    # https://stackoverflow.com/questions/50393354/accessing-test-file-name-from-conftest-py
     # Rename the test database to accorns-test.db and the original database back to accorns.db
     # overwrite last test database if needed
     if os.path.exists(testDB):
