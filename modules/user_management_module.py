@@ -97,7 +97,7 @@ def user_management_server(
             (
                 'SELECT u."username", a."code" AS \'resetCode\', u."fName", u."lName", u."email"'
                 'FROM "accessCode" AS a, "user" AS u WHERE a."uID_user" = u."uID" '
-                'AND a."codeType" = 0 AND a."used" IS NULL'
+                'AND a."codeType" = 1 AND a."used" IS NULL'
             ),
         )
         conn.close()

@@ -28,7 +28,13 @@ def pytest_addoption(parser):
         "--newVectorDB",
         action="store_true",
         default=False,
-        help="Test vector database file insertion",
+        help="Don't use the existing vector database. More time and LLM tokens required",
+    )
+    parser.addoption(
+        "--excludeLLMTest",
+        action="store_true",
+        default=False,
+        help="Dont test LLM based actions, apart from the chat itself",
     )
     parser.addoption(
         "--scuirrelOnly",
@@ -59,6 +65,7 @@ def cmdopt(request):
     return {
         "save": request.config.getoption("--save"),
         "newVectorDB": request.config.getoption("--newVectorDB"),
+        "excludeLLMTest": request.config.getoption("--excludeLLMTest"),
         "scuirrelOnly": request.config.getoption("--scuirrelOnly"),
         "accornsOnly": request.config.getoption("--accornsOnly"),
         "publishPostgres": request.config.getoption("--publishPostgres"),
@@ -106,24 +113,19 @@ def pytest_sessionstart(session):
     if os.path.exists(appDB):
         os.rename(appDB, appDB + ".bak")
     if os.path.exists(vectorDB): 
-        if session.config.getoption("--newVectorDB"):
-            os.rename(vectorDB, vectorDB + ".bak")
-        else:
-            copyfile(vectorDB, vectorDB + ".bak")
-    
-    if not session.config.getoption("--newVectorDB"):
-        testVectorDB = os.path.join(curDir, "testData", "vectordb.duckdb")
-        if os.path.exists(testVectorDB):
-            os.replace(testVectorDB, vectorDB)
+        os.rename(vectorDB, vectorDB + ".bak")
 
     return
 
 
 def pytest_sessionfinish(session, exitstatus):
 
-    # Save the test vector database for future use
-    testVectorDB = os.path.join(curDir, "testData", "vectordb.duckdb")
-    os.replace(vectorDB, testVectorDB)
+    # Delete the vector database used in testing
+    if os.path.exists(appDB):
+        os.remove(appDB)
+    
+    if os.path.exists(vectorDB):
+        os.remove(vectorDB)
 
     # Restore any previous databases
     if os.path.exists(appDB + ".bak"):
@@ -214,20 +216,44 @@ def accornsApp(appFiles, request):
     if request.config.getoption("--scuirrelOnly"):
         pytest.skip("Skipping ACCORNS")
 
+    # Use a clean database backup if it exists and not --newVectorDB
+    cleanDB = os.path.join(curDir, "testData", "clean_vectorDB.duckdb")
+    if os.path.exists(cleanDB) and not request.config.getoption("--newVectorDB"):
+        copyfile(cleanDB, vectorDB)
+
     app = appFiles["ACCORNS"]
     app_purepath_exists = isinstance(app, PurePath) and Path(app).is_file()
     app_path = app if app_purepath_exists else request.path.parent / app
     sa_gen = shiny_app_gen(app_path, timeout_secs=60)
 
-    yield next(sa_gen)
+    x = next(sa_gen)
+    
+    # Save a clean backup of the vector database is not already saved or if --newVectorDB
+    if not os.path.exists(cleanDB) or request.config.getoption("--newVectorDB"):
+        copyfile(vectorDB, cleanDB)
+
+    yield x
 
     prefix = "tutorial" if "tutorial" in request.node.name else "test"   
 
-    testDB = os.path.join(curDir, "testData", f"{prefix}_accornsTest.db")
+    # Check if the test failed
+    suffix = "_failed" if request.node.rep_call.failed else ""
+
+    # Save appDB
+    testDB = os.path.join(curDir, "testData", f"{prefix}_accornsAppDB{suffix}.db")
     copyfile(appDB, testDB)
 
     if request.config.getoption("--save"):
-        copyfile(testDB, os.path.join(curDir, "testData", f"{prefix}_accornsTest_{int(datetime.now().timestamp())}.db"))
+        copyfile(testDB, os.path.join(curDir, "testData", f"{prefix}_accornsAppDB{suffix}_{int(datetime.now().timestamp())}.db"))
+
+    # Save vector DB (needed if SCUIRREL is run without ACCORNS first)
+    #  Only do this when test files have been added to the vector DB
+    if not request.config.getoption("--excludeLLMTest"):
+        testDB = os.path.join(curDir, "testData", f"{prefix}_vectorDB{suffix}.duckdb")
+        copyfile(vectorDB, testDB)
+
+    if request.config.getoption("--save"):
+        copyfile(testDB, os.path.join(curDir, "testData", f"{prefix}_vectorDB{suffix}_{int(datetime.now().timestamp())}.duckdb"))
 
 @pytest.fixture
 def scuirrelApp(appFiles, request):
@@ -235,15 +261,24 @@ def scuirrelApp(appFiles, request):
         pytest.skip("Skipping SCUIRREL")
     
     prefix = "tutorial" if "tutorial" in request.node.name else "test"
-    testDB = os.path.join(curDir, "testData", f"{prefix}_accornsTest.db")
+    
+    # Get the appDB from backup    
+    testDB = os.path.join(curDir, "testData", f"{prefix}_accornsAppDB.db")
 
-    if request.config.getoption("--scuirrelOnly"):        
-        if not os.path.exists(testDB):
-            raise ConnectionError(
-                "Existing test database was not found. Please run ACCORNS first"
-            )
-        copyfile(testDB, appDB)
-        return
+    if not os.path.exists(testDB):
+        raise ConnectionError(
+            "Existing app database was not found. Please run ACCORNS first"
+        )
+    copyfile(testDB, appDB)
+    
+    # Get the vectorDB from backup
+    testDB = os.path.join(curDir, "testData", f"{prefix}_vectorDB.duckdb")
+
+    if not os.path.exists(testDB):
+        raise ConnectionError(
+            "Existing vector database was not found. Please run ACCORNS first"
+        )
+    copyfile(testDB, vectorDB)
 
     app = appFiles["SCUIRREL"]
     app_purepath_exists = isinstance(app, PurePath) and Path(app).is_file()
@@ -252,9 +287,9 @@ def scuirrelApp(appFiles, request):
 
     yield next(sa_gen)
 
-    testDB = os.path.join(curDir, "testData", f"{prefix}_scuirrelTest.db")
-    os.replace(appDB, testDB)
+    testDB = os.path.join(curDir, "testData", f"{prefix}_scuirrelAppDB.db")
+    copyfile(appDB, testDB)
 
     if request.config.getoption("--save"):
-        copyfile(testDB, os.path.join(curDir, "testData", f"{prefix}_scuirrelTest_{int(datetime.now().timestamp())}.db"))
+        copyfile(testDB, os.path.join(curDir, "testData", f"{prefix}_scuirrelAppDB_{int(datetime.now().timestamp())}.db"))
 

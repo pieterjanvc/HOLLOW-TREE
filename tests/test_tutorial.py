@@ -96,7 +96,7 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         addSubtitle(page, subt)
 
         subt = """Let's start by creating an account. This will allow you access to both
-        ACCORNS and SCUIRREL providing you have the right access code.You will receive 
+        ACCORNS and SCUIRREL providing you have the right access code. You will receive 
         an access code via an administrator or other instructor.  
         Let's say we have an access code 'W4t-00k-gTR'. On the right side of the login page, 
         fill out the sign up form and provide the access code"""
@@ -156,7 +156,7 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         
         controller.OutputDataFrame(page, "vectorDB-filesTable").select_rows([1])
         subt = """You can now see a summary of the file information being displayed. 
-        Let's now start creating some new topics that can reviewed
+        Let's now start creating some new topics that can be reviewed
          by students in SCUIRREL based on the uploaded materials"""
         addSubtitle(page, subt)        
 
@@ -272,7 +272,7 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         )
 
         subt = """Start by selecting the group and topic you want to generate quiz questions for.
-        Then, click the 'Generate Quiz' button"""
+        Then, click the 'Generate new' button"""
         addSubtitle(page, subt)
         # Add a new quiz question
         controller.InputActionButton(page, "quizGeneration-qGenerate").click(
@@ -285,8 +285,8 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         After you finished reviewing and editing the questions, you should save your changes"""
         addSubtitle(page, subt)
 
-        subt = """Now you have setup new materials, it's time to invite student or other 
-        instructors to join your group and engage with what you have created. To do this,
+        subt = """Now you have setup new materials, it's time to invite students or other 
+        instructors to create accounts and access what you have created. To start,
         navigate to the 'User management' tab"""
         addSubtitle(page, subt)
         controller.NavPanel(page, id="postLoginTabs", data_value="uTab").click(
@@ -294,9 +294,9 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         )
 
         subt = """Remember how you used an access code to create your account? 
-        You can generate new access codes for other people to join your group. 
-        Let's start by generating a new access code for students to create and account 
-        with SCUIRREL access. Set the number of codes to generate, the role of the user,
+        You can generate new access codes for other people to create accounts. 
+        Let's start by generating a new access code for students to create an account 
+        with SCUIRREL access. Set the number of codes to generate, choose 'User' as the role,
         and optionally add a note why you are generating the codes"""
         addSubtitle(page, subt)
 
@@ -322,8 +322,8 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
             timeout=10000
         )
 
-        subt = """Let's also generate a new access code for a co-instructor to get 
-        access to both ACCORNS and SCUIRREL"""
+        subt = """Let's also generate a new access code for a co-instructor to create an
+        account with both ACCORNS and SCUIRREL access."""
         addSubtitle(page, subt)
 
         controller.InputNumeric(page, "userManagement-numCodes").set(
@@ -339,9 +339,13 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         controller.InputActionButton(page, "userManagement-generateCodes").click(
             timeout=10000
         )
+        page.wait_for_timeout(500)
+        
+        #Select first row in code table
+        controller.OutputDataFrame(page, "userManagement-newCodesTable").select_rows([0])
 
         subt = """You can keep track of any unclaimed codes in the table on this page.
-        Note that access codes only give you access to the apps itself, but
+        IMPORTANT: access codes only give you access to the apps itself, but
         not to the topic groups created by you or other users. To join a group, you need
         to generate separate group access code. Let's do that now by navigating back 
         to the 'Groups' tab"""
@@ -383,8 +387,8 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         page.reload()
 
         subt = """You can continue where you left off by logging in again with your account 
-        details. Should you every forget your password, you can request a reset code 
-        by clicking the 'Reset Password' button on the login page""" 
+        details. Should you ever forget your password or like to change it, you can 
+        request a reset code by clicking the 'Reset Password' button on the login page""" 
         addSubtitle(page, subt)            
 
         controller.InputActionLink(page, "login-showReset").click(timeout=10000)
@@ -399,8 +403,8 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         )
         subt = """You should see a message that a reset code has been created.
         You now have to reach out to another instructor or admin to get the code.
-        Given we still know our password, let's just look where to get the code by 
-        logging in again""" 
+        Given we still know our old password, let's login an see where to find the reset 
+        codes""" 
         addSubtitle(page, subt) 
         page.locator('"Dismiss"').click(timeout=10000)  # Close the modal
 
@@ -417,8 +421,11 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         controller.NavPanel(page, id="postLoginTabs", data_value="uTab").click(
             timeout=10000
         )
+        page.wait_for_timeout(500)
+        # Select first row in reset table
+        controller.OutputDataFrame(page, "userManagement-resetTable").select_rows([0])
         subt = """You will now see a table with all requested reset codes you can 
-        share with other users who need to reset their password""" 
+        share with those who requested it.""" 
         addSubtitle(page, subt)
         
         page.wait_for_timeout(1000)
@@ -427,6 +434,8 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         subt = """This concludes the ACCORNS tutorial. If you have any questions,
         please reach out to the app administrator or read the documentation""" 
         addSubtitle(page, subt)
+
+        accornsApp.close()
         
         # page.get_by_text("File info").scroll_into_view_if_needed()
         # # wait 1 second
@@ -596,15 +605,19 @@ def test_scuirrel_tutorial(cmdopt, page, scuirrelApp):
         controller.InputActionButton(page, "chat-joinGroup-submitJoin").click(
             timeout=10000
         )
-        subt = """We can now select any of the topics available in the group to review
+        subt = """We can now select any of the topics available in the new group to review
         and start the conversation with SCUIRREL"""
         addSubtitle(page, subt)
         controller.InputSelect(page, "chat-gID").set("2", timeout=10000)
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(2000)
         # Chat with SCUIRREL
         controller.InputActionButton(page, "chat-startConversation").click(
             timeout=10000
         )
+        page.wait_for_timeout(2000)
+
+        # Bring the send button into view3
+        page.locator("#chat-send").scroll_into_view_if_needed()
 
         subt = """SCUIRREL will initiate and guide the conversation as it had been set
         up by instructors to only cover specific concepts related to the topic relevant 
@@ -638,12 +651,31 @@ def test_scuirrel_tutorial(cmdopt, page, scuirrelApp):
         controller.InputActionButton(page, "chat-quiz-quizQuestion").click(
             timeout=10000
         )
-        page.wait_for_timeout(1000)
+        subt = """Read the question and select the correct answer from the options"""
+        addSubtitle(page, subt, min_wait_seconds=4)
         controller.InputRadioButtons(page, "chat-quiz-quizOptions").set(
             q["answer"].iloc[0], timeout=10000
         )
-        page.wait_for_timeout(1000)
+        subt = """Then check your answer"""
+        addSubtitle(page, subt)
         controller.InputActionButton(page, "chat-quiz-checkAnswer").click(timeout=10000)
         page.get_by_text(q["explanation" + q["answer"].iloc[0]].iloc[0]).wait_for(
             timeout=10000
         )
+        subt = """You can close the quiz window when finished"""
+        addSubtitle(page, subt)
+        page.locator('"Return"').click(timeout=10000)
+
+        subt = """When you have finished, you can simply reload or close the browser 
+        to log out."""
+        addSubtitle(page, subt)
+
+        page.reload()
+        page.wait_for_timeout(1000)
+
+        subt = """This concludes the brief introduction to SCUIRREL.  
+        If you have any questions, please reach out to the app administrator or 
+        read the documentation"""
+        addSubtitle(page, subt)
+
+        scuirrelApp.close()

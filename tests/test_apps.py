@@ -20,7 +20,8 @@ curDir = os.path.dirname(os.path.realpath(__file__))
 #       --headed (browser is visible)
 #       --slowmo 200 (slows down every action by x ms to better see what's happening)
 #       --save (save timestamped database, otherwise overwrite previous test database)
-#       --newVectorDB (test the vector database, uses more GPT tokens)
+#       --newVectorDB (don't use a backup vector database. More time and LLM tokens required)
+#       --excludeLLMTest (exclude test functions that use LLM apart from chat itself)
 #       --scuirrelOnly (test SCUIRREL only, requires existing test database)
 #       --accornsOnly (test ACCORNS only)
 #       --publishPostgres (generate publishing directories and test with the postgres database)
@@ -69,6 +70,12 @@ def test_accorns(cmdopt, page, browser, accornsApp):
         controller.NavPanel(page, id="postLoginTabs", data_value="uTab").click(
             timeout=10000
         )
+        # Check if the reset table has the reset code
+        resetCode = dbQuery(conn, 'SELECT "code" FROM "accessCode" WHERE "codeType" = 1')
+        controller.OutputDataFrame(page, "userManagement-resetTable").expect_cell(
+            resetCode["code"].iloc[0], row=0, col=1
+        )
+
         # Generate a code for a user, instructor and admin
         for user in ["User", "Instructor", "Admin"]:
             controller.InputNumeric(page, "userManagement-numCodes").set(
@@ -132,7 +139,7 @@ def test_accorns(cmdopt, page, browser, accornsApp):
         controller.OutputDataFrame(page, "vectorDB-filesTable").select_rows([0])
         controller.OutputUi(page, "vectorDB-fileInfo").expect_container_tag("div")
 
-        if cmdopt["newVectorDB"]:
+        if not cmdopt["excludeLLMTest"]:
             controller.InputFile(page, "vectorDB-newFile").set(
                 os.path.join(curDir, "testData", "MendelianInheritance.txt"),
                 expect_complete_timeout=10000,
@@ -208,12 +215,12 @@ def test_accorns(cmdopt, page, browser, accornsApp):
         )
 
         # Add a new quiz question
-        if cmdopt["newVectorDB"]:
+        if not cmdopt["excludeLLMTest"]:
             controller.InputActionButton(page, "quizGeneration-qGenerate").click(
                 timeout=10000
             )
             page.get_by_text(re.compile("Correct answer:"), exact=False).wait_for(
-                timeout=10000
+                timeout=20000
             )
             q = dbQuery(conn, 'SELECT "optionA" FROM "question"')
             controller.InputText(page, "quizGeneration-rqOA").expect_value(
@@ -363,6 +370,7 @@ def test_accorns(cmdopt, page, browser, accornsApp):
         assert q["uID"].iloc[0] == 2
         assert not q.loc[:, q.columns != "error"].iloc[0].isna().any()
 
+    page.reload()
     accornsApp.close()
 
 
@@ -439,6 +447,7 @@ def test_scuirrel(page, browser, scuirrelApp, cmdopt):
             timeout=10000
         )
     
+    page.reload()
     scuirrelApp.close()
 
 
