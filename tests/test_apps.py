@@ -146,7 +146,7 @@ def test_accorns(cmdopt, page, browser, accornsApp):
             )
             # If successful, the file will be added to the table
             controller.OutputDataFrame(page, "vectorDB-filesTable").expect_nrow(
-                2, timeout=10000
+                2, timeout=20000
             )
 
         # TOPICS TAB
@@ -404,6 +404,7 @@ def test_scuirrel(page, browser, scuirrelApp, cmdopt):
         controller.InputText(page, "chat-joinGroup-accessCode").set(
             accessCodes["code"].iloc[0], timeout=10000
         )
+        page.wait_for_timeout(200)
         controller.InputActionButton(page, "chat-joinGroup-submitJoin").click(
             timeout=10000
         )

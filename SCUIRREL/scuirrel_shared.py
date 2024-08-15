@@ -20,9 +20,7 @@ curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 with open(os.path.join(curDir, "scuirrel_config.toml"), "r") as f:
     config = toml.load(f)
 
-allowMultiGuess = any(
-    config["general"]["allowMultiGuess"] == x for x in ["True", "true", "T", 1]
-)
+allowMultiGuess = config["general"]["allowMultiGuess"]
 
 if not os.path.exists(shared.vectorDB) and not shared.remoteAppDB:
     raise ConnectionError("The vector database was not found. Please run ACCORNS first")

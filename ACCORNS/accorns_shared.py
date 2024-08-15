@@ -35,9 +35,7 @@ appDBDir = os.path.join(curDir, "appDB")
 with open(os.path.join(curDir, "accorns_config.toml"), "r") as f:
     config = toml.load(f)
 
-saveFileCopy = any(
-    config["localStorage"]["saveFileCopy"] == x for x in ["True", "true", "T", 1]
-)
+saveFileCopy = config["localStorage"]["saveFileCopy"]
 
 if not saveFileCopy:
     storageFolder = None

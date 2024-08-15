@@ -95,7 +95,7 @@ def user_management_server(
         resetTable = shared.pandasQuery(
             conn,
             (
-                'SELECT u."username", a."code" AS \'resetCode\', u."fName", u."lName", u."email"'
+                'SELECT u."username", a."code" AS "resetCode", u."fName", u."lName", u."email" '
                 'FROM "accessCode" AS a, "user" AS u WHERE a."uID_user" = u."uID" '
                 'AND a."codeType" = 1 AND a."used" IS NULL'
             ),

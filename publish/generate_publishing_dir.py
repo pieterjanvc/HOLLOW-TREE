@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser(description='Command line arguments for the pub
 # App to generate
 parser.add_argument('--app', default = "", type=str, help='App to generate (SCUIRREL or ACCORNS)')
 
-# Setitngs
+# Settings
 parser.add_argument('--localDB', action='store_true', help='Use file-based databases for the app (not compatible with online deployment)')
 parser.add_argument('--addDemo', action='store_true', help='Add the demo to the app')
 parser.add_argument('--personalInfo', action='store_true', help='Require personal information when signing up')

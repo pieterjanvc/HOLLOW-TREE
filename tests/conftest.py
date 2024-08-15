@@ -90,12 +90,15 @@ def appFiles(request):
 def pytest_sessionstart(session):
 
     if session.config.getoption("--publishPostgres"):
+        if session.config.getoption("--scuirrelOnly") or session.config.getoption("--accornsOnly"):
+            NotImplementedError("Cannot run SCUIRREL or ACCORNS only with --publishPostgres")
+        
         # Generate the publishing directories
         script = (
             os.path.join(curDir, "..", "publish", "generate_publishing_dir.py")
             + " --addDemo"
         )
-        os.system(script)
+        os.system("python " + script)
 
         # Reset the Postgres database
         script = os.path.join(
@@ -119,6 +122,9 @@ def pytest_sessionstart(session):
 
 
 def pytest_sessionfinish(session, exitstatus):
+
+    if session.config.getoption("--publishPostgres"):
+        return
 
     # Delete the vector database used in testing
     if os.path.exists(appDB):
@@ -218,7 +224,7 @@ def accornsApp(appFiles, request):
 
     # Use a clean database backup if it exists and not --newVectorDB
     cleanDB = os.path.join(curDir, "testData", "clean_vectorDB.duckdb")
-    if os.path.exists(cleanDB) and not request.config.getoption("--newVectorDB"):
+    if os.path.exists(cleanDB) and not request.config.getoption("--newVectorDB") and not request.config.getoption("--publishPostgres"):
         copyfile(cleanDB, vectorDB)
 
     app = appFiles["ACCORNS"]
@@ -229,7 +235,7 @@ def accornsApp(appFiles, request):
     x = next(sa_gen)
     
     # Save a clean backup of the vector database is not already saved or if --newVectorDB
-    if not os.path.exists(cleanDB) or request.config.getoption("--newVectorDB"):
+    if not os.path.exists(cleanDB) or request.config.getoption("--newVectorDB") and not request.config.getoption("--publishPostgres"):
         copyfile(vectorDB, cleanDB)
 
     yield x
@@ -238,6 +244,10 @@ def accornsApp(appFiles, request):
 
     # Check if the test failed
     suffix = "_failed" if request.node.rep_call.failed else ""
+
+    # Don't save local the databases if --publishPostgres
+    if request.config.getoption("--publishPostgres"):
+        return
 
     # Save appDB
     testDB = os.path.join(curDir, "testData", f"{prefix}_accornsAppDB{suffix}.db")
@@ -259,26 +269,28 @@ def accornsApp(appFiles, request):
 def scuirrelApp(appFiles, request):
     if request.config.getoption("--accornsOnly"):
         pytest.skip("Skipping SCUIRREL")
-    
+        
     prefix = "tutorial" if "tutorial" in request.node.name else "test"
     
-    # Get the appDB from backup    
-    testDB = os.path.join(curDir, "testData", f"{prefix}_accornsAppDB.db")
+    # Ignore local DB when the test is run with --publishPostgres 
+    if not request.config.getoption("--publishPostgres"):
+        # Get the appDB from backup    
+        testDB = os.path.join(curDir, "testData", f"{prefix}_accornsAppDB.db")
 
-    if not os.path.exists(testDB):
-        raise ConnectionError(
-            "Existing app database was not found. Please run ACCORNS first"
-        )
-    copyfile(testDB, appDB)
-    
-    # Get the vectorDB from backup
-    testDB = os.path.join(curDir, "testData", f"{prefix}_vectorDB.duckdb")
+        if not os.path.exists(testDB):
+            raise ConnectionError(
+                "Existing app database was not found. Please run ACCORNS first"
+            )
+        copyfile(testDB, appDB)
+        
+        # Get the vectorDB from backup
+        testDB = os.path.join(curDir, "testData", f"{prefix}_vectorDB.duckdb")
 
-    if not os.path.exists(testDB):
-        raise ConnectionError(
-            "Existing vector database was not found. Please run ACCORNS first"
-        )
-    copyfile(testDB, vectorDB)
+        if not os.path.exists(testDB):
+            raise ConnectionError(
+                "Existing vector database was not found. Please run ACCORNS first"
+            )
+        copyfile(testDB, vectorDB)
 
     app = appFiles["SCUIRREL"]
     app_purepath_exists = isinstance(app, PurePath) and Path(app).is_file()
@@ -286,6 +298,10 @@ def scuirrelApp(appFiles, request):
     sa_gen = shiny_app_gen(app_path, timeout_secs=60)
 
     yield next(sa_gen)
+
+    # Don't save local the databases if --publishPostgres
+    if request.config.getoption("--publishPostgres"):
+        return
 
     testDB = os.path.join(curDir, "testData", f"{prefix}_scuirrelAppDB.db")
     copyfile(appDB, testDB)

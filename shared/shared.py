@@ -39,10 +39,8 @@ codeTypes = {0: "accessCode", 1: "resetCode", 2: "groupCode"}
 with open(os.path.join(curDir, "shared_config.toml"), "r") as f:
     config = toml.load(f)
 
-remoteAppDB = any(
-    config["general"]["remoteAppDB"] == x for x in ["True", "true", "T", 1]
-)
-addDemo = any(config["general"]["addDemo"] == x for x in ["True", "true", "T", 1])
+remoteAppDB = config["general"]["remoteAppDB"]
+addDemo = config["general"]["addDemo"]
 demoFile = "https://github.com/pieterjanvc/seq2mgs/files/14964109/Central_dogma_of_molecular_biology.pdf"
 postgresHost = config["postgres"]["host"]
 postgresPort = int(config["postgres"]["port"])
@@ -50,9 +48,7 @@ vectorDB = os.path.normpath(config["localStorage"]["duckDB"])
 sqliteDB = os.path.normpath(config["localStorage"]["sqliteDB"])
 postgresAccorns = "accorns"
 postgresScuirrel = "scuirrel"
-personalInfo = any(
-    config["auth"]["personalInfo"] == x for x in ["True", "true", "T", 1]
-)
+personalInfo = config["auth"]["personalInfo"]
 validEmail = config["auth"]["validEmail"]
 
 # Create the parent directory for the sqliteDB if it does not exist
