@@ -6,7 +6,7 @@
 
 from shiny.playwright import controller
 from shiny.run import ShinyAppProc
-from playwright.sync_api import Page
+from playwright.sync_api import Page, Browser
 from conftest import appDBConn, dbQuery
 import pytest
 import os
@@ -33,7 +33,7 @@ curDir = os.path.dirname(os.path.realpath(__file__))
 #      create_app_fixture(os.path.join(curDir, "..", "accorns_app.py"))
 
 
-def test_accorns(cmdopt, page, accornsApp):
+def test_accorns(cmdopt, page, browser, accornsApp):
     # Ignore this test if the scuirrelOnly flag is set
     if cmdopt["scuirrelOnly"] and not cmdopt["publishPostgres"]:
         return
@@ -260,7 +260,7 @@ def test_accorns(cmdopt, page, accornsApp):
             accessCodes["code"].iloc[1], timeout=10000
         )
         controller.InputActionButton(page, "login-createAccount").click(timeout=10000)
-
+        page.wait_for_timeout(500)
         # Instructor
         controller.InputText(page, "login-cUsername").set(
             "testInstructor", timeout=10000
@@ -363,11 +363,13 @@ def test_accorns(cmdopt, page, accornsApp):
         assert q["uID"].iloc[0] == 2
         assert not q.loc[:, q.columns != "error"].iloc[0].isna().any()
 
+    accornsApp.close()
+
 
 # Initialise Shiny app
 
 
-def test_scuirrel(page, scuirrelApp, cmdopt):
+def test_scuirrel(page, browser, scuirrelApp, cmdopt):
     # Ignore this test if the scuirrelOnly flag is set
     if cmdopt["accornsOnly"] and not cmdopt["publishPostgres"]:
         return
@@ -436,6 +438,8 @@ def test_scuirrel(page, scuirrelApp, cmdopt):
         page.get_by_text(q["explanation" + q["answer"].iloc[0]].iloc[0]).wait_for(
             timeout=10000
         )
+    
+    scuirrelApp.close()
 
 
 # def test_publishing(page: Page, accornsApp: ShinyAppProc, cmdopt):

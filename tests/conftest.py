@@ -15,9 +15,6 @@ from playwright.sync_api import Playwright, Browser, BrowserContext
 curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 appDB = os.path.join(curDir, "..", "appData", "accorns.db")
 vectorDB = os.path.join(curDir, "..", "appData", "vectordb.duckdb")
-testDB = os.path.join(curDir, "..", "appData", "accorns-test.db")
-scuirrelOnlyDB = os.path.join(curDir, "..", "appData", "scuirrelOnly-test.db")
-
 
 # Add a command line option to save the database after the test
 def pytest_addoption(parser):
@@ -84,6 +81,7 @@ def appFiles(request):
 
 # Code to run before and after the test session
 def pytest_sessionstart(session):
+
     if session.config.getoption("--publishPostgres"):
         # Generate the publishing directories
         script = (
@@ -102,47 +100,36 @@ def pytest_sessionstart(session):
         )
         os.system(script)
 
-    if session.config.getoption("--scuirrelOnly"):
-        if not os.path.exists(testDB):
-            raise ConnectionError(
-                "Existing test database was not found. Please run ACCORNS test first"
-            )
-        copyfile(testDB, appDB)
         return
-
+    
     # Backup existing databases
     if os.path.exists(appDB):
         os.rename(appDB, appDB + ".bak")
-    if os.path.exists(vectorDB):
-        copyfile(vectorDB, vectorDB + ".bak")
+    if os.path.exists(vectorDB): 
+        if session.config.getoption("--newVectorDB"):
+            os.rename(vectorDB, vectorDB + ".bak")
+        else:
+            copyfile(vectorDB, vectorDB + ".bak")
+    
+    if not session.config.getoption("--newVectorDB"):
+        testVectorDB = os.path.join(curDir, "testData", "vectordb.duckdb")
+        if os.path.exists(testVectorDB):
+            os.replace(testVectorDB, vectorDB)
 
     return
 
 
 def pytest_sessionfinish(session, exitstatus):
-    if session.config.getoption("--scuirrelOnly"):
-        if os.path.exists(scuirrelOnlyDB):
-            os.remove(scuirrelOnlyDB)
-        os.rename(appDB, scuirrelOnlyDB)
 
-        return
-    # https://stackoverflow.com/questions/50393354/accessing-test-file-name-from-conftest-py
-    # Rename the test database to accorns-test.db and the original database back to accorns.db
-    # overwrite last test database if needed
-    if os.path.exists(testDB):
-        os.remove(testDB)
+    # Save the test vector database for future use
+    testVectorDB = os.path.join(curDir, "testData", "vectordb.duckdb")
+    os.replace(vectorDB, testVectorDB)
 
-    if session.config.getoption("--save"):
-        os.rename(appDB, f"appData/accorns-test_{int(datetime.now().timestamp())}.db")
-    elif os.path.exists(appDB):
-        os.rename(appDB, testDB)
-
+    # Restore any previous databases
     if os.path.exists(appDB + ".bak"):
         os.rename(appDB + ".bak", appDB)
-
-    # Restore the original vector database
+    
     if os.path.exists(vectorDB + ".bak"):
-        os.remove(vectorDB)
         os.rename(vectorDB + ".bak", vectorDB)
 
 
@@ -225,7 +212,7 @@ def context(browser: Browser, request) -> BrowserContext:
 @pytest.fixture
 def accornsApp(appFiles, request):
     if request.config.getoption("--scuirrelOnly"):
-        pytest.skip("Skipping ACCORNS test")
+        pytest.skip("Skipping ACCORNS")
 
     app = appFiles["ACCORNS"]
     app_purepath_exists = isinstance(app, PurePath) and Path(app).is_file()
@@ -234,15 +221,40 @@ def accornsApp(appFiles, request):
 
     yield next(sa_gen)
 
+    prefix = "tutorial" if "tutorial" in request.node.name else "test"   
+
+    testDB = os.path.join(curDir, "testData", f"{prefix}_accornsTest.db")
+    copyfile(appDB, testDB)
+
+    if request.config.getoption("--save"):
+        copyfile(testDB, os.path.join(curDir, "testData", f"{prefix}_accornsTest_{int(datetime.now().timestamp())}.db"))
 
 @pytest.fixture
 def scuirrelApp(appFiles, request):
     if request.config.getoption("--accornsOnly"):
-        pytest.skip("Skipping SCUIRREL test")
+        pytest.skip("Skipping SCUIRREL")
+    
+    prefix = "tutorial" if "tutorial" in request.node.name else "test"
+    testDB = os.path.join(curDir, "testData", f"{prefix}_accornsTest.db")
+
+    if request.config.getoption("--scuirrelOnly"):        
+        if not os.path.exists(testDB):
+            raise ConnectionError(
+                "Existing test database was not found. Please run ACCORNS first"
+            )
+        copyfile(testDB, appDB)
+        return
 
     app = appFiles["SCUIRREL"]
     app_purepath_exists = isinstance(app, PurePath) and Path(app).is_file()
     app_path = app if app_purepath_exists else request.path.parent / app
     sa_gen = shiny_app_gen(app_path, timeout_secs=60)
+
     yield next(sa_gen)
+
+    testDB = os.path.join(curDir, "testData", f"{prefix}_scuirrelTest.db")
+    os.replace(appDB, testDB)
+
+    if request.config.getoption("--save"):
+        copyfile(testDB, os.path.join(curDir, "testData", f"{prefix}_scuirrelTest_{int(datetime.now().timestamp())}.db"))
 
