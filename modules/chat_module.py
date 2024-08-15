@@ -18,21 +18,24 @@ from htmltools import HTML, div
 
 
 # ---- VARS & FUNCTIONS ----
-def groupQuery(uID, postgresUser, demo=shared.addDemo):
+def groupQuery(user, postgresUser, demo=shared.addDemo):
     includeDemo = (
         'UNION SELECT "gID", "group" FROM "group" WHERE "gID" = 1 ' if demo else ""
     )
+    userFilter = 'AND m."uID" = ? ' if user["adminLevel"] < 2 else ""
+    params = (user["uID"],) if user["adminLevel"] < 2 else ()
+
     conn = shared.appDBConn(postgresUser)
     getGroups = shared.pandasQuery(
         conn,
         (
             'SELECT g."gID", g."group" '
             'FROM group_member AS m, "group_topic" AS t, "group" AS g '
-            'WHERE m."uID" = ? AND m."gID" = g."gID" AND t."gID" = g."gID" '
+            f'WHERE m."gID" = g."gID" AND t."gID" = g."gID" {userFilter}'
             'AND t."tID" IN (SELECT DISTINCT "tID" FROM "concept" WHERE "archived" = 0) '
             f'{includeDemo} ORDER BY "group"'
         ),
-        (uID,),
+        params,
     )
     conn.close()
     return getGroups
@@ -151,7 +154,7 @@ def chat_server(
         if newGroup() is None:
             return
 
-        groups.set(groupQuery(user.get()["uID"], postgresUser))
+        groups.set(groupQuery(user.get(), postgresUser))
         return
 
     @reactive.effect
@@ -183,7 +186,7 @@ def chat_server(
     @reactive.effect
     @reactive.event(user)
     def _():
-        getGroups = groupQuery(user.get()["uID"], postgresUser)
+        getGroups = groupQuery(user.get(), postgresUser)
         groups.set(getGroups)
 
         return

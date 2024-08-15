@@ -1,12 +1,15 @@
 appData/uploadedFiles/*
 *.pyc
 *.db
+*.db-journal
 backup/*
 local/*
 *.svg
 *.duckdb
+*.duckdb-wal
 .venv/*
 .vscode/*
 *.code-workspace
 publish/*
 !publish/publish.py
+*.webm

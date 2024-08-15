@@ -6,7 +6,7 @@
 
 from shiny.playwright import controller
 from shiny.run import ShinyAppProc
-from playwright.sync_api import Page
+from playwright.sync_api import Page, Browser
 from conftest import appDBConn, dbQuery
 import pytest
 import os
@@ -20,7 +20,8 @@ curDir = os.path.dirname(os.path.realpath(__file__))
 #       --headed (browser is visible)
 #       --slowmo 200 (slows down every action by x ms to better see what's happening)
 #       --save (save timestamped database, otherwise overwrite previous test database)
-#       --newVectorDB (test the vector database, uses more GPT tokens)
+#       --newVectorDB (don't use a backup vector database. More time and LLM tokens required)
+#       --excludeLLMTest (exclude test functions that use LLM apart from chat itself)
 #       --scuirrelOnly (test SCUIRREL only, requires existing test database)
 #       --accornsOnly (test ACCORNS only)
 #       --publishPostgres (generate publishing directories and test with the postgres database)
@@ -33,7 +34,7 @@ curDir = os.path.dirname(os.path.realpath(__file__))
 #      create_app_fixture(os.path.join(curDir, "..", "accorns_app.py"))
 
 
-def test_accorns(cmdopt, page, accornsApp):
+def test_accorns(cmdopt, page, browser, accornsApp):
     # Ignore this test if the scuirrelOnly flag is set
     if cmdopt["scuirrelOnly"] and not cmdopt["publishPostgres"]:
         return
@@ -69,6 +70,14 @@ def test_accorns(cmdopt, page, accornsApp):
         controller.NavPanel(page, id="postLoginTabs", data_value="uTab").click(
             timeout=10000
         )
+        # Check if the reset table has the reset code
+        resetCode = dbQuery(
+            conn, 'SELECT "code" FROM "accessCode" WHERE "codeType" = 1'
+        )
+        controller.OutputDataFrame(page, "userManagement-resetTable").expect_cell(
+            resetCode["code"].iloc[0], row=0, col=1
+        )
+
         # Generate a code for a user, instructor and admin
         for user in ["User", "Instructor", "Admin"]:
             controller.InputNumeric(page, "userManagement-numCodes").set(
@@ -132,14 +141,14 @@ def test_accorns(cmdopt, page, accornsApp):
         controller.OutputDataFrame(page, "vectorDB-filesTable").select_rows([0])
         controller.OutputUi(page, "vectorDB-fileInfo").expect_container_tag("div")
 
-        if cmdopt["newVectorDB"]:
+        if not cmdopt["excludeLLMTest"]:
             controller.InputFile(page, "vectorDB-newFile").set(
                 os.path.join(curDir, "testData", "MendelianInheritance.txt"),
                 expect_complete_timeout=10000,
             )
             # If successful, the file will be added to the table
             controller.OutputDataFrame(page, "vectorDB-filesTable").expect_nrow(
-                2, timeout=10000
+                2, timeout=20000
             )
 
         # TOPICS TAB
@@ -208,12 +217,12 @@ def test_accorns(cmdopt, page, accornsApp):
         )
 
         # Add a new quiz question
-        if cmdopt["newVectorDB"]:
+        if not cmdopt["excludeLLMTest"]:
             controller.InputActionButton(page, "quizGeneration-qGenerate").click(
                 timeout=10000
             )
             page.get_by_text(re.compile("Correct answer:"), exact=False).wait_for(
-                timeout=10000
+                timeout=20000
             )
             q = dbQuery(conn, 'SELECT "optionA" FROM "question"')
             controller.InputText(page, "quizGeneration-rqOA").expect_value(
@@ -260,7 +269,7 @@ def test_accorns(cmdopt, page, accornsApp):
             accessCodes["code"].iloc[1], timeout=10000
         )
         controller.InputActionButton(page, "login-createAccount").click(timeout=10000)
-
+        page.wait_for_timeout(500)
         # Instructor
         controller.InputText(page, "login-cUsername").set(
             "testInstructor", timeout=10000
@@ -363,11 +372,14 @@ def test_accorns(cmdopt, page, accornsApp):
         assert q["uID"].iloc[0] == 2
         assert not q.loc[:, q.columns != "error"].iloc[0].isna().any()
 
+    page.reload()
+    accornsApp.close()
+
 
 # Initialise Shiny app
 
 
-def test_scuirrel(page, scuirrelApp, cmdopt):
+def test_scuirrel(page, browser, scuirrelApp, cmdopt):
     # Ignore this test if the scuirrelOnly flag is set
     if cmdopt["accornsOnly"] and not cmdopt["publishPostgres"]:
         return
@@ -394,6 +406,7 @@ def test_scuirrel(page, scuirrelApp, cmdopt):
         controller.InputText(page, "chat-joinGroup-accessCode").set(
             accessCodes["code"].iloc[0], timeout=10000
         )
+        page.wait_for_timeout(200)
         controller.InputActionButton(page, "chat-joinGroup-submitJoin").click(
             timeout=10000
         )
@@ -436,6 +449,9 @@ def test_scuirrel(page, scuirrelApp, cmdopt):
         page.get_by_text(q["explanation" + q["answer"].iloc[0]].iloc[0]).wait_for(
             timeout=10000
         )
+
+    page.reload()
+    scuirrelApp.close()
 
 
 # def test_publishing(page: Page, accornsApp: ShinyAppProc, cmdopt):

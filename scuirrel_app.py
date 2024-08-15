@@ -23,7 +23,7 @@ from htmltools import HTML
 # *********************************
 
 if shared.remoteAppDB:
-    _ = shared.checkRemoteDB(postgresUser = shared.postgresScuirrel)
+    _ = shared.checkRemoteDB(postgresUser=shared.postgresScuirrel)
 
 # --- RENDERING UI ---
 # ********************
