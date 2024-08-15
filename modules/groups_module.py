@@ -18,10 +18,18 @@ accessCodesQuery = (
     'FROM "accessCode" AS a, "group" AS g, "user" AS u '
     'WHERE a."gID" = g."gID" AND a."uID_creator" = u."uID" AND a."used" IS NULL AND a."gID" = ?'
 )
-groupQuery = (
-    'SELECT * FROM "group" WHERE "gID" IN ('
-    'SELECT "gID" FROM "group_member" WHERE "uID" = ?)'
+
+def groupQuery(conn, user):
+    userFilter = 'WHERE "gID" IN (SELECT "gID" FROM "group_member" WHERE "uID" = ?) ' if user["adminLevel"] < 2 else ""
+    params = (int(user["uID"]),) if user["adminLevel"] < 2 else ()
+    return shared.pandasQuery(
+            conn,
+            (
+            f'SELECT * FROM "group" {userFilter} '
+            ),
+            params=params,
 )
+
 # Ignore the anonymous group
 groupAdminLevels = {
     k: shared.groupAdminLevels[k] for k in list(shared.groupAdminLevels.keys())[1:]
@@ -113,11 +121,7 @@ def groups_server(
             return
 
         conn = shared.appDBConn(postgresUser=postgresUser)
-        newGroups = shared.pandasQuery(
-            conn,
-            groupQuery,
-            params=(int(user.get()["uID"]),),
-        )
+        newGroups = groupQuery(conn, user.get())
         conn.close()
         groups.set(newGroups)
         return
@@ -127,7 +131,7 @@ def groups_server(
     def _():
         conn = shared.appDBConn(postgresUser=postgresUser)
         groups.set(
-            shared.pandasQuery(conn, groupQuery, params=(int(user.get()["uID"]),))
+            groupQuery(conn, user.get())
         )
         conn.close()
 
@@ -140,6 +144,7 @@ def groups_server(
             choices=dict(
                 zip(groups.get()["gID"].to_list(), groups.get()["group"].to_list())
             ),
+            selected=groups.get().shape[0] if groups.get().shape[0] > 0 else None,
         )
         return
 
@@ -217,11 +222,7 @@ def groups_server(
             (gID, int(user.get()["uID"]), 2, shared.dt()),
         )
 
-        newGroups = shared.pandasQuery(
-            conn,
-            groupQuery,
-            params=(int(user.get()["uID"]),),
-        )
+        newGroups = groupQuery(conn, user.get())
         conn.commit()
         conn.close()
 

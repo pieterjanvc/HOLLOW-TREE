@@ -155,6 +155,9 @@ def test_accorns(cmdopt, page, browser, accornsApp):
         controller.NavPanel(page, id="postLoginTabs", data_value="tTab").click(
             timeout=10000
         )
+        
+        # Select the new group by name
+        controller.InputSelect(page, "topics-gID").set("testGroup", timeout=10000)
 
         # Add a new topic
         controller.InputActionButton(page, "topics-tAdd").click(timeout=10000)
@@ -215,6 +218,9 @@ def test_accorns(cmdopt, page, browser, accornsApp):
         controller.NavPanel(page, id="postLoginTabs", data_value="qTab").click(
             timeout=10000
         )
+
+        # Select the new group by name
+        controller.InputSelect(page, "quizGeneration-gID").set("testGroup", timeout=10000)
 
         # Add a new quiz question
         if not cmdopt["excludeLLMTest"]:
