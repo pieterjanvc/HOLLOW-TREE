@@ -16,6 +16,7 @@ curDir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 appDB = os.path.join(curDir, "..", "appData", "accorns.db")
 vectorDB = os.path.join(curDir, "..", "appData", "vectordb.duckdb")
 
+
 # Add a command line option to save the database after the test
 def pytest_addoption(parser):
     parser.addoption(
@@ -57,7 +58,6 @@ def pytest_addoption(parser):
         default=False,
         help="Record the test session",
     )
-    
 
 
 @pytest.fixture
@@ -88,11 +88,14 @@ def appFiles(request):
 
 # Code to run before and after the test session
 def pytest_sessionstart(session):
-
     if session.config.getoption("--publishPostgres"):
-        if session.config.getoption("--scuirrelOnly") or session.config.getoption("--accornsOnly"):
-            NotImplementedError("Cannot run SCUIRREL or ACCORNS only with --publishPostgres")
-        
+        if session.config.getoption("--scuirrelOnly") or session.config.getoption(
+            "--accornsOnly"
+        ):
+            NotImplementedError(
+                "Cannot run SCUIRREL or ACCORNS only with --publishPostgres"
+            )
+
         # Generate the publishing directories
         script = (
             os.path.join(curDir, "..", "publish", "generate_publishing_dir.py")
@@ -111,32 +114,31 @@ def pytest_sessionstart(session):
         os.system(script)
 
         return
-    
+
     # Backup existing databases
     if os.path.exists(appDB):
         os.rename(appDB, appDB + ".bak")
-    if os.path.exists(vectorDB): 
+    if os.path.exists(vectorDB):
         os.rename(vectorDB, vectorDB + ".bak")
 
     return
 
 
 def pytest_sessionfinish(session, exitstatus):
-
     if session.config.getoption("--publishPostgres"):
         return
 
     # Delete the vector database used in testing
     if os.path.exists(appDB):
         os.remove(appDB)
-    
+
     if os.path.exists(vectorDB):
         os.remove(vectorDB)
 
     # Restore any previous databases
     if os.path.exists(appDB + ".bak"):
         os.rename(appDB + ".bak", appDB)
-    
+
     if os.path.exists(vectorDB + ".bak"):
         os.rename(vectorDB + ".bak", vectorDB)
 
@@ -178,29 +180,29 @@ def dbQuery(conn, query, params=(), insert=False, remoteAppDB=False):
 
     return q
 
+
 @pytest.fixture(scope="session")
 def browser(playwright: Playwright, request) -> Browser:
-    headed = request.config.getoption("--headed") 
-    slowmo = request.config.getoption("--slowmo")  
+    headed = request.config.getoption("--headed")
+    slowmo = request.config.getoption("--slowmo")
 
     launch_options = {}
     if headed:
-        launch_options['headless'] = False  
+        launch_options["headless"] = False
     if slowmo:
-        launch_options['slow_mo'] = slowmo
+        launch_options["slow_mo"] = slowmo
 
     return playwright.chromium.launch(**launch_options)
+
 
 @pytest.fixture(scope="function")
 def context(browser: Browser, request) -> BrowserContext:
     record = request.config.getoption("--record")
 
-    context_options = {
-        'viewport': {'width': 1280, 'height': 1000}
-    }
+    context_options = {"viewport": {"width": 1280, "height": 1000}}
 
     if record:
-        context_options['record_video_size'] = {'width': 1280, 'height': 1000}
+        context_options["record_video_size"] = {"width": 1280, "height": 1000}
 
     if not record:
         yield browser.new_context(**context_options)
@@ -209,13 +211,14 @@ def context(browser: Browser, request) -> BrowserContext:
     video_dir = os.path.join(os.path.dirname(__file__), "videos")
     os.makedirs(video_dir, exist_ok=True)
 
-    context_options['record_video_dir'] = video_dir
+    context_options["record_video_dir"] = video_dir
 
-    context = browser.new_context(**context_options)    
-    
+    context = browser.new_context(**context_options)
+
     yield context
 
     context.close()
+
 
 @pytest.fixture
 def accornsApp(appFiles, request):
@@ -224,7 +227,11 @@ def accornsApp(appFiles, request):
 
     # Use a clean database backup if it exists and not --newVectorDB
     cleanDB = os.path.join(curDir, "testData", "clean_vectorDB.duckdb")
-    if os.path.exists(cleanDB) and not request.config.getoption("--newVectorDB") and not request.config.getoption("--publishPostgres"):
+    if (
+        os.path.exists(cleanDB)
+        and not request.config.getoption("--newVectorDB")
+        and not request.config.getoption("--publishPostgres")
+    ):
         copyfile(cleanDB, vectorDB)
 
     app = appFiles["ACCORNS"]
@@ -233,14 +240,18 @@ def accornsApp(appFiles, request):
     sa_gen = shiny_app_gen(app_path, timeout_secs=60)
 
     x = next(sa_gen)
-    
+
     # Save a clean backup of the vector database is not already saved or if --newVectorDB
-    if not os.path.exists(cleanDB) or request.config.getoption("--newVectorDB") and not request.config.getoption("--publishPostgres"):
+    if (
+        not os.path.exists(cleanDB)
+        or request.config.getoption("--newVectorDB")
+        and not request.config.getoption("--publishPostgres")
+    ):
         copyfile(vectorDB, cleanDB)
 
     yield x
 
-    prefix = "tutorial" if "tutorial" in request.node.name else "test"   
+    prefix = "tutorial" if "tutorial" in request.node.name else "test"
 
     # Check if the test failed
     suffix = "_failed" if request.node.rep_call.failed else ""
@@ -254,7 +265,14 @@ def accornsApp(appFiles, request):
     copyfile(appDB, testDB)
 
     if request.config.getoption("--save"):
-        copyfile(testDB, os.path.join(curDir, "testData", f"{prefix}_accornsAppDB{suffix}_{int(datetime.now().timestamp())}.db"))
+        copyfile(
+            testDB,
+            os.path.join(
+                curDir,
+                "testData",
+                f"{prefix}_accornsAppDB{suffix}_{int(datetime.now().timestamp())}.db",
+            ),
+        )
 
     # Save vector DB (needed if SCUIRREL is run without ACCORNS first)
     #  Only do this when test files have been added to the vector DB
@@ -263,18 +281,26 @@ def accornsApp(appFiles, request):
         copyfile(vectorDB, testDB)
 
     if request.config.getoption("--save"):
-        copyfile(testDB, os.path.join(curDir, "testData", f"{prefix}_vectorDB{suffix}_{int(datetime.now().timestamp())}.duckdb"))
+        copyfile(
+            testDB,
+            os.path.join(
+                curDir,
+                "testData",
+                f"{prefix}_vectorDB{suffix}_{int(datetime.now().timestamp())}.duckdb",
+            ),
+        )
+
 
 @pytest.fixture
 def scuirrelApp(appFiles, request):
     if request.config.getoption("--accornsOnly"):
         pytest.skip("Skipping SCUIRREL")
-        
+
     prefix = "tutorial" if "tutorial" in request.node.name else "test"
-    
-    # Ignore local DB when the test is run with --publishPostgres 
+
+    # Ignore local DB when the test is run with --publishPostgres
     if not request.config.getoption("--publishPostgres"):
-        # Get the appDB from backup    
+        # Get the appDB from backup
         testDB = os.path.join(curDir, "testData", f"{prefix}_accornsAppDB.db")
 
         if not os.path.exists(testDB):
@@ -282,7 +308,7 @@ def scuirrelApp(appFiles, request):
                 "Existing app database was not found. Please run ACCORNS first"
             )
         copyfile(testDB, appDB)
-        
+
         # Get the vectorDB from backup
         testDB = os.path.join(curDir, "testData", f"{prefix}_vectorDB.duckdb")
 
@@ -307,5 +333,11 @@ def scuirrelApp(appFiles, request):
     copyfile(appDB, testDB)
 
     if request.config.getoption("--save"):
-        copyfile(testDB, os.path.join(curDir, "testData", f"{prefix}_scuirrelAppDB_{int(datetime.now().timestamp())}.db"))
-
+        copyfile(
+            testDB,
+            os.path.join(
+                curDir,
+                "testData",
+                f"{prefix}_scuirrelAppDB_{int(datetime.now().timestamp())}.db",
+            ),
+        )

@@ -3,7 +3,7 @@
 # *************************************
 
 
-# pytest tests\test_tutorial.py --headed --slowmo 200 --record 
+# pytest tests\test_tutorial.py --headed --slowmo 200 --record
 
 from shiny.playwright import controller
 from shiny.run import ShinyAppProc
@@ -16,11 +16,11 @@ from datetime import datetime
 
 curDir = os.path.dirname(os.path.realpath(__file__))
 
-def addSubtitle(page, text, avg_wpm=150, min_wait_seconds=3, maxChars=135):
 
+def addSubtitle(page, text, avg_wpm=150, min_wait_seconds=3, maxChars=135):
     # Split the text into multiple pieces each no longer than 150 characters. Only split by sentence
     text = text.replace("\n", " ")
-    text = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s', text.strip())
+    text = re.split(r"(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s", text.strip())
 
     # Loop through the result and merge the text into longer strings as long as the length is less than 150
     newText = []
@@ -35,18 +35,18 @@ def addSubtitle(page, text, avg_wpm=150, min_wait_seconds=3, maxChars=135):
     newText.append(tempText)
 
     for text in newText:
-
         word_count = len(text.split())
-        
+
         # Estimate reading time in seconds
         reading_time_seconds = (word_count / avg_wpm) * 60
-        
+
         # Ensure the wait time is at least the minimum wait time
         wait_time = max(reading_time_seconds, min_wait_seconds)
 
-        page.evaluate((
-            f"const customHtml = `<div id='subtitles'>{text}</div>`;"
-            """
+        page.evaluate(
+            (
+                f"const customHtml = `<div id='subtitles'>{text}</div>`;"
+                """
             document.body.insertAdjacentHTML('beforeend', customHtml);
                         
             const style = document.createElement('style');
@@ -67,9 +67,11 @@ def addSubtitle(page, text, avg_wpm=150, min_wait_seconds=3, maxChars=135):
                         }
                     `;
             document.head.appendChild(style);
-        """))
+        """
+            )
+        )
 
-        page.wait_for_timeout(wait_time*1000)
+        page.wait_for_timeout(wait_time * 1000)
 
         page.evaluate("document.getElementById('subtitles').remove()")
 
@@ -77,10 +79,9 @@ def addSubtitle(page, text, avg_wpm=150, min_wait_seconds=3, maxChars=135):
 def test_accorns_tutorial(cmdopt, page, accornsApp):
     # Start app
     page.goto(accornsApp.url)
-    page.wait_for_load_state("networkidle")         
+    page.wait_for_load_state("networkidle")
 
     with appDBConn(remoteAppDB=cmdopt["publishPostgres"]) as conn:
-
         # Insert an access code for a new instructor into the database
         dbQuery(
             conn,
@@ -90,7 +91,7 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
             ),
             insert=True,
         )
-        
+
         subt = """Welcome to ACCORNS! In this tutorial, we will go through the main 
         features of the app."""
         addSubtitle(page, subt)
@@ -100,9 +101,11 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         an access code via an administrator or other instructor.  
         Let's say we have an access code 'W4t-00k-gTR'. On the right side of the login page, 
         fill out the sign up form and provide the access code"""
-        addSubtitle(page, subt) 
+        addSubtitle(page, subt)
 
-        controller.InputText(page, "login-cUsername").set("topInstructor", timeout=10000)
+        controller.InputText(page, "login-cUsername").set(
+            "topInstructor", timeout=10000
+        )
         page.wait_for_timeout(1000)
         controller.InputPassword(page, "login-cPassword").set(
             "instr123ABC!", timeout=10000
@@ -113,7 +116,7 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         )
         page.wait_for_timeout(1000)
         controller.InputText(page, "login-cAccessCode").set(
-            'W4t-00k-gTR', timeout=10000
+            "W4t-00k-gTR", timeout=10000
         )
         page.wait_for_timeout(1000)
 
@@ -122,12 +125,16 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         controller.InputActionButton(page, "login-createAccount").click(timeout=10000)
 
         subt = """Let's now login with the new account details"""
-        addSubtitle(page, subt)        
+        addSubtitle(page, subt)
 
         # LOGIN TAB
-        controller.InputText(page, "login-lUsername").set("topInstructor", timeout=10000)
+        controller.InputText(page, "login-lUsername").set(
+            "topInstructor", timeout=10000
+        )
         page.wait_for_timeout(1000)
-        controller.InputPassword(page, "login-lPassword").set("instr123ABC!", timeout=10000)
+        controller.InputPassword(page, "login-lPassword").set(
+            "instr123ABC!", timeout=10000
+        )
         page.wait_for_timeout(1000)
         controller.InputActionButton(page, "login-login").click(timeout=10000)
 
@@ -137,13 +144,13 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         background information on topics you'll create later. 
         To upload a new file, simply click on the 'Pick a file' button and choose 
         a file from your computer. You can upload different types of text files like PDF, DOCX, and TXT files."""
-        addSubtitle(page, subt)    
-       
+        addSubtitle(page, subt)
+
         # VECTOR DB TAB
         # A a new file to the database
         # controller.NavPanel(page, id="postLoginTabs", data_value="vTab").click(
         #     timeout=10000
-        # )        
+        # )
 
         controller.InputFile(page, "vectorDB-newFile").set(
             os.path.join(curDir, "testData", "MendelianInheritance.txt"),
@@ -152,13 +159,13 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         subt = """Depending on the size of the file, uploading and processing may take some time. 
         After a file has been processed, you can view the file information by 
         clicking on the file name in the table at the top of the page"""
-        addSubtitle(page, subt)          
-        
+        addSubtitle(page, subt)
+
         controller.OutputDataFrame(page, "vectorDB-filesTable").select_rows([1])
         subt = """You can now see a summary of the file information being displayed. 
         Let's now start creating some new topics that can be reviewed
          by students in SCUIRREL based on the uploaded materials"""
-        addSubtitle(page, subt)        
+        addSubtitle(page, subt)
 
         subt = """Before we get started with this, we need to create a new group to 
         organize the topics"""
@@ -183,7 +190,7 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         controller.InputActionButton(page, "groups-ngAdd").click(timeout=10000)
 
         subt = """Now that we have a group, let's add a new topic. Navigate to the 'Topics' tab"""
-        addSubtitle(page, subt)  
+        addSubtitle(page, subt)
         controller.NavPanel(page, id="postLoginTabs", data_value="tTab").click(
             timeout=10000
         )
@@ -196,13 +203,15 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         controller.InputActionButton(page, "topics-tAdd").click(timeout=10000)
         subt = """Fill out the topic name and optional description and click the 'Add' button"""
         addSubtitle(page, subt)
-        controller.InputText(page, "topics-ntTopic").set("Mendelian inheritance", timeout=10000)
+        controller.InputText(page, "topics-ntTopic").set(
+            "Mendelian inheritance", timeout=10000
+        )
         page.wait_for_timeout(1000)
         controller.InputText(page, "topics-ntDescr").set(
             "Basics about genetic inheritance", timeout=10000
         )
         page.wait_for_timeout(1000)
-        controller.InputActionButton(page, "topics-ntAdd").click(timeout=10000)        
+        controller.InputActionButton(page, "topics-ntAdd").click(timeout=10000)
 
         # controller.InputActionButton(page, "topics-tEdit").click(timeout=10000)
         # controller.InputText(page, "topics-etInput").set(
@@ -221,32 +230,35 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         controller.InputActionButton(page, "topics-cAdd").click(timeout=10000)
         subt = """Define the concept in a single sentence (e.g. as a fact). There is no need to provide
         context as this will be provided by the files you uploaded earlier into the database"""
-        addSubtitle(page, subt)       
+        addSubtitle(page, subt)
         controller.InputText(page, "topics-ncInput").set(
-            "Gregor Mendel, the father of modern genetics, was a nineteenth-century monk", timeout=10000
+            "Gregor Mendel, the father of modern genetics, was a nineteenth-century monk",
+            timeout=10000,
         )
         subt = """Click the 'Add' button to add the concept to the topic"""
-        addSubtitle(page, subt)   
+        addSubtitle(page, subt)
         controller.InputActionButton(page, "topics-ncAdd").click(timeout=10000)
 
-        subt = """Keep adding concepts until you feel you have enough to cover the topic"""
+        subt = (
+            """Keep adding concepts until you feel you have enough to cover the topic"""
+        )
         addSubtitle(page, subt)
         controller.InputActionButton(page, "topics-cAdd").click(timeout=10000)
         controller.InputText(page, "topics-ncInput").set(
-            """We have two copies (alleles) of each gene, one from each parent""", 
-            timeout=10000
+            """We have two copies (alleles) of each gene, one from each parent""",
+            timeout=10000,
         )
         controller.InputActionButton(page, "topics-ncAdd").click(timeout=10000)
         controller.InputActionButton(page, "topics-cAdd").click(timeout=10000)
         controller.InputText(page, "topics-ncInput").set(
-            """An organism with at least one dominant allele will display the effect of the dominant allele""", 
-            timeout=10000
+            """An organism with at least one dominant allele will display the effect of the dominant allele""",
+            timeout=10000,
         )
         controller.InputActionButton(page, "topics-ncAdd").click(timeout=10000)
         controller.InputActionButton(page, "topics-cAdd").click(timeout=10000)
         controller.InputText(page, "topics-ncInput").set(
-            """To display a recessive trait, an organism must have two copies of a recessive allele""", 
-            timeout=10000
+            """To display a recessive trait, an organism must have two copies of a recessive allele""",
+            timeout=10000,
         )
         controller.InputActionButton(page, "topics-ncAdd").click(timeout=10000)
 
@@ -276,8 +288,8 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         addSubtitle(page, subt)
         # Add a new quiz question
         controller.InputActionButton(page, "quizGeneration-qGenerate").click(
-                timeout=10000
-            )
+            timeout=10000
+        )
         subt = """Note that generating quiz questions may take some time and it's
         possible that the process may fail. In case of failure, you will be notified and 
         you can try again later. If successful, you will see a summary of the generated 
@@ -326,11 +338,11 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         account with both ACCORNS and SCUIRREL access."""
         addSubtitle(page, subt)
 
-        controller.InputNumeric(page, "userManagement-numCodes").set(
-            "1", timeout=10000
-        )
+        controller.InputNumeric(page, "userManagement-numCodes").set("1", timeout=10000)
         page.wait_for_timeout(1000)
-        controller.InputSelect(page, "userManagement-role").set("Instructor", timeout=10000)
+        controller.InputSelect(page, "userManagement-role").set(
+            "Instructor", timeout=10000
+        )
         page.wait_for_timeout(1000)
         controller.InputText(page, "userManagement-note").set(
             "Instructor account for GEN101", timeout=10000
@@ -340,9 +352,11 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
             timeout=10000
         )
         page.wait_for_timeout(500)
-        
-        #Select first row in code table
-        controller.OutputDataFrame(page, "userManagement-newCodesTable").select_rows([0])
+
+        # Select first row in code table
+        controller.OutputDataFrame(page, "userManagement-newCodesTable").select_rows(
+            [0]
+        )
 
         subt = """You can keep track of any unclaimed codes in the table on this page.
         IMPORTANT: access codes only give you access to the apps itself, but
@@ -366,7 +380,9 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         page.wait_for_timeout(1000)
         controller.InputNumeric(page, "groups-numCodes").set("5", timeout=10000)
         page.wait_for_timeout(1000)
-        controller.InputText(page, "groups-note").set("Student codes for GEN101", timeout=10000)
+        controller.InputText(page, "groups-note").set(
+            "Student codes for GEN101", timeout=10000
+        )
         page.wait_for_timeout(1000)
         controller.InputActionButton(page, "groups-generateCodes").click(timeout=10000)
 
@@ -381,19 +397,19 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         page.wait_for_timeout(1000)
         page.click('button:text("Cancel")')
 
-        subt = """Finally, you can close the app simply by refreshing or closing the page""" 
-        addSubtitle(page, subt)  
+        subt = """Finally, you can close the app simply by refreshing or closing the page"""
+        addSubtitle(page, subt)
 
         page.reload()
 
         subt = """You can continue where you left off by logging in again with your account 
         details. Should you ever forget your password or like to change it, you can 
-        request a reset code by clicking the 'Reset Password' button on the login page""" 
-        addSubtitle(page, subt)            
+        request a reset code by clicking the 'Reset Password' button on the login page"""
+        addSubtitle(page, subt)
 
         controller.InputActionLink(page, "login-showReset").click(timeout=10000)
-        subt = """Provide your username, then click the 'Request Reset Code' button.""" 
-        addSubtitle(page, subt)  
+        subt = """Provide your username, then click the 'Request Reset Code' button."""
+        addSubtitle(page, subt)
         controller.InputText(page, "login-loginReset-rUsername").set(
             "topInstructor", timeout=10000
         )
@@ -404,11 +420,13 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         subt = """You should see a message that a reset code has been created.
         You now have to reach out to another instructor or admin to get the code.
         Given we still know our old password, let's login an see where to find the reset 
-        codes""" 
-        addSubtitle(page, subt) 
+        codes"""
+        addSubtitle(page, subt)
         page.locator('"Dismiss"').click(timeout=10000)  # Close the modal
 
-        controller.InputText(page, "login-lUsername").set("topInstructor", timeout=10000)
+        controller.InputText(page, "login-lUsername").set(
+            "topInstructor", timeout=10000
+        )
         page.wait_for_timeout(300)
         controller.InputPassword(page, "login-lPassword").set(
             "instr123ABC!", timeout=10000
@@ -416,7 +434,7 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         page.wait_for_timeout(300)
         controller.InputActionButton(page, "login-login").click(timeout=10000)
 
-        subt = """Navigate to the 'User management' tab""" 
+        subt = """Navigate to the 'User management' tab"""
         addSubtitle(page, subt)
         controller.NavPanel(page, id="postLoginTabs", data_value="uTab").click(
             timeout=10000
@@ -425,18 +443,18 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         # Select first row in reset table
         controller.OutputDataFrame(page, "userManagement-resetTable").select_rows([0])
         subt = """You will now see a table with all requested reset codes you can 
-        share with those who requested it.""" 
+        share with those who requested it."""
         addSubtitle(page, subt)
-        
+
         page.wait_for_timeout(1000)
         page.reload()
 
         subt = """This concludes the ACCORNS tutorial. If you have any questions,
-        please reach out to the app administrator or read the documentation""" 
+        please reach out to the app administrator or read the documentation"""
         addSubtitle(page, subt)
 
         accornsApp.close()
-        
+
         # page.get_by_text("File info").scroll_into_view_if_needed()
         # # wait 1 second
         # page.wait_for_timeout(1000)
@@ -520,10 +538,11 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         # assert q["uID"].iloc[0] == 2
         # assert not q.loc[:, q.columns != "error"].iloc[0].isna().any()
 
+
 def test_scuirrel_tutorial(cmdopt, page, scuirrelApp):
     # Start app
     page.goto(scuirrelApp.url)
-    page.wait_for_load_state("networkidle")         
+    page.wait_for_load_state("networkidle")
 
     with appDBConn(remoteAppDB=cmdopt["publishPostgres"]) as conn:
         # Insert an access code for a new instructor into the database
@@ -535,7 +554,7 @@ def test_scuirrel_tutorial(cmdopt, page, scuirrelApp):
             ),
             insert=True,
         )
-        
+
         subt = """Welcome! This application allows you to review important topics you are 
         interested in with the help of an AI named SCUIRREL. The topics have been 
         carefully curated by real humans, but SCUIRREL will try it's best to take the 
@@ -547,7 +566,7 @@ def test_scuirrel_tutorial(cmdopt, page, scuirrelApp):
         via an administrator or instructor in order to be able to create an account.  
         Let's say we have an access code 'W4t-00k-gTR'. On the right side of the login page, 
         fill out the sign up form and provide the access code"""
-        addSubtitle(page, subt) 
+        addSubtitle(page, subt)
 
         controller.InputText(page, "login-cUsername").set("topStudent", timeout=10000)
         page.wait_for_timeout(1000)
@@ -560,7 +579,7 @@ def test_scuirrel_tutorial(cmdopt, page, scuirrelApp):
         )
         page.wait_for_timeout(1000)
         controller.InputText(page, "login-cAccessCode").set(
-            '4Xt-Bb4-487', timeout=10000
+            "4Xt-Bb4-487", timeout=10000
         )
         page.wait_for_timeout(1000)
 
@@ -569,20 +588,19 @@ def test_scuirrel_tutorial(cmdopt, page, scuirrelApp):
         controller.InputActionButton(page, "login-createAccount").click(timeout=10000)
 
         subt = """Let's now login with the new account details"""
-        addSubtitle(page, subt)        
+        addSubtitle(page, subt)
 
         # LOGIN TAB
         controller.InputText(page, "login-lUsername").set("topStudent", timeout=10000)
         page.wait_for_timeout(1000)
-        controller.InputPassword(page, "login-lPassword").set("user123ABC!", timeout=10000)
+        controller.InputPassword(page, "login-lPassword").set(
+            "user123ABC!", timeout=10000
+        )
         page.wait_for_timeout(1000)
         controller.InputActionButton(page, "login-login").click(timeout=10000)
 
         groupCode = dbQuery(
-            conn,
-            (
-                'SELECT * FROM "accessCode" WHERE "codeType" = 2 AND "used" IS NULL'
-            )
+            conn, ('SELECT * FROM "accessCode" WHERE "codeType" = 2 AND "used" IS NULL')
         )
 
         groupCode = groupCode["code"].iloc[0]
@@ -641,7 +659,7 @@ def test_scuirrel_tutorial(cmdopt, page, scuirrelApp):
         subt = """You can continue the conversation and monitor you progress in the bar 
         at the top of the conversation window"""
         addSubtitle(page, subt)
-        
+
         subt = """If available, you can also take a quiz to test your understanding of 
         the topic. Simply click the 'Take a quiz question' button to start"""
         addSubtitle(page, subt)

@@ -43,7 +43,7 @@ if not (shared.remoteAppDB):
     print(accorns_shared.createLocalVectorDB())
 else:
     # Check if a remote database is used and if it's accessible
-    print(shared.checkRemoteDB(postgresUser = shared.postgresAccorns))
+    print(shared.checkRemoteDB(postgresUser=shared.postgresAccorns))
 # Add the demo to the database if requested
 if shared.addDemo:
     print(accorns_shared.addDemo(None))

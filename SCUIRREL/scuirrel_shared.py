@@ -139,7 +139,9 @@ interesting
     ]
     refine_template = ChatPromptTemplate(chat_refine_msgs)
 
-    index = shared.getIndex(user=shared.postgresScuirrel, postgresUser=shared.postgresScuirrel)
+    index = shared.getIndex(
+        user=shared.postgresScuirrel, postgresUser=shared.postgresScuirrel
+    )
 
     return index.as_query_engine(
         text_qa_template=text_qa_template,

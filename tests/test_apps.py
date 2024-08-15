@@ -71,7 +71,9 @@ def test_accorns(cmdopt, page, browser, accornsApp):
             timeout=10000
         )
         # Check if the reset table has the reset code
-        resetCode = dbQuery(conn, 'SELECT "code" FROM "accessCode" WHERE "codeType" = 1')
+        resetCode = dbQuery(
+            conn, 'SELECT "code" FROM "accessCode" WHERE "codeType" = 1'
+        )
         controller.OutputDataFrame(page, "userManagement-resetTable").expect_cell(
             resetCode["code"].iloc[0], row=0, col=1
         )
@@ -447,7 +449,7 @@ def test_scuirrel(page, browser, scuirrelApp, cmdopt):
         page.get_by_text(q["explanation" + q["answer"].iloc[0]].iloc[0]).wait_for(
             timeout=10000
         )
-    
+
     page.reload()
     scuirrelApp.close()
 
