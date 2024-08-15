@@ -8,6 +8,7 @@ import ACCORNS.accorns_shared as accorns_shared
 import pandas as pd
 import json
 import asyncio
+import regex as re
 
 # -- Shiny
 from shiny import Inputs, Outputs, Session, module, reactive, ui, render
@@ -178,10 +179,21 @@ def quiz_generation_server(
     * If possible integrate across multiple concepts. 
     * Do NOT mention the topic as part of the question (that's inferred) 
     * Try to generate a question that that forces the student to think critically (not just a short definition).
-    * Generate 4 possible answers, with only ONE correct option, and an explanation why each option is correct or incorrect.
+    * Generate 4 possible answers (A, B, C, D), with only ONE correct option, and an explanation why each option is correct or incorrect.
 
-    You will output a python dictionary string according to this template:
-    {{"question":"<add question>","answer":"<e.g. A>","optionA":"","explanationA":"","optionB":"","explanationB":"","optionC":"","explanationC":"","optionD":"","explanationD":""}}"""
+    The output should be a python dictionary according to the template below. Make sure the "answer" field is a single capital letter (e.g. A):
+    {{
+    "question": "<Insert your question here>",
+    "answer": "<Insert the correct option letter here>",
+    "optionA": "<Insert option A here>",
+    "explanationA": "<Insert explanation for option A here>",
+    "optionB": "<Insert option B here>",
+    "explanationB": "<Insert explanation for option B here>",
+    "optionC": "<Insert option C here>",
+    "explanationC": "<Insert explanation for option C here>",
+    "optionD": "<Insert option D here>",
+    "explanationD": "<Insert explanation for option D here>"
+    }}"""
                 ),
             ),
             ChatMessage(role=MessageRole.USER, content=qa_prompt_str),
@@ -193,7 +205,8 @@ def quiz_generation_server(
             ChatMessage(
                 role=MessageRole.SYSTEM,
                 content=(
-                    "Make sure the provided response is a Python dictionary. Double check correct use of quotes"
+                    "Make sure the provided response is a Python dictionary. " 
+                    "Double check correct use of quotes and make sure the answer field is a single capital letter (e.g. A)"
                 ),
             ),
             ChatMessage(role=MessageRole.USER, content=refine_prompt_str),
@@ -278,7 +291,6 @@ def quiz_generation_server(
     The question should center around the following concept:
     {focusConcept}\n
     {prevQuestions}"""
-
         botResponse(quizEngine(), info, cID)
 
     def botResponse_task(quizEngine, info, cID):
@@ -287,11 +299,13 @@ def quiz_generation_server(
         tries = 0
         while not valid:
             try:
-                resp = str(quizEngine.query(info))
-                resp = pd.json_normalize(json.loads(resp))
+                x = str(quizEngine.query(info))
+                resp = pd.json_normalize(json.loads(x))
+                # Make sure only to keep one capital letter for the answer
+                resp["answer"] = re.search('[A-D]', resp["answer"].iloc[0]).group(0)[0]
                 valid = True
             except Exception:
-                print(("Failed to generate quiz question"))
+                print(("Failed to generate quiz question\n" + x))
                 if tries > 1:
                     return {"resp": None, "cID": cID}
                 tries += 1
@@ -366,6 +380,8 @@ def quiz_generation_server(
             ui.update_select(
                 "qID", choices=dict(zip(q["qID"], q["question"])), selected=qID
             )
+            shared.elementDisplay("qID", "s", session)
+
 
     @reactive.effect
     @reactive.event(input.qtID)

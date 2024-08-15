@@ -30,7 +30,7 @@ def groupQuery(user, postgresUser, demo=shared.addDemo):
         conn,
         (
             'SELECT g."gID", g."group" '
-            'FROM group_member AS m, "group_topic" AS t, "group" AS g '
+            'FROM "group_member" AS m, "group_topic" AS t, "group" AS g '
             f'WHERE m."gID" = g."gID" AND t."gID" = g."gID" {userFilter}'
             'AND t."tID" IN (SELECT DISTINCT "tID" FROM "concept" WHERE "archived" = 0) '
             f'{includeDemo} ORDER BY "group"'
