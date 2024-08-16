@@ -1,7 +1,7 @@
 pandas>=2.0.0
 shiny>=1.0.0
 llama-index
-llama-index-llms-openai
+llama-index-llms-openai>=0.1.29
 # Issue with DuckDB in llamaindex forced reverting to previous version
 # https://github.com/run-llama/llama_index/issues/12542
 llama-index-vector-stores-duckdb==0.1.1
