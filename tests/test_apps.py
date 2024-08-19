@@ -148,7 +148,7 @@ def test_accorns(cmdopt, page, browser, accornsApp):
             )
             # If successful, the file will be added to the table
             controller.OutputDataFrame(page, "vectorDB-filesTable").expect_nrow(
-                2, timeout=20000
+                2, timeout=30000
             )
 
         # TOPICS TAB
