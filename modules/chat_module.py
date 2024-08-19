@@ -22,6 +22,7 @@ from llama_index.core.llms import ChatMessage, MessageRole
 
 # --- CLASSES
 
+
 # Messages and conversation
 class Conversation:
     def __init__(self):
@@ -105,6 +106,7 @@ def groupQuery(user, postgresUser, demo=shared.addDemo):
     conn.close()
     return getGroups
 
+
 # Chat Agent - Adapt the chat engine to the topic
 def chatEngine(topic, concepts, cIndex, eval):
     # TUTORIAL Llamaindex + Prompt engineering
@@ -137,12 +139,11 @@ def chatEngine(topic, concepts, cIndex, eval):
     cDone = (
         ""
         if cIndex == 0
-        else "Already discussed:\n* "
-        + "\n* ".join(concepts.head(cIndex)["concept"])
+        else "Already discussed:\n* " + "\n* ".join(concepts.head(cIndex)["concept"])
     )
 
     cToDo = "Will be discussed later:\n* " + "\n* ".join(
-        concepts[(cIndex+1):]["concept"]
+        concepts[(cIndex + 1) :]["concept"]
     )
 
     cAll = "CONCEPT LIST:\n* " + "\n* ".join(concepts["concept"])
@@ -152,29 +153,37 @@ def chatEngine(topic, concepts, cIndex, eval):
 
     if int(eval["progress"]) == 1:
         if int(eval["score"]) == 1:
-            progress = (f"You are currently discussing the following concept: {currentConcept}\n"
-                        "It seems the student did not understand the question, or is very mistaken. " 
-                        "Try and reformulate the question without giving away the whole concept.")
+            progress = (
+                f"You are currently discussing the following concept: {currentConcept}\n"
+                "It seems the student did not understand the question, or is very mistaken. "
+                "Try and reformulate the question without giving away the whole concept."
+            )
         elif int(eval["score"]) == 2:
-            progress = (f"You are currently discussing the following concept: {currentConcept}\n"
-                        "It seems you need to explore this concept a bit more "
-                        "with the student as there is still lack of understanding or mistakes were made. "
-                        "Be carful not to give away any crucial information but do provide hints.")
+            progress = (
+                f"You are currently discussing the following concept: {currentConcept}\n"
+                "It seems you need to explore this concept a bit more "
+                "with the student as there is still lack of understanding or mistakes were made. "
+                "Be carful not to give away any crucial information but do provide hints."
+            )
         else:
-            progress = (f"It seems the student has a basic understanding of the concept: {currentConcept} \n" 
-                        "However, you feel you can nudge them just a little further")
+            progress = (
+                f"It seems the student has a basic understanding of the concept: {currentConcept} \n"
+                "However, you feel you can nudge them just a little further"
+            )
     else:
         if int(eval["score"]) < 3:
-            progress = ("It seems the student is stuck:\n"
-                        f"FIRST - Explain the concept concept they are stuck on: {prevConcept}. Don't ask questions about it anymore\n"
-                        f"SECOND - move on to the next concept: {currentConcept}")
+            progress = (
+                "It seems the student is stuck:\n"
+                f"FIRST - Explain the concept concept they are stuck on: {prevConcept}. Don't ask questions about it anymore\n"
+                f"SECOND - move on to the next concept: {currentConcept}"
+            )
         else:
-            progress = (f"It seems the student has a good enough understanding of the previous concept: {prevConcept} \n"
-                        " Provide relevant feedback and highlight any parts of this previous " 
-                         "concept that were not explicitly covered in the conversation. \n\n"
-                        f"Your next question will focus on: {currentConcept}")
-
-
+            progress = (
+                f"It seems the student has a good enough understanding of the previous concept: {prevConcept} \n"
+                " Provide relevant feedback and highlight any parts of this previous "
+                "concept that were not explicitly covered in the conversation. \n\n"
+                f"Your next question will focus on: {currentConcept}"
+            )
 
     # System prompt
     chat_text_qa_msgs = [
@@ -306,7 +315,6 @@ Provide a response in the form of a Python dictionary: \n"""
         refine_template=refine_template,
         llm=shared.llm,
     )
-
 
 
 # --- UI
@@ -621,7 +629,7 @@ def chat_server(
             engine = chatEngine(topic, concepts, cIndex, eval)
             # import pprint
             # pprint.pprint(engine.get_prompts())
-            x = engine.query(conversation)            
+            x = engine.query(conversation)
             resp = str(x)
 
         return {"resp": resp, "eval": eval}
@@ -654,7 +662,7 @@ def chat_server(
             i = conceptIndex.get()
             finished = False
             if int(eval["progress"]) > 1:
-                finished = False if i < (concepts().shape[0] - 1) else True                
+                finished = False if i < (concepts().shape[0] - 1) else True
                 i = i + 1 if not finished else i
                 progress = int(100 * i / concepts().shape[0]) if not finished else 100
                 progressBar("chatProgress", progress)

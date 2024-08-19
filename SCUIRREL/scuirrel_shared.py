@@ -36,6 +36,7 @@ if topics.shape[0] == 0:
     )
 conn.close()
 
+
 # Function to register the end of a discussion in the DB
 def endDiscussion(cursor, dID, messages, timeStamp=shared.dt()):
     _ = shared.executeQuery(

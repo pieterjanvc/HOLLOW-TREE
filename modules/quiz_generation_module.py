@@ -205,7 +205,7 @@ def quiz_generation_server(
             ChatMessage(
                 role=MessageRole.SYSTEM,
                 content=(
-                    "Make sure the provided response is a Python dictionary. " 
+                    "Make sure the provided response is a Python dictionary. "
                     "Double check correct use of quotes and make sure the answer field is a single capital letter (e.g. A)"
                 ),
             ),
@@ -302,7 +302,7 @@ def quiz_generation_server(
                 x = str(quizEngine.query(info))
                 resp = pd.json_normalize(json.loads(x))
                 # Make sure only to keep one capital letter for the answer
-                resp["answer"] = re.search('[A-D]', resp["answer"].iloc[0]).group(0)[0]
+                resp["answer"] = re.search("[A-D]", resp["answer"].iloc[0]).group(0)[0]
                 valid = True
             except Exception:
                 print(("Failed to generate quiz question\n" + x))
@@ -381,7 +381,6 @@ def quiz_generation_server(
                 "qID", choices=dict(zip(q["qID"], q["question"])), selected=qID
             )
             shared.elementDisplay("qID", "s", session)
-
 
     @reactive.effect
     @reactive.event(input.qtID)
