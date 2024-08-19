@@ -150,7 +150,7 @@ def chatEngine(topic, concepts, cIndex, eval):
     currentConcept = concepts.iloc[cIndex]["concept"]
     prevConcept = concepts.iloc[cIndex - 1]["concept"] if cIndex > 0 else ""
 
-    if eval["next"] == "no":
+    if int(eval["progress"]) == 1:
         if int(eval["score"]) == 1:
             progress = (f"You are currently discussing the following concept: {currentConcept}\n"
                         "It seems the student did not understand the question, or is very mistaken. " 
@@ -165,9 +165,9 @@ def chatEngine(topic, concepts, cIndex, eval):
                         "However, you feel you can nudge them just a little further")
     else:
         if int(eval["score"]) < 3:
-            progress = ("It seems the student is stuck and will not be able to give better answers with additional questions. "
-                        f"FIRST - Explain the concept concept they are stuck on: {prevConcept} \n"
-                        f"NEXT move on to the next concept: {currentConcept}")
+            progress = ("It seems the student is stuck:\n"
+                        f"FIRST - Explain the concept concept they are stuck on: {prevConcept}. Don't ask questions about it anymore\n"
+                        f"SECOND - move on to the next concept: {currentConcept}")
         else:
             progress = (f"It seems the student has a good enough understanding of the previous concept: {prevConcept} \n"
                         " Provide relevant feedback and highlight any parts of this previous " 
@@ -266,20 +266,21 @@ You do this by evaluating the conversation using the following metrics:
 
 score: Score the STUDENT's current understanding of the concept on a scale of 1-4
 * 1: No relevant response, error, or any demonstration of understanding yet
-* 2: Some understanding, but still incomplete or with mistakes warranting more discussion 
-* 3: Basics of the concept seem to be understood and correct terminology has been used
+* 2: Some understanding, but not all aspects of the topic have been covered or there are mistakes
+* 3: All basics of the concept are understood and correct terminology has been used
 * 4: Clear demonstration of understanding
 
-next: Decide whether to move on to the next concept.
-* yes: in case of a score of 3 or 4, or if the STUDENTS response is that they don't know
-* no: in case of a score of 1 or 2 providing the student is not stuck
+progress: Decide how the conversation is going
+* 1: The STUDENT has not demonstrated understanding of the concept yet
+* 2: The conversation is stuck (only after at least two attempts) and the TUTOR should provide the answer
+* 3: The STUDENT has demonstrated understanding and the conversation can move on to the next concept
 
 comment: Reasoning behind the score and decision
 In addition you will provide a very brief comment why you gave the score
 
 OUTPUT:
 Provide a response in the form of a Python dictionary: \n"""
-                r'{{"score": <int>, "next": "<yes/no>", "comment": "<reasoning>"}}'
+                r'{{"score": <int>, "progress": <int>, "comment": "<reasoning>"}}'
             ),
         ),
         ChatMessage(role=MessageRole.USER),
@@ -291,7 +292,7 @@ Provide a response in the form of a Python dictionary: \n"""
         ChatMessage(
             role=MessageRole.SYSTEM,
             content=(
-                r'Make sure the output is in Python dictionary format: {{"score": <int>, "next": "<yes/no>", "comment": "<reasoning>"}}'
+                r'Make sure the output is in Python dictionary format: {{"score": <int>, "progress": <int>, "comment": "<reasoning>"}}'
             ),
         ),
         ChatMessage(role=MessageRole.USER),
@@ -344,8 +345,8 @@ def chat_ui():
                         ),
                         ui.input_action_button(
                             "startConversation",
-                            "Start conversation",
-                            width="200px",
+                            "Start new conversation",
+                            width="auto",
                             style="display: inline-block;",
                         ),
                         quiz_ui("quiz"),
@@ -611,7 +612,7 @@ def chat_server(
             return {"resp": None, "eval": None}
 
         # See if the LLM thinks we can move on to the next concept or or not
-        if eval["next"] == "yes":
+        if int(eval["progress"]) > 1:
             cIndex += 1
         # Check if all concepts have been covered successfully
         if cIndex >= concepts.shape[0]:
@@ -652,10 +653,11 @@ def chat_server(
             # Check the topic progress and move on to next concept if current one scored well
             i = conceptIndex.get()
             finished = False
-            if eval["next"]  == "yes":
+            if int(eval["progress"]) > 1:
                 finished = False if i < (concepts().shape[0] - 1) else True                
-                i = i + 1
-                progressBar("chatProgress", int(100 * i / concepts().shape[0]))
+                i = i + 1 if not finished else i
+                progress = int(100 * i / concepts().shape[0]) if not finished else 100
+                progressBar("chatProgress", progress)
 
             # Add the evaluation of the student's last reply to the log
             msg = messages.get()
