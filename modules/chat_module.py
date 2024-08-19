@@ -16,6 +16,72 @@ import asyncio
 from shiny import Inputs, Outputs, Session, module, reactive, ui, render
 from htmltools import HTML, div
 
+# Llamaindex
+from llama_index.core import ChatPromptTemplate
+from llama_index.core.llms import ChatMessage, MessageRole
+
+# --- CLASSES
+
+
+# Messages and conversation
+class Conversation:
+    def __init__(self):
+        self.id = 0
+        columns = {
+            "id": int,
+            "cID": int,
+            "isBot": int,
+            "timeStamp": str,
+            "content": str,
+            "pCode": str,
+            "pMessage": str,
+        }
+        self.messages = pd.DataFrame(columns=columns.keys()).astype(columns)
+
+    def add_message(
+        self,
+        cID: int,
+        isBot: int,
+        content: str,
+        pCode: int = None,
+        pMessage: str = None,
+        timeStamp: str = None,
+    ):
+        timeStamp = timeStamp if timeStamp else shared.dt()
+        self.messages = pd.concat(
+            [
+                self.messages,
+                pd.DataFrame.from_dict(
+                    {
+                        "id": [self.id],
+                        "cID": [cID],
+                        "timeStamp": [timeStamp],
+                        "isBot": [isBot],
+                        "content": [content],
+                        "pCode": [pCode],
+                        "pMessage": [pMessage],
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )
+        self.id += 1
+
+    def addEval(self, score, comment):
+        self.messages.at[self.messages.index[-1], "pCode"] = score
+        self.messages.at[self.messages.index[-1], "pMessage"] = comment
+
+    def astuple(self, order=None):
+        if order is not None and (
+            set(["cID", "isBot", "timeStamp", "content", "pCode", "pMessage"])
+            != set(order)
+        ):
+            raise ValueError("messages order not correct")
+        out = self.messages.drop(columns=["id"])
+        if order:
+            out = out[order]
+        return [tuple(x) for x in out.to_numpy()]
+
 
 # ---- VARS & FUNCTIONS ----
 def groupQuery(user, postgresUser, demo=shared.addDemo):
@@ -39,6 +105,216 @@ def groupQuery(user, postgresUser, demo=shared.addDemo):
     )
     conn.close()
     return getGroups
+
+
+# Chat Agent - Adapt the chat engine to the topic
+def chatEngine(topic, concepts, cIndex, eval):
+    # TUTORIAL Llamaindex + Prompt engineering
+    # https://github.com/run-llama/llama_index/blob/main/docs/examples/chat_engine/chat_engine_best.ipynb
+    # https://docs.llamaindex.ai/en/stable/examples/customization/prompts/chat_prompts/
+
+    # The two strings below have not been altered from the defaults set by llamaindex,
+    # but can be if needed
+    qa_prompt_str = (
+        "Context information is below.\n"
+        "---------------------\n"
+        "{context_str}\n"
+        "---------------------\n"
+        "Given the context information and not prior knowledge, "
+        "answer the question: {query_str}\n"
+    )
+
+    refine_prompt_str = (
+        "We have the opportunity to refine the original answer "
+        "(only if needed) with some more context below.\n"
+        "------------\n"
+        "{context_msg}\n"
+        "------------\n"
+        "Given the new context, refine the original answer to better "
+        "answer the question: {query_str}. "
+        "If the context isn't useful, output the original answer again.\n"
+        "Original Answer: {existing_answer}"
+    )
+
+    cDone = (
+        ""
+        if cIndex == 0
+        else "Already discussed:\n* " + "\n* ".join(concepts.head(cIndex)["concept"])
+    )
+
+    cToDo = "Will be discussed later:\n* " + "\n* ".join(
+        concepts[(cIndex + 1) :]["concept"]
+    )
+
+    cAll = "CONCEPT LIST:\n* " + "\n* ".join(concepts["concept"])
+
+    currentConcept = concepts.iloc[cIndex]["concept"]
+    prevConcept = concepts.iloc[cIndex - 1]["concept"] if cIndex > 0 else ""
+
+    if int(eval["progress"]) == 1:
+        if int(eval["score"]) == 1:
+            progress = (
+                f"You are currently discussing the following concept: {currentConcept}\n"
+                "It seems the student did not understand the question, or is very mistaken. "
+                "Try and reformulate the question without giving away the whole concept."
+            )
+        elif int(eval["score"]) == 2:
+            progress = (
+                f"You are currently discussing the following concept: {currentConcept}\n"
+                "It seems you need to explore this concept a bit more "
+                "with the student as there is still lack of understanding or mistakes were made. "
+                "Be carful not to give away any crucial information but do provide hints."
+            )
+        else:
+            progress = (
+                f"It seems the student has a basic understanding of the concept: {currentConcept} \n"
+                "However, you feel you can nudge them just a little further"
+            )
+    else:
+        if int(eval["score"]) < 3:
+            progress = (
+                "It seems the student is stuck:\n"
+                f"FIRST - Explain the concept concept they are stuck on: {prevConcept}. Don't ask questions about it anymore\n"
+                f"SECOND - move on to the next concept: {currentConcept}"
+            )
+        else:
+            progress = (
+                f"It seems the student has a good enough understanding of the previous concept: {prevConcept} \n"
+                " Provide relevant feedback and highlight any parts of this previous "
+                "concept that were not explicitly covered in the conversation. \n\n"
+                f"Your next question will focus on: {currentConcept}"
+            )
+
+    # System prompt
+    chat_text_qa_msgs = [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                f"""You (MENTOR) are chatting with a student (STUDENT) to review their understanding of the following topic: 
+{topic}
+
+You are using a list of concepts (i.e. facts / information) about this topic to guide the conversation.
+{cAll}
+
+{progress}
+
+IMPORTANT:
+- DO NOT use the concept text as part of your question. Instead ask questions of which the answer is the concept text
+- If the last student response is asking about something not related to the current concept, please steer them back
+- Do not lecture, i.e. providing dry definitions, but be inquisitive and ask questions 
+- Make sure not to deviate from the concepts being discussed. If your question is not related to the current concept, please adjust it
+- Make the student thinks and reasons critically
+- Do not go beyond what is listed in the concepts list, you can explain more, but not ask questions about adjecent concepts
+- Always check the previous user messages for conceptual mistakes, like the use of incorrect terminology. Correct if needed, this is very important!"""
+            ),
+        ),
+        ChatMessage(role=MessageRole.USER, content=qa_prompt_str),
+    ]
+    text_qa_template = ChatPromptTemplate(chat_text_qa_msgs)
+
+    # Refine Prompt
+    chat_refine_msgs = [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                """
+Only if necessary, make edits to ensure your response does not contain any errors and 
+is not giving away the concept you are trying to test. 
+"""
+            ),
+        ),
+        ChatMessage(role=MessageRole.USER, content=refine_prompt_str),
+    ]
+    refine_template = ChatPromptTemplate(chat_refine_msgs)
+
+    index = shared.getIndex(
+        user=shared.postgresScuirrel, postgresUser=shared.postgresScuirrel
+    )
+
+    return index.as_query_engine(
+        text_qa_template=text_qa_template,
+        refine_template=refine_template,
+        llm=shared.llm,
+    )
+
+
+# Monitoring Agent - Adapt the chat engine to the topic
+def progressCheckEngine(conversation, topic, concepts, cIndex, postgresUser):
+    cDone = (
+        ""
+        if cIndex == 0
+        else "These concepts were already covered successfully:\n* "
+        + "\n* ".join(concepts.head(cIndex)["concept"])
+    )
+
+    cToDo = "The following concepts still need to be discussed:\n* " + "\n* ".join(
+        concepts[cIndex:]["concept"]
+    )
+
+    # System prompt
+    chat_text_qa_msgs = [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                f"""You are monitoring a conversation between a tutor (TUTOR) and a student (STUDENT) on following topic:  
+{topic}
+
+{cDone}\n\n
+{cToDo}
+
+The conversation is currently focused on the following concept: 
+{concepts.iloc[cIndex]["concept"]}
+
+{conversation}
+
+----
+
+With this information, you have to decide if the STUDENT demonstrated enough understanding 
+of the current concept to move on to the next one or if they are stuck and the TUTOR should provide the answer. 
+You do this by evaluating the conversation using the following metrics:
+
+score: Score the STUDENT's current understanding of the concept on a scale of 1-4
+* 1: No relevant response, error, or any demonstration of understanding yet
+* 2: Some understanding, but not all aspects of the topic have been covered or there are mistakes
+* 3: All basics of the concept are understood and correct terminology has been used
+* 4: Clear demonstration of understanding
+
+progress: Decide how the conversation is going
+* 1: The STUDENT has not demonstrated understanding of the concept yet
+* 2: The conversation is stuck (only after at least two attempts) and the TUTOR should provide the answer
+* 3: The STUDENT has demonstrated understanding and the conversation can move on to the next concept
+
+comment: Reasoning behind the score and decision
+In addition you will provide a very brief comment why you gave the score
+
+OUTPUT:
+Provide a response in the form of a Python dictionary: \n"""
+                r'{{"score": <int>, "progress": <int>, "comment": "<reasoning>"}}'
+            ),
+        ),
+        ChatMessage(role=MessageRole.USER),
+    ]
+    text_qa_template = ChatPromptTemplate(chat_text_qa_msgs)
+
+    # Refine Prompt
+    chat_refine_msgs = [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                r'Make sure the output is in Python dictionary format: {{"score": <int>, "progress": <int>, "comment": "<reasoning>"}}'
+            ),
+        ),
+        ChatMessage(role=MessageRole.USER),
+    ]
+    refine_template = ChatPromptTemplate(chat_refine_msgs)
+
+    index = shared.getIndex(user=shared.postgresScuirrel, postgresUser=postgresUser)
+
+    return index.as_query_engine(
+        text_qa_template=text_qa_template,
+        refine_template=refine_template,
+        llm=shared.llm,
+    )
 
 
 # --- UI
@@ -77,8 +353,8 @@ def chat_ui():
                         ),
                         ui.input_action_button(
                             "startConversation",
-                            "Start conversation",
-                            width="200px",
+                            "Start new conversation",
+                            width="auto",
                             style="display: inline-block;",
                         ),
                         quiz_ui("quiz"),
@@ -256,7 +532,7 @@ def chat_server(
             f'{topics().iloc[0]["topic"]}. What do you already know about this?'
         )
 
-        msg = scuirrel_shared.Conversation()
+        msg = Conversation()
         msg.add_message(
             isBot=1,
             cID=int(concepts().iloc[conceptIndex.get()]["cID"]),
@@ -325,13 +601,15 @@ def chat_server(
 
     def botResponse_task(topic, concepts, cIndex, conversation):
         # Check the student's progress on the current concept based on the last reply (other engine)
-        engine = scuirrel_shared.progressCheckEngine(
+        engine = progressCheckEngine(
             conversation, topic, concepts, cIndex, postgresUser=postgresUser
         )
         tries = 0
         while tries < 3:
             try:
-                eval = json.loads(str(engine.query(conversation)))
+                resp = str(engine.query(conversation))
+                print(resp)
+                eval = json.loads(resp)
                 break
             except json.JSONDecodeError:
                 print("Conversation agent JSON decode error, retrying...")
@@ -342,14 +620,17 @@ def chat_server(
             return {"resp": None, "eval": None}
 
         # See if the LLM thinks we can move on to the next concept or or not
-        if int(eval["score"]) > 2:
+        if int(eval["progress"]) > 1:
             cIndex += 1
         # Check if all concepts have been covered successfully
         if cIndex >= concepts.shape[0]:
             resp = f"Well done! It seems you have demonstrated understanding of everything we wanted you to know about: {topic}"
         else:
-            engine = scuirrel_shared.chatEngine(topic, concepts, cIndex, eval)
-            resp = str(engine.query(conversation))
+            engine = chatEngine(topic, concepts, cIndex, eval)
+            # import pprint
+            # pprint.pprint(engine.get_prompts())
+            x = engine.query(conversation)
+            resp = str(x)
 
         return {"resp": resp, "eval": eval}
 
@@ -380,13 +661,11 @@ def chat_server(
             # Check the topic progress and move on to next concept if current one scored well
             i = conceptIndex.get()
             finished = False
-            if int(eval["score"]) > 2:
-                if i < (concepts().shape[0] - 1):
-                    i = i + 1
-                else:
-                    finished = True
-
-                progressBar("chatProgress", int(100 * i / concepts().shape[0]))
+            if int(eval["progress"]) > 1:
+                finished = False if i < (concepts().shape[0] - 1) else True
+                i = i + 1 if not finished else i
+                progress = int(100 * i / concepts().shape[0]) if not finished else 100
+                progressBar("chatProgress", progress)
 
             # Add the evaluation of the student's last reply to the log
             msg = messages.get()

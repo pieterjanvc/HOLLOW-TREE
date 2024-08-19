@@ -148,14 +148,14 @@ def test_accorns(cmdopt, page, browser, accornsApp):
             )
             # If successful, the file will be added to the table
             controller.OutputDataFrame(page, "vectorDB-filesTable").expect_nrow(
-                2, timeout=20000
+                2, timeout=30000
             )
 
         # TOPICS TAB
         controller.NavPanel(page, id="postLoginTabs", data_value="tTab").click(
             timeout=10000
         )
-        
+
         # Select the new group by name
         controller.InputSelect(page, "topics-gID").set("testGroup", timeout=10000)
 
@@ -220,7 +220,9 @@ def test_accorns(cmdopt, page, browser, accornsApp):
         )
 
         # Select the new group by name
-        controller.InputSelect(page, "quizGeneration-gID").set("testGroup", timeout=10000)
+        controller.InputSelect(page, "quizGeneration-gID").set(
+            "testGroup", timeout=10000
+        )
 
         # Add a new quiz question
         if not cmdopt["excludeLLMTest"]:

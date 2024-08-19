@@ -19,16 +19,20 @@ accessCodesQuery = (
     'WHERE a."gID" = g."gID" AND a."uID_creator" = u."uID" AND a."used" IS NULL AND a."gID" = ?'
 )
 
+
 def groupQuery(conn, user):
-    userFilter = 'WHERE "gID" IN (SELECT "gID" FROM "group_member" WHERE "uID" = ?) ' if user["adminLevel"] < 2 else ""
+    userFilter = (
+        'WHERE "gID" IN (SELECT "gID" FROM "group_member" WHERE "uID" = ?) '
+        if user["adminLevel"] < 2
+        else ""
+    )
     params = (int(user["uID"]),) if user["adminLevel"] < 2 else ()
     return shared.pandasQuery(
-            conn,
-            (
-            f'SELECT * FROM "group" {userFilter} '
-            ),
-            params=params,
-)
+        conn,
+        (f'SELECT * FROM "group" {userFilter} '),
+        params=params,
+    )
+
 
 # Ignore the anonymous group
 groupAdminLevels = {
@@ -130,9 +134,7 @@ def groups_server(
     @reactive.event(user)
     def _():
         conn = shared.appDBConn(postgresUser=postgresUser)
-        groups.set(
-            groupQuery(conn, user.get())
-        )
+        groups.set(groupQuery(conn, user.get()))
         conn.close()
 
     # Update group list
