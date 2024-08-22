@@ -8,7 +8,7 @@
 from shiny.playwright import controller
 from shiny.run import ShinyAppProc
 from playwright.sync_api import Page
-from conftest import appDBConn, dbQuery
+from tests.conftest import appDBConn, dbQuery
 import pytest
 import os
 import re
