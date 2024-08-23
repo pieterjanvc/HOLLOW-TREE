@@ -75,7 +75,7 @@ def vectorDB_management_server(
         index = None
         shared.elementDisplay("blankDBMsg", "s", session, alertNotFound=False)
     else:
-        index = shared.getIndex("accorns", postgresUser=shared.postgresAccorns)
+        index = shared.getIndex(postgresUser=shared.postgresAccorns)
 
     files = reactive.value(files)
     index = reactive.value(index)
@@ -149,7 +149,7 @@ def vectorDB_management_server(
         conn.close()
 
         files.set(getFiles)
-        index.set(shared.getIndex(user="accorns", postgresUser=shared.postgresAccorns))
+        index.set(shared.getIndex(postgresUser=shared.postgresAccorns))
 
         shared.elementDisplay("uiUploadFile", "s", session, alertNotFound=False)
         ui.remove_ui("#processFile")

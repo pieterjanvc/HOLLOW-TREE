@@ -127,3 +127,7 @@ If you make any changes that require new or updated packages do the following:
 - Navigate to the project root folder
 - Run `uv pip compile pyproject.toml > requirements.txt` to update the
   [requirements.txt](../../requirements.txt) file
+
+## Testing apps and generating tutorials
+
+See [Testing apps & Generating tutorials](testing.md)

@@ -28,12 +28,6 @@ curDir = os.path.dirname(os.path.realpath(__file__))
 #
 # pytest tests\test_apps.py --headed --slowmo 200
 
-# Initialise Shiny app
-# @pytest.fixture
-# def accornsApp():
-#      create_app_fixture(os.path.join(curDir, "..", "accorns_app.py"))
-
-
 def test_accorns(cmdopt, page, browser, accornsApp):
     # Ignore this test if the scuirrelOnly flag is set
     if cmdopt["scuirrelOnly"] and not cmdopt["publishPostgres"]:
