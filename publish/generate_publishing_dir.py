@@ -42,6 +42,9 @@ if args.app not in apps and args.app != "":
 elif args.app != "":
     apps = [args.app]
 
+# Generate a new requirements.txt file for rsconnect
+os.system(f"uv pip compile {os.path.join(baseFolder, 'pyproject.toml')} > {os.path.join(publishDir, 'requirements.txt')}")
+
 for toGenerate in apps:
 
     newFolder = os.path.join(publishDir, toGenerate)
@@ -60,7 +63,7 @@ for toGenerate in apps:
             os.path.join(newFolder, "app.py"))
 
     # Copy the requirements.txt file to the publish directory
-    copyfile(os.path.join(baseFolder, "requirements.txt"), 
+    copyfile(os.path.join(publishDir, "requirements.txt"), 
             os.path.join(newFolder, "requirements.txt"))
 
     # Copy the shared.py file to the publish directory

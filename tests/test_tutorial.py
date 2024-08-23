@@ -8,7 +8,7 @@
 from shiny.playwright import controller
 from shiny.run import ShinyAppProc
 from playwright.sync_api import Page
-from conftest import appDBConn, dbQuery
+from tests.conftest import appDBConn, dbQuery
 import pytest
 import os
 import re
@@ -103,21 +103,19 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         fill out the sign up form and provide the access code"""
         addSubtitle(page, subt)
 
-        controller.InputText(page, "login-cUsername").set(
+        controller.InputText(page, "login-newUsername").set(
             "topInstructor", timeout=10000
         )
         page.wait_for_timeout(1000)
-        controller.InputPassword(page, "login-cPassword").set(
+        controller.InputPassword(page, "login-newPassword").set(
             "instr123ABC!", timeout=10000
         )
         page.wait_for_timeout(1000)
-        controller.InputPassword(page, "login-cPassword2").set(
+        controller.InputPassword(page, "login-newPassword2").set(
             "instr123ABC!", timeout=10000
         )
         page.wait_for_timeout(1000)
-        controller.InputText(page, "login-cAccessCode").set(
-            "W4t-00k-gTR", timeout=10000
-        )
+        controller.InputText(page, "login-accessCode").set("W4t-00k-gTR", timeout=10000)
         page.wait_for_timeout(1000)
 
         subt = """Click the 'Create Account' button to create your account"""
@@ -128,11 +126,9 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         addSubtitle(page, subt)
 
         # LOGIN TAB
-        controller.InputText(page, "login-lUsername").set(
-            "topInstructor", timeout=10000
-        )
+        controller.InputText(page, "login-username").set("topInstructor", timeout=10000)
         page.wait_for_timeout(1000)
-        controller.InputPassword(page, "login-lPassword").set(
+        controller.InputPassword(page, "login-password").set(
             "instr123ABC!", timeout=10000
         )
         page.wait_for_timeout(1000)
@@ -424,11 +420,9 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         addSubtitle(page, subt)
         page.locator('"Dismiss"').click(timeout=10000)  # Close the modal
 
-        controller.InputText(page, "login-lUsername").set(
-            "topInstructor", timeout=10000
-        )
+        controller.InputText(page, "login-username").set("topInstructor", timeout=10000)
         page.wait_for_timeout(300)
-        controller.InputPassword(page, "login-lPassword").set(
+        controller.InputPassword(page, "login-password").set(
             "instr123ABC!", timeout=10000
         )
         page.wait_for_timeout(300)
@@ -490,8 +484,8 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         # page.locator('"Dismiss"').click(timeout=10000)  # Close the modal
 
         # # Try to login with user account
-        # controller.InputText(page, "login-lUsername").set("testUser", timeout=10000)
-        # controller.InputPassword(page, "login-lPassword").set(
+        # controller.InputText(page, "login-username").set("testUser", timeout=10000)
+        # controller.InputPassword(page, "login-password").set(
         #     "user123ABC!", timeout=10000
         # )
         # controller.InputActionButton(page, "login-login").click(timeout=10000)
@@ -500,10 +494,10 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         # ).wait_for(timeout=10000)
 
         # # Login with the instructor account and join the group
-        # controller.InputText(page, "login-lUsername").set(
+        # controller.InputText(page, "login-username").set(
         #     "testInstructor", timeout=10000
         # )
-        # controller.InputPassword(page, "login-lPassword").set(
+        # controller.InputPassword(page, "login-password").set(
         #     "instr123ABC!", timeout=10000
         # )
         # controller.InputActionButton(page, "login-login").click(timeout=10000)
@@ -568,19 +562,17 @@ def test_scuirrel_tutorial(cmdopt, page, scuirrelApp):
         fill out the sign up form and provide the access code"""
         addSubtitle(page, subt)
 
-        controller.InputText(page, "login-cUsername").set("topStudent", timeout=10000)
+        controller.InputText(page, "login-newUsername").set("topStudent", timeout=10000)
         page.wait_for_timeout(1000)
-        controller.InputPassword(page, "login-cPassword").set(
+        controller.InputPassword(page, "login-newPassword").set(
             "user123ABC!", timeout=10000
         )
         page.wait_for_timeout(1000)
-        controller.InputPassword(page, "login-cPassword2").set(
+        controller.InputPassword(page, "login-newPassword2").set(
             "user123ABC!", timeout=10000
         )
         page.wait_for_timeout(1000)
-        controller.InputText(page, "login-cAccessCode").set(
-            "4Xt-Bb4-487", timeout=10000
-        )
+        controller.InputText(page, "login-accessCode").set("4Xt-Bb4-487", timeout=10000)
         page.wait_for_timeout(1000)
 
         subt = """Click the 'Create Account' button to create your account"""
@@ -591,9 +583,9 @@ def test_scuirrel_tutorial(cmdopt, page, scuirrelApp):
         addSubtitle(page, subt)
 
         # LOGIN TAB
-        controller.InputText(page, "login-lUsername").set("topStudent", timeout=10000)
+        controller.InputText(page, "login-username").set("topStudent", timeout=10000)
         page.wait_for_timeout(1000)
-        controller.InputPassword(page, "login-lPassword").set(
+        controller.InputPassword(page, "login-password").set(
             "user123ABC!", timeout=10000
         )
         page.wait_for_timeout(1000)

@@ -304,8 +304,11 @@ def quiz_generation_server(
                 # Make sure only to keep one capital letter for the answer
                 resp["answer"] = re.search("[A-D]", resp["answer"].iloc[0]).group(0)[0]
                 valid = True
-            except Exception:
-                print(("Failed to generate quiz question\n" + x))
+            except Exception as e:
+                import traceback
+
+                print(("Failed to generate quiz question\n" + str(e)))
+                print(traceback.format_exc())
                 if tries > 1:
                     return {"resp": None, "cID": cID}
                 tries += 1

@@ -155,12 +155,12 @@ def vectorDBConn(postgresUser, remoteAppDB=remoteAppDB, vectorDB=vectorDB):
 
 
 # Get the current vector database index
-def getIndex(user, postgresUser, remote=remoteAppDB):
+def getIndex(postgresUser, remote=remoteAppDB):
     if remote:
         vectorStore = PGVectorStore.from_params(
             host=postgresHost,
             port=postgresPort,
-            user=user,
+            user=postgresUser,
             password=os.environ.get(
                 "POSTGRES_PASS_"
                 + ("SCUIRREL" if postgresUser == postgresScuirrel else "ACCORNS")

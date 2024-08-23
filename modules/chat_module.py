@@ -227,9 +227,7 @@ is not giving away the concept you are trying to test.
     ]
     refine_template = ChatPromptTemplate(chat_refine_msgs)
 
-    index = shared.getIndex(
-        user=shared.postgresScuirrel, postgresUser=shared.postgresScuirrel
-    )
+    index = shared.getIndex(postgresUser=shared.postgresScuirrel)
 
     return index.as_query_engine(
         text_qa_template=text_qa_template,
@@ -308,7 +306,7 @@ Provide a response in the form of a Python dictionary: \n"""
     ]
     refine_template = ChatPromptTemplate(chat_refine_msgs)
 
-    index = shared.getIndex(user=shared.postgresScuirrel, postgresUser=postgresUser)
+    index = shared.getIndex(postgresUser=postgresUser)
 
     return index.as_query_engine(
         text_qa_template=text_qa_template,

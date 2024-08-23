@@ -7,7 +7,7 @@
 from shiny.playwright import controller
 from shiny.run import ShinyAppProc
 from playwright.sync_api import Page, Browser
-from conftest import appDBConn, dbQuery
+from tests.conftest import appDBConn, dbQuery
 import pytest
 import os
 import re
@@ -27,11 +27,6 @@ curDir = os.path.dirname(os.path.realpath(__file__))
 #       --publishPostgres (generate publishing directories and test with the postgres database)
 #
 # pytest tests\test_apps.py --headed --slowmo 200
-
-# Initialise Shiny app
-# @pytest.fixture
-# def accornsApp():
-#      create_app_fixture(os.path.join(curDir, "..", "accorns_app.py"))
 
 
 def test_accorns(cmdopt, page, browser, accornsApp):
@@ -58,8 +53,8 @@ def test_accorns(cmdopt, page, browser, accornsApp):
         page.locator('"Dismiss"').click(timeout=10000)  # Close the modal
 
         # LOGIN TAB
-        controller.InputText(page, "login-lUsername").set("admin", timeout=10000)
-        controller.InputPassword(page, "login-lPassword").set("admin", timeout=10000)
+        controller.InputText(page, "login-username").set("admin", timeout=10000)
+        controller.InputPassword(page, "login-password").set("admin", timeout=10000)
         controller.InputActionButton(page, "login-login").click(timeout=10000)
         # Check if all the tabs are visible
         controller.NavsetPill(page, id="postLoginTabs").expect_nav_values(
@@ -263,37 +258,37 @@ def test_accorns(cmdopt, page, browser, accornsApp):
         # Create new accounts
 
         # User
-        controller.InputText(page, "login-cUsername").set("testUser", timeout=10000)
+        controller.InputText(page, "login-newUsername").set("testUser", timeout=10000)
         # controller.InputText(page, "login-cFirstName").set("user")
         # controller.InputText(page, "login-cLastName").set("test")
         # controller.InputText(page, "login-cEmail").set("user@test.com")
-        controller.InputPassword(page, "login-cPassword").set(
+        controller.InputPassword(page, "login-newPassword").set(
             "user123ABC!", timeout=10000
         )
-        controller.InputPassword(page, "login-cPassword2").set(
+        controller.InputPassword(page, "login-newPassword2").set(
             "user123ABC!", timeout=10000
         )
-        controller.InputText(page, "login-cAccessCode").set(
+        controller.InputText(page, "login-accessCode").set(
             accessCodes["code"].iloc[1], timeout=10000
         )
         controller.InputActionButton(page, "login-createAccount").click(timeout=10000)
         page.wait_for_timeout(500)
         # Instructor
-        controller.InputText(page, "login-cUsername").set(
+        controller.InputText(page, "login-newUsername").set(
             "testInstructor", timeout=10000
         )
-        controller.InputPassword(page, "login-cPassword").set(
+        controller.InputPassword(page, "login-newPassword").set(
             "instr123ABC!", timeout=10000
         )
-        controller.InputPassword(page, "login-cPassword2").set(
+        controller.InputPassword(page, "login-newPassword2").set(
             "instr23ABC!", timeout=10000
         )
-        controller.InputText(page, "login-cAccessCode").set(
+        controller.InputText(page, "login-accessCode").set(
             accessCodes["code"].iloc[2], timeout=10000
         )
         controller.InputActionButton(page, "login-createAccount").click(timeout=10000)
         page.get_by_text("Passwords do not match").wait_for(timeout=10000)
-        controller.InputPassword(page, "login-cPassword2").set(
+        controller.InputPassword(page, "login-newPassword2").set(
             "instr123ABC!", timeout=10000
         )
         controller.InputActionButton(page, "login-createAccount").click(timeout=10000)
@@ -332,8 +327,8 @@ def test_accorns(cmdopt, page, browser, accornsApp):
         page.locator('"Dismiss"').click(timeout=10000)  # Close the modal
 
         # Try to login with user account
-        controller.InputText(page, "login-lUsername").set("testUser", timeout=10000)
-        controller.InputPassword(page, "login-lPassword").set(
+        controller.InputText(page, "login-username").set("testUser", timeout=10000)
+        controller.InputPassword(page, "login-password").set(
             "user123ABC!", timeout=10000
         )
         controller.InputActionButton(page, "login-login").click(timeout=10000)
@@ -342,10 +337,10 @@ def test_accorns(cmdopt, page, browser, accornsApp):
         ).wait_for(timeout=10000)
 
         # Login with the instructor account and join the group
-        controller.InputText(page, "login-lUsername").set(
+        controller.InputText(page, "login-username").set(
             "testInstructor", timeout=10000
         )
-        controller.InputPassword(page, "login-lPassword").set(
+        controller.InputPassword(page, "login-password").set(
             "instr123ABC!", timeout=10000
         )
         controller.InputActionButton(page, "login-login").click(timeout=10000)
@@ -398,8 +393,8 @@ def test_scuirrel(page, browser, scuirrelApp, cmdopt):
 
     with appDBConn(remoteAppDB=cmdopt["publishPostgres"]) as conn:
         # LOGIN TAB
-        controller.InputText(page, "login-lUsername").set("testUser", timeout=10000)
-        controller.InputPassword(page, "login-lPassword").set(
+        controller.InputText(page, "login-username").set("testUser", timeout=10000)
+        controller.InputPassword(page, "login-password").set(
             "user123ABC!", timeout=10000
         )
         controller.InputActionButton(page, "login-login").click(timeout=10000)

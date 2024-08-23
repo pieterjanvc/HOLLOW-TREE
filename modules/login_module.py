@@ -13,17 +13,29 @@ from htmltools import HTML
 import shared.shared as shared
 from modules.login_reset_module import login_reset_ui, login_reset_server
 
+passRules = "minlength: 8; maxlength: 20; required: lower; required: upper; required: digit; required: [!#$%&()*+.=@^_];"
+
 
 # --- UI
+def customAttr(element, attrs):
+    for attr, value in attrs.items():
+        e = element
+        e.children[1].attrs[attr] = value
+
+    return e
+
+
 @module.ui
 def login_ui():
     return [
         ui.layout_columns(
             ui.card(
                 ui.card_header("Login"),
-                ui.input_text("lUsername", "Username"),
-                ui.input_password("lPassword", "Password"),
-                ui.input_action_button("login", "Login", width="200px"),
+                ui.tags.form(
+                    ui.input_text("username", "Username"),
+                    ui.input_password("password", "Password"),
+                    ui.input_action_button("login", "Login", width="200px"),
+                ),
                 ui.input_action_link("showReset", "Reset password"),
             ),
             ui.card(
@@ -31,17 +43,28 @@ def login_ui():
                 HTML("""<i>NOTE: This application has been built for research purposes 
                         and has not been extensively tested for security. We recommend
                         you create a unique password for this you are not using anywhere else</i>"""),
-                ui.input_text("cUsername", "Username"),
-                ui.panel_conditional(
-                    "true" if shared.personalInfo else "false",
-                    ui.input_text("cFirstName", "First name"),
-                    ui.input_text("cLastName", "Last name"),
-                    ui.input_text("cEmail", "Email"),
+                ui.tags.form(
+                    customAttr(
+                        ui.input_text("newUsername", "Username"),
+                        {"autocomplete": "username"},
+                    ),
+                    ui.panel_conditional(
+                        "true" if shared.personalInfo else "false",
+                        ui.input_text("firstName", "First name"),
+                        ui.input_text("lastName", "Last name"),
+                        ui.input_text("email", "Email"),
+                    ),
+                    customAttr(
+                        ui.input_password("newPassword", "New Password"),
+                        {"autocomplete": "new-password", "passwordrules": passRules},
+                    ),
+                    customAttr(
+                        ui.input_password("newPassword2", "Repeat password"),
+                        {"autocomplete": "new-password", "passwordrules": passRules},
+                    ),
+                    ui.input_text("accessCode", "Access code"),
+                    ui.input_action_button("createAccount", "Create", width="200px"),
                 ),
-                ui.input_password("cPassword", "Password"),
-                ui.input_password("cPassword2", "Repeat password"),
-                ui.input_text("cAccessCode", "Access code"),
-                ui.input_action_button("createAccount", "Create", width="200px"),
             ),
             col_widths=6,
         )
@@ -69,7 +92,7 @@ def login_server(
     @reactive.event(input.login)
     def _():
         conn = shared.appDBConn(postgresUser=postgresUser)
-        userCheck = shared.authCheck(conn, input.lUsername(), input.lPassword())
+        userCheck = shared.authCheck(conn, input.username(), input.password())
 
         if userCheck["user"] is None:
             ui.notification_show("Invalid username")
@@ -100,8 +123,8 @@ def login_server(
         conn.close()
 
         # Clear the input fields
-        ui.update_text_area("lUsername", value="")
-        ui.update_text_area("lPassword", value="")
+        ui.update_text_area("username", value="")
+        ui.update_text_area("password", value="")
 
         user.set(userCheck.to_dict(orient="records")[0])
 
@@ -111,8 +134,8 @@ def login_server(
     @reactive.effect
     @reactive.event(input.createAccount)
     def _():
-        username = input.cUsername()
-        accessCode = input.cAccessCode()
+        username = input.newUsername()
+        accessCode = input.accessCode()
 
         # Check if the username is long enough
         if re_search(r"^\w{6,20}$", username) is None:
@@ -135,9 +158,9 @@ def login_server(
 
         if shared.personalInfo:
             # Check if the personal information is long enough
-            fName = input.cFirstName().strip()
-            lName = input.cLastName().strip()
-            email = input.cEmail().strip()
+            fName = input.firstName().strip()
+            lName = input.lastName().strip()
+            email = input.email().strip()
 
             if len(fName) == 0:
                 ui.notification_show("First name cannot be empty")
@@ -153,7 +176,7 @@ def login_server(
                 return
 
         # Check the password
-        pCheck = shared.passCheck(input.cPassword(), input.cPassword2())
+        pCheck = shared.passCheck(input.newPassword(), input.newPassword2())
         if pCheck:
             ui.notification_show(pCheck)
             conn.close()
@@ -167,7 +190,7 @@ def login_server(
             return
 
         # Create the user
-        hashed = bcrypt.hashpw(input.cPassword().encode("utf-8"), bcrypt.gensalt())
+        hashed = bcrypt.hashpw(input.newPassword().encode("utf-8"), bcrypt.gensalt())
 
         if shared.personalInfo:
             newuID = shared.executeQuery(
@@ -218,10 +241,10 @@ def login_server(
         conn.close()
 
         # Clear the input fields
-        ui.update_text_area("cUsername", value="")
-        ui.update_text_area("cPassword", value="")
-        ui.update_text_area("cPassword2", value="")
-        ui.update_text_area("cAccessCode", value="")
+        ui.update_text_area("newUsername", value="")
+        ui.update_text_area("newPassword", value="")
+        ui.update_text_area("newPassword2", value="")
+        ui.update_text_area("accessCode", value="")
 
         ui.notification_show("Account created successfully. Please login")
 

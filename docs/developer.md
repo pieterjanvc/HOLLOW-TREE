@@ -120,25 +120,9 @@ Note that this file structure only works for _local development_. When deploying
 apps, separate app folders need to be generated. For more details, see the
 [IT admin guide](ITadmin.md)
 
-## Testing the apps
+## Testing the apps & Generating tutorials
 
-The `tests/` folder contains a `test_apps.py` script that can be run to test major app functionality 
-using the playwright library. To test, run the following command
-
-```
-pytest tests\test_apps.py
-```
-The following arguments (defined in [conftest.py](../tests/conftest.py)) can be set:
-- --headed (browser is visible during test)
-- --slowmo <200> (slows down every action by x ms to better see what's happening)
-- --save (save timestamped database, otherwise overwrite previous test database)
-- --newVectorDB (test the vector database, uses more GPT tokens)
-- --scuirrelOnly (test SCUIRREL only, requires existing test database)
-- --accornsOnly (test ACCORNS only)
-- --publishPostgres (test generating publishing directories and test with the postgres database)
-
-Initial testing found that the testing can error out due to not obeying timeouts when writing text. To
-avoid these errors (most of the time) run the test headed and a slowmo of 200
+See [Testing apps & Generating tutorials](testing.md) for more details
 
 ```
 pytest tests\test_apps.py --headed --slowmo 200

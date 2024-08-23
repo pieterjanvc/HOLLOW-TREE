@@ -11,44 +11,34 @@ project and ensure consistency across different machines.
 
 ## Set up a Virtual Python environment
 
-Full tutorial for setting up Shiny within a virtual environment found on
-[website](https://shiny.posit.co/py/docs/install-create-run.html#install)
+1. Install uv
 
-The command below should be run on the CMD on Windows (_not_ PowerShell), or a terminal
-on Linux or MacOS.
+See the
+[uv installation guide](https://github.com/astral-sh/uv?tab=readme-ov-file#installation)
+for help installing uv on your system.
 
-1. Navigate to the HOLLOW-TREE root folder and run
+2. Setup the environment
+
+Navigate to the project root folder and run the following command:
 
 ```
-python -m venv .venv
+uv sync --locked
 ```
-_Depending on your PositConnect server, you might need to use a specific python version
-in which case you use for example `path/to/python/python -m venv .venv`_
+
+_This will create a virtual environment and install all packages needed_
+
+- You can add `--no-dev` to the command above to only install the packages needed to run
 
 2. Activate the environment
 
-_... On WINDOWS_
-
-```
-.venv\Scripts\activate.bat
-```
-
-_... ON LINUX/MAC_
-
-```
-source .venv/bin/activate
-```
+Run `.venv\Scripts\activate.bat` on Windows or `source .venv/bin/activate` on Linux
 
 _You should see (.venv) appear before the prompt_
 
-3. Install any project dependencies
+## Run a Shiny app locally
 
-```
-py -m pip install -r requirements.txt
-```
-
-4. Start the app Make sure you are in the HOLLOW-TREE root folder and run the following
-   command:
+Make sure you are in the HOLLOW-TREE root folder with the virtual environment activated
+and run the following command:
 
 ```
 shiny run --reload --launch-browser accorns_app.py
@@ -57,14 +47,12 @@ shiny run --reload --launch-browser accorns_app.py
 or
 
 ```
-shiny run --reload --launch-browser accorns_app.py
+shiny run --reload --launch-browser scuirrel_app.py
 ```
 
-_Note: If you get a PostgreSQL connection error, make sure to set
+## Deactivate the virtual environment
 
-`remoteAppDB = "False"` in [shared/shared_config.py](../../shared/shared_config.toml)_
-
-5. To deactivate the virtual environment run
+When finished you can deactivate the virtual environment by running:
 
 ```
 deactivate
@@ -96,3 +84,22 @@ In case of errors or not found, set it manually:
 3. Clicking the button should start the app in an integrated browser. Alternatively,
    choose the dropdown and choose 'Debug Shiny App' to run the in debug mode (it will
    automatically stop at breakpoints)
+
+## Updating dependencies
+
+To install or update a package, you can use the following command:
+
+```
+uv add <package-name>
+```
+- Example `uv add ruff` or `uv add ruff==0.5.0` for specific version
+- Add --dev to install as a development dependency
+
+This will automatically update the [pyproject.toml](../../pyproject.toml) file and the
+[uv.lock](../../uv.lock) file
+
+Removing a package is done with `uv remove <package-name>`
+
+## Testing apps and generating tutorials
+
+See [Testing apps & Generating tutorials](testing.md)
