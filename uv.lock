@@ -684,7 +684,7 @@ requires-dist = [
 dev = [
     { name = "playwright", specifier = ">=1.46.0" },
     { name = "pytest", specifier = ">=8.3.2" },
-    { name = "pytest-playwright" },
+    { name = "pytest-playwright", specifier = ">=0.5.1" },
     { name = "rsconnect", specifier = ">=0.1.3" },
 ]
 

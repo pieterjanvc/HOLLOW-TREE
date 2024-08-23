@@ -24,13 +24,12 @@ for help installing uv on your system.
 Navigate to the project root folder and run the following command:
 
 ```
-uv pip sync requirements.txt
+uv sync
 ```
 
 _This will create a virtual environment and install all packages needed_
 
-NOTE: If you make any changes that require new or updated packages, you need to update
-the `requirements.txt` file by running `uv pip compile pyproject.toml`
+- You can add `--no-dev` to the command above to only install the packages needed to run
 
 2. Activate the environment
 
@@ -119,3 +118,12 @@ In case of errors or not found, set it manually:
 3. Clicking the button should start the app in an integrated browser. Alternatively,
    choose the dropdown and choose 'Debug Shiny App' to run the in debug mode (it will
    automatically stop at breakpoints)
+
+## Update dependencies
+
+If you make any changes that require new or updated packages do the following:
+
+- Update the dependencies in the [pyproject.toml](../../pyproject.toml) file
+- Navigate to the project root folder
+- Run `uv pip compile pyproject.toml > requirements.txt` to update the
+  [requirements.txt](../../requirements.txt) file
