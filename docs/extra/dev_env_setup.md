@@ -92,8 +92,8 @@ To install or update a package, you can use the following command:
 ```
 uv add <package-name>
 ```
-
-_For example `uv add ruff` or `uv add ruff==0.5.0` for specific version_
+- Example `uv add ruff` or `uv add ruff==0.5.0` for specific version
+- Add --dev to install as a development dependency
 
 This will automatically update the [pyproject.toml](../../pyproject.toml) file and the
 [uv.lock](../../uv.lock) file

@@ -28,6 +28,7 @@ curDir = os.path.dirname(os.path.realpath(__file__))
 #
 # pytest tests\test_apps.py --headed --slowmo 200
 
+
 def test_accorns(cmdopt, page, browser, accornsApp):
     # Ignore this test if the scuirrelOnly flag is set
     if cmdopt["scuirrelOnly"] and not cmdopt["publishPostgres"]:

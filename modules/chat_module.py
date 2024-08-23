@@ -227,9 +227,7 @@ is not giving away the concept you are trying to test.
     ]
     refine_template = ChatPromptTemplate(chat_refine_msgs)
 
-    index = shared.getIndex(
-        postgresUser=shared.postgresScuirrel
-    )
+    index = shared.getIndex(postgresUser=shared.postgresScuirrel)
 
     return index.as_query_engine(
         text_qa_template=text_qa_template,

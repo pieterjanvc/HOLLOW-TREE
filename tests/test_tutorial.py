@@ -115,9 +115,7 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
             "instr123ABC!", timeout=10000
         )
         page.wait_for_timeout(1000)
-        controller.InputText(page, "login-accessCode").set(
-            "W4t-00k-gTR", timeout=10000
-        )
+        controller.InputText(page, "login-accessCode").set("W4t-00k-gTR", timeout=10000)
         page.wait_for_timeout(1000)
 
         subt = """Click the 'Create Account' button to create your account"""
@@ -128,9 +126,7 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         addSubtitle(page, subt)
 
         # LOGIN TAB
-        controller.InputText(page, "login-username").set(
-            "topInstructor", timeout=10000
-        )
+        controller.InputText(page, "login-username").set("topInstructor", timeout=10000)
         page.wait_for_timeout(1000)
         controller.InputPassword(page, "login-password").set(
             "instr123ABC!", timeout=10000
@@ -424,9 +420,7 @@ def test_accorns_tutorial(cmdopt, page, accornsApp):
         addSubtitle(page, subt)
         page.locator('"Dismiss"').click(timeout=10000)  # Close the modal
 
-        controller.InputText(page, "login-username").set(
-            "topInstructor", timeout=10000
-        )
+        controller.InputText(page, "login-username").set("topInstructor", timeout=10000)
         page.wait_for_timeout(300)
         controller.InputPassword(page, "login-password").set(
             "instr123ABC!", timeout=10000
@@ -578,9 +572,7 @@ def test_scuirrel_tutorial(cmdopt, page, scuirrelApp):
             "user123ABC!", timeout=10000
         )
         page.wait_for_timeout(1000)
-        controller.InputText(page, "login-accessCode").set(
-            "4Xt-Bb4-487", timeout=10000
-        )
+        controller.InputText(page, "login-accessCode").set("4Xt-Bb4-487", timeout=10000)
         page.wait_for_timeout(1000)
 
         subt = """Click the 'Create Account' button to create your account"""

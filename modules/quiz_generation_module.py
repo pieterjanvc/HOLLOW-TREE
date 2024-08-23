@@ -306,6 +306,7 @@ def quiz_generation_server(
                 valid = True
             except Exception as e:
                 import traceback
+
                 print(("Failed to generate quiz question\n" + str(e)))
                 print(traceback.format_exc())
                 if tries > 1:
