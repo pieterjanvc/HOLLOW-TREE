@@ -101,7 +101,7 @@ def createLocalVectorDB(
 def addFileToDB(
     newFile,
     shinyToken,
-    vectorDB=None,
+    vectorDB,
     remoteAppDB=shared.remoteAppDB,
     storageFolder=None,
     newFileName=None,
@@ -135,14 +135,23 @@ def addFileToDB(
     # Move the file to permanent storage if requested
     newFileName = os.path.basename(newFile) if newFileName is None else newFileName
 
+    # Check if the file name is already in file table of the vector database
+    conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
+    existingFile = shared.pandasQuery(
+        conn,
+        'SELECT "fileName" FROM "file" WHERE "fileName" = ?',
+        (newFileName,),
+    )
+    conn.close()
+
+    if existingFile.shape[0] > 0:
+            return (1, "A file with this name already exists. Please rename the file before uploading it again")
+
     if (storageFolder is not None) & (not isURL):
         if not os.path.exists(storageFolder):
             os.makedirs(storageFolder)
 
         newFilePath = os.path.join(storageFolder, "") + newFileName
-
-        if os.path.exists(newFilePath):
-            return (1, "A file with this name already exists. Skipping")
 
         move(newFile, newFilePath)
         newFile = newFilePath

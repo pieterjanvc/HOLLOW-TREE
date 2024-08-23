@@ -34,7 +34,9 @@ def vectorDB_management_ui():
         ui.panel_conditional(
             "output.fileInfo != ''",
             ui.card(
-                ui.card_header("File info"), ui.output_ui("fileInfo"), id="fileInfoCard"
+                ui.card_header("File info"), 
+                ui.output_ui("fileInfo"),
+                id="fileInfoCard"
             ),
         ),
         # Option to add new files
@@ -136,7 +138,7 @@ def vectorDB_management_server(
         if insertionResult == 0:
             msg = "File successfully added to the vector database"
         elif insertionResult == 1:
-            msg = "A file with the same name already exists. Skipping upload"
+            msg = "A file with the same name already exists. Please rename the file and try again"
         else:
             msg = "Not a valid file type. Please upload a .csv, .pdf, .docx, .txt, .md, .epub, .ipynb, .ppt or .pptx file"
 
@@ -171,13 +173,60 @@ def vectorDB_management_server(
         conn.close()
         keywords = "; ".join(keywords["keyword"])
 
-        return HTML(
+        return ui.TagList(HTML(
             f"<h4>{info.fileName}</h4><ul>"
             f"<li><b>Summary title</b> <i>(AI generated)</i>: {info.title}</li>"
             f"<li><b>Summary subtitle</b> <i>(AI generated)</i>: {info.subtitle}</li>"
             f"<li><b>Uploaded</b>: {info.created}</li></ul>"
             "<p><b>Top-10 keywords extracted from document</b> <i>(AI generated)</i></p>"
             f"{keywords}"
+        ), ui.input_action_button("deleteFile","Delete file", width="auto"),)
+    
+    @reactive.effect
+    @reactive.event(input.deleteFile)
+    def _():
+        fileName = files().iloc[filesTable.data_view(selected=True).index[0]].fileName
+        ui.modal_show(
+            ui.modal(
+                HTML(f"<p style='color:red;'>{fileName}</p>"
+                 "<p>If you sure you want to delete this file from the vector database,"
+                 "type <b>DELETE</b> in all caps in the text box below and click confirm</p><br>"),
+                ui.input_text("deleteConfirm", label="Type DELETE in all caps"),
+                title="Delete file",                
+                footer=[
+                    ui.input_action_button("confirmDelete", "Confirm"),
+                    ui.modal_button("Cancel"),
+                ],
+            )
         )
+    
+    @reactive.effect
+    @reactive.event(input.confirmDelete)
+    def _():
+        if input.deleteConfirm() == "DELETE":
+            file = files().iloc[filesTable.data_view(selected=True).index[0]]
+            conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
+            # Delete the vectors
+            cursor = conn.cursor()
+            _ = shared.executeQuery(
+                cursor,
+                ('DELETE FROM "documents" WHERE '
+                "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = '\"?\"'"),
+                (file.fileName,),
+                remoteAppDB=True,
+            )
+            _ = shared.executeQuery(
+                cursor,
+                'DELETE FROM "file" WHERE "fID" = ?',
+                (file.fID,),
+                remoteAppDB=True,
+            )
+            conn.close()
+            shared.elementDisplay("fileInfoCard", "h", session, alertNotFound=False)
+            files.set(shared.pandasQuery(conn, query='SELECT * FROM "file"'))            
+            ui.notification_show("File successfully deleted")
+        else:
+            ui.notification_show("Incorrect input. Please type DELETE in all caps to confirm deletion")
+    
 
     return index, files
