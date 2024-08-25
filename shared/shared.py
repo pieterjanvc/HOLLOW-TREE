@@ -175,7 +175,6 @@ def getIndex(postgresUser, remote=remoteAppDB):
             DuckDBVectorStore.from_local(vectorDB)
         )
 
-
 # Execute a query on the accorns database
 def executeQuery(cursor, query, params=(), lastRowId="", remoteAppDB=remoteAppDB):
     query = query.replace("?", "%s") if remoteAppDB else query

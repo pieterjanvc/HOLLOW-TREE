@@ -7,7 +7,7 @@
 from shiny.playwright import controller
 from shiny.run import ShinyAppProc
 from playwright.sync_api import Page, Browser
-from tests.conftest import appDBConn, dbQuery, vectorDBConn
+from tests.conftest import appDBConn, dbQuery
 import pytest
 import os
 import re
@@ -146,40 +146,7 @@ def test_accorns(cmdopt, page, browser, accornsApp):
             # If successful, the file will be added to the table
             controller.OutputDataFrame(page, "vectorDB-filesTable").expect_nrow(
                 2, timeout=30000
-            )
-        
-        # Check Vector DB
-        if cmdopt["publishPostgres"]:
-            vconn = psycopg2.connect(
-                host="localhost",
-                user="accorns",
-                password=os.environ.get("POSTGRES_PASS_ACCORNS"),
-                database="vector_db",
-            )
-
-        else:
-            vectorDB = os.path.join(curDir, "..", "appData", "vectordb.duckdb")
-            if not os.path.exists(vectorDB):
-                raise ConnectionError(
-                    "The vector database was not found. Please run ACCORNS first"
-                )
-            vconn = duckdb.connect(vectorDB, read_only=True)
-
-        fileName = "MendelianInheritance.txt"
-        cursor = vconn.cursor()
-        if cmdopt["publishPostgres"]:            
-            _ = cursor.execute(
-                "SELECT node_id FROM data_document WHERE metadata_ ->> 'file_name' = %s",
-                parameters = (fileName,)
-            )
-        else:
-            _ = cursor.execute(
-                ("SELECT node_id FROM documents WHERE "
-                "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"),
-                parameters = ('"' + fileName + '"',)
-            )
-        
-        assert cursor.fetchone() is not None
+            )        
         
         # Delete a file from the vector database
         controller.OutputDataFrame(page, "vectorDB-filesTable").select_rows([0])
@@ -190,24 +157,7 @@ def test_accorns(cmdopt, page, browser, accornsApp):
         
         controller.InputText(page, "vectorDB-deleteConfirm").set("DELETE", timeout=10000)
         controller.InputActionButton(page, "vectorDB-confirmDelete").click(timeout=10000)
-        controller.OutputDataFrame(page, "vectorDB-filesTable").expect_nrow(1)
-
-        # Check DB
-        fileName = "Central_dogma_of_molecular_biology.pdf"
-        if cmdopt["publishPostgres"]:            
-            _ = cursor.execute(
-                "SELECT node_id FROM data_document WHERE metadata_ ->> 'file_name' = %s",
-                parameters = (fileName,)
-            )
-        else:
-            _ = cursor.execute(
-                ("SELECT node_id FROM documents WHERE "
-                "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"),
-                parameters = ('"' + fileName + '"',)
-            )
-        
-        assert not cursor.fetchone()
-        vconn.close()
+        controller.OutputDataFrame(page, "vectorDB-filesTable").expect_nrow(1)       
 
         # TOPICS TAB
         controller.NavPanel(page, id="postLoginTabs", data_value="tTab").click(
@@ -527,13 +477,53 @@ def test_scuirrel(page, browser, scuirrelApp, cmdopt):
     scuirrelApp.close()
 
 
-# def test_publishing(page: Page, accornsApp: ShinyAppProc, cmdopt):
+def test_checkDB(cmdopt):
+    # Check Vector DB
+    if cmdopt["publishPostgres"]:
+        vconn = psycopg2.connect(
+            host="localhost",
+            user="accorns",
+            password=os.environ.get("POSTGRES_PASS_ACCORNS"),
+            database="vector_db",
+        )
 
-#     # Generate the publishing directories
-#     script = (os.path.join(curDir, "..", "publish", "generate_publishing_dir.py") +
-#                " --addDemo --remoteAppDB" )
-#     os.system(script)
+    else:
+        print("connect vectorDB test")
+        vectorDB = os.path.join(curDir, "..", "appData", "vectordb.duckdb")
+        if not os.path.exists(vectorDB):
+            raise ConnectionError(
+                "The vector database was not found. Please run ACCORNS first"
+            )
+        vconn = duckdb.connect(vectorDB, read_only=True)
 
-#     # Reset the Postgres database
-#     script = os.path.join(curDir, "..", "ACCORNS", "appDB", f"appDB_postgres_init.{'bat' if os.name == 'nt' else 'sh'}")
-#     os.system(script)
+    fileName = "MendelianInheritance.txt"
+    cursor = vconn.cursor()
+    if cmdopt["publishPostgres"]:            
+        _ = cursor.execute(
+            "SELECT node_id FROM data_document WHERE metadata_ ->> 'file_name' = %s",
+            parameters = (fileName,)
+        )
+    else:
+        _ = cursor.execute(
+            ("SELECT node_id FROM documents WHERE "
+            "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"),
+            parameters = ('"' + fileName + '"',)
+        )
+    
+    assert cursor.fetchone() is not None
+    # Check DB
+    fileName = "Central_dogma_of_molecular_biology.pdf"
+    if cmdopt["publishPostgres"]:            
+        _ = cursor.execute(
+            "SELECT node_id FROM data_document WHERE metadata_ ->> 'file_name' = %s",
+            parameters = (fileName,)
+        )
+    else:
+        _ = cursor.execute(
+            ("SELECT node_id FROM documents WHERE "
+            "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"),
+            parameters = ('"' + fileName + '"',)
+        )
+    
+    assert not cursor.fetchone()
+    vconn.close()

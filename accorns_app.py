@@ -159,11 +159,10 @@ def server(input, output, session):
     _ = user_management_server(
         "userManagement", user=user, postgresUser=shared.postgresAccorns
     )
-    index, files = vectorDB_management_server("vectorDB", user=user, pool=pool)
+    files = vectorDB_management_server("vectorDB", user=user, pool=pool)
     _ = quiz_generation_server(
         "quizGeneration",
         sID=sID,
-        index=index,
         user=user,
         topicsx=topics,
         groups=groups,

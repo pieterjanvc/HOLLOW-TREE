@@ -73,14 +73,13 @@ def vectorDB_management_server(
     conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
     files = shared.pandasQuery(conn, query='SELECT * FROM "file"')
     conn.close()
-    if files.shape[0] == 0:
-        index = None
-        shared.elementDisplay("blankDBMsg", "s", session, alertNotFound=False)
-    else:
-        index = shared.getIndex(postgresUser=shared.postgresAccorns)
+    # if files.shape[0] == 0:
+    #     index = None
+    #     shared.elementDisplay("blankDBMsg", "s", session, alertNotFound=False)
+    # else:
+    #     index = shared.getIndex(postgresUser=shared.postgresAccorns)
 
     files = reactive.value(files)
-    index = reactive.value(index)
 
     # Display the files in the vector database as a table
     @render.data_frame
@@ -134,7 +133,7 @@ def vectorDB_management_server(
     @reactive.effect
     def _():
         insertionResult = updateVectorDB.result()[0]
-
+        
         if insertionResult == 0:
             msg = "File successfully added to the vector database"
         elif insertionResult == 1:
@@ -151,7 +150,6 @@ def vectorDB_management_server(
         conn.close()
 
         files.set(getFiles)
-        index.set(shared.getIndex(postgresUser=shared.postgresAccorns))
 
         shared.elementDisplay("uiUploadFile", "s", session, alertNotFound=False)
         ui.remove_ui("#processFile")
@@ -255,4 +253,4 @@ def vectorDB_management_server(
             ui.notification_show("Incorrect input. Please type DELETE in all caps to confirm deletion")
     
 
-    return index, files
+    return files

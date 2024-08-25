@@ -166,28 +166,27 @@ def appDBConn(remoteAppDB=False, postgresHost="localhost"):
     finally:
         conn.close()
 
-@contextmanager
-def vectorDBConn(remoteAppDB=False, postgresHost="localhost"):
-    return
-    # if remoteAppDB:
-    #     conn = psycopg2.connect(
-    #         host=postgresHost,
-    #         user="accorns",
-    #         password=os.environ.get("POSTGRES_PASS_ACCORNS"),
-    #         database="vector_db",
-    #     )
+# @contextmanager
+# def vectorDBConn(remoteAppDB=False, postgresHost="localhost"):
+#     if remoteAppDB:
+#         conn = psycopg2.connect(
+#             host=postgresHost,
+#             user="accorns",
+#             password=os.environ.get("POSTGRES_PASS_ACCORNS"),
+#             database="vector_db",
+#         )
 
-    # else:
-    #     if not os.path.exists(vectorDB):
-    #         raise ConnectionError(
-    #             "The vector database was not found. Please run ACCORNS first"
-    #         )
-    #     conn = duckdb.connect(vectorDB, read_only=True)
+#     else:
+#         if not os.path.exists(vectorDB):
+#             raise ConnectionError(
+#                 "The vector database was not found. Please run ACCORNS first"
+#             )
+#         conn = duckdb.connect(vectorDB, read_only=True)
 
-    # try:
-    #     yield conn
-    # finally:
-    #     conn.close()
+#     try:
+#         yield conn
+#     finally:
+#         conn.close()
 
 
 def dbQuery(conn, query, params=(), insert=False, remoteAppDB=False):
