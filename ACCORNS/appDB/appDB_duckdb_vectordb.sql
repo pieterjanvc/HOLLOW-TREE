@@ -26,5 +26,5 @@ CREATE TABLE keyword (
   "kID" INTEGER PRIMARY KEY,
   "fID" INTEGER,
   "keyword" TEXT,
-  FOREIGN KEY("fID") REFERENCES "file"("fID") 
+  FOREIGN KEY("fID") REFERENCES "file"("fID")
 );

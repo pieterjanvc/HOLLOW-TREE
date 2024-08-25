@@ -199,8 +199,9 @@ def addFileToDB(
         conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
         cursor = conn.cursor()
         _ = cursor.execute(
-            "SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y "
-            f"FROM data_document WHERE metadata_ ->> 'file_name' = '{fileName}'"
+            ("SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y "
+            "FROM data_document WHERE metadata_ ->> 'file_name' = %s"),
+            parameters=(fileName,),
         )
 
         q = cursor.fetchall()
@@ -217,8 +218,9 @@ def addFileToDB(
         )
         cursor = conn.cursor()
         _ = cursor.execute(
-            "SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE "
-            f"CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = '\"{fileName}\"'"
+            ("SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE "
+            "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"),
+            parameters=('"'+ fileName + '"',)
         )
         q = cursor.fetchall()
         conn.close()
@@ -257,7 +259,7 @@ def addFileToDB(
     )
     conn.commit()
     conn.close()
-
+        
     return (0, "Completed")
 
 
@@ -300,6 +302,7 @@ def addDemo(shinyToken):
         addFileToDB(
             newFile=shared.demoFile, shinyToken=shinyToken, vectorDB=shared.vectorDB
         )
+    conn.close()
 
     return (
         msg,

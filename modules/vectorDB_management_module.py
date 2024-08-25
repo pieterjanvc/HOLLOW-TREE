@@ -185,6 +185,20 @@ def vectorDB_management_server(
     @reactive.effect
     @reactive.event(input.deleteFile)
     def _():
+        if user.get()["adminLevel"] < 3:
+            # Get the userid of the file owner
+            shinyToken = files().iloc[filesTable.data_view(selected=True).index[0]].shinyToken
+            conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
+            shinyToken = shared.pandasQuery(
+                conn, 
+                'SELECT "uID" FROM "session" WHERE "shinyToken" = ?', 
+                (shinyToken,)
+            )
+            conn.close()
+            if user.get()["uID"] not in shinyToken["uID"].values:
+                ui.notification_show("Only admins can delete files uploaded by others")
+                return
+        
         fileName = files().iloc[filesTable.data_view(selected=True).index[0]].fileName
         ui.modal_show(
             ui.modal(
@@ -208,23 +222,35 @@ def vectorDB_management_server(
             conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
             # Delete the vectors
             cursor = conn.cursor()
+            # The syntax is different between DuckDB and PostgreSQL for JSON extraction
+            if shared.remoteAppDB:
+                _ = cursor.execute(
+                    ("DELETE FROM data_document WHERE metadata_ ->> 'file_name' = %s"),
+                    parameters=(file.fileName,),                
+                )
+            else:
+                _ = cursor.execute(
+                    ('DELETE FROM "documents" WHERE '
+                    "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"),
+                    parameters=('"'+ file.fileName + '"',),                
+                )
+
             _ = shared.executeQuery(
                 cursor,
-                ('DELETE FROM "documents" WHERE '
-                "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = '\"?\"'"),
-                (file.fileName,),
-                remoteAppDB=True,
+                'DELETE FROM "keyword" WHERE "fID" = ?',
+                (int(file.fID),),                
             )
             _ = shared.executeQuery(
                 cursor,
                 'DELETE FROM "file" WHERE "fID" = ?',
-                (file.fID,),
-                remoteAppDB=True,
-            )
-            conn.close()
+                (int(file.fID),),                
+            )            
             shared.elementDisplay("fileInfoCard", "h", session, alertNotFound=False)
             files.set(shared.pandasQuery(conn, query='SELECT * FROM "file"'))            
+            conn.commit()
+            conn.close()
             ui.notification_show("File successfully deleted")
+            ui.modal_remove()
         else:
             ui.notification_show("Incorrect input. Please type DELETE in all caps to confirm deletion")
     
