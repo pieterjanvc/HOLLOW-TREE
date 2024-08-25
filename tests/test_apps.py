@@ -146,18 +146,29 @@ def test_accorns(cmdopt, page, browser, accornsApp):
             # If successful, the file will be added to the table
             controller.OutputDataFrame(page, "vectorDB-filesTable").expect_nrow(
                 2, timeout=30000
-            )        
-        
+            )
+
         # Delete a file from the vector database
         controller.OutputDataFrame(page, "vectorDB-filesTable").select_rows([0])
         controller.InputActionButton(page, "vectorDB-deleteFile").click(timeout=10000)
         controller.InputText(page, "vectorDB-deleteConfirm").set("del", timeout=10000)
-        controller.InputActionButton(page, "vectorDB-confirmDelete").click(timeout=10000)
-        assert page.get_by_text("Incorrect input. Please type DELETE in all caps to confirm deletion").count() == 1
-        
-        controller.InputText(page, "vectorDB-deleteConfirm").set("DELETE", timeout=10000)
-        controller.InputActionButton(page, "vectorDB-confirmDelete").click(timeout=10000)
-        controller.OutputDataFrame(page, "vectorDB-filesTable").expect_nrow(1)       
+        controller.InputActionButton(page, "vectorDB-confirmDelete").click(
+            timeout=10000
+        )
+        assert (
+            page.get_by_text(
+                "Incorrect input. Please type DELETE in all caps to confirm deletion"
+            ).count()
+            == 1
+        )
+
+        controller.InputText(page, "vectorDB-deleteConfirm").set(
+            "DELETE", timeout=10000
+        )
+        controller.InputActionButton(page, "vectorDB-confirmDelete").click(
+            timeout=10000
+        )
+        controller.OutputDataFrame(page, "vectorDB-filesTable").expect_nrow(1)
 
         # TOPICS TAB
         controller.NavPanel(page, id="postLoginTabs", data_value="tTab").click(
@@ -357,7 +368,7 @@ def test_accorns(cmdopt, page, browser, accornsApp):
             "instr123ABC!", timeout=10000
         )
         controller.InputActionButton(page, "login-login").click(timeout=10000)
-        
+
         # Try to delete a file from the vector database
         controller.OutputDataFrame(page, "vectorDB-filesTable").select_rows([0])
         controller.InputActionButton(page, "vectorDB-deleteFile").click(timeout=10000)
@@ -401,6 +412,7 @@ def test_accorns(cmdopt, page, browser, accornsApp):
 
 
 # Initialise Shiny app
+
 
 def test_scuirrel(page, browser, scuirrelApp, cmdopt):
     # Ignore this test if the scuirrelOnly flag is set
@@ -498,32 +510,36 @@ def test_checkDB(cmdopt):
 
     fileName = "MendelianInheritance.txt"
     cursor = vconn.cursor()
-    if cmdopt["publishPostgres"]:            
+    if cmdopt["publishPostgres"]:
         _ = cursor.execute(
             "SELECT node_id FROM data_document WHERE metadata_ ->> 'file_name' = %s",
-            (fileName,)
+            (fileName,),
         )
     else:
         _ = cursor.execute(
-            ("SELECT node_id FROM documents WHERE "
-            "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"),
-            parameters = ('"' + fileName + '"',)
+            (
+                "SELECT node_id FROM documents WHERE "
+                "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"
+            ),
+            parameters=('"' + fileName + '"',),
         )
-    
+
     assert cursor.fetchone() is not None
     # Check DB
     fileName = "Central_dogma_of_molecular_biology.pdf"
-    if cmdopt["publishPostgres"]:            
+    if cmdopt["publishPostgres"]:
         _ = cursor.execute(
             "SELECT node_id FROM data_document WHERE metadata_ ->> 'file_name' = %s",
-            (fileName,)
+            (fileName,),
         )
     else:
         _ = cursor.execute(
-            ("SELECT node_id FROM documents WHERE "
-            "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"),
-            parameters = ('"' + fileName + '"',)
+            (
+                "SELECT node_id FROM documents WHERE "
+                "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"
+            ),
+            parameters=('"' + fileName + '"',),
         )
-    
+
     assert not cursor.fetchone()
     vconn.close()

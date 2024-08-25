@@ -34,9 +34,7 @@ def vectorDB_management_ui():
         ui.panel_conditional(
             "output.fileInfo != ''",
             ui.card(
-                ui.card_header("File info"), 
-                ui.output_ui("fileInfo"),
-                id="fileInfoCard"
+                ui.card_header("File info"), ui.output_ui("fileInfo"), id="fileInfoCard"
             ),
         ),
         # Option to add new files
@@ -133,7 +131,7 @@ def vectorDB_management_server(
     @reactive.effect
     def _():
         insertionResult = updateVectorDB.result()[0]
-        
+
         if insertionResult == 0:
             msg = "File successfully added to the vector database"
         elif insertionResult == 1:
@@ -171,47 +169,54 @@ def vectorDB_management_server(
         conn.close()
         keywords = "; ".join(keywords["keyword"])
 
-        return ui.TagList(HTML(
-            f"<h4>{info.fileName}</h4><ul>"
-            f"<li><b>Summary title</b> <i>(AI generated)</i>: {info.title}</li>"
-            f"<li><b>Summary subtitle</b> <i>(AI generated)</i>: {info.subtitle}</li>"
-            f"<li><b>Uploaded</b>: {info.created}</li></ul>"
-            "<p><b>Top-10 keywords extracted from document</b> <i>(AI generated)</i></p>"
-            f"{keywords}"
-        ), ui.input_action_button("deleteFile","Delete file", width="auto"),)
-    
+        return ui.TagList(
+            HTML(
+                f"<h4>{info.fileName}</h4><ul>"
+                f"<li><b>Summary title</b> <i>(AI generated)</i>: {info.title}</li>"
+                f"<li><b>Summary subtitle</b> <i>(AI generated)</i>: {info.subtitle}</li>"
+                f"<li><b>Uploaded</b>: {info.created}</li></ul>"
+                "<p><b>Top-10 keywords extracted from document</b> <i>(AI generated)</i></p>"
+                f"{keywords}"
+            ),
+            ui.input_action_button("deleteFile", "Delete file", width="auto"),
+        )
+
     @reactive.effect
     @reactive.event(input.deleteFile)
     def _():
         if user.get()["adminLevel"] < 3:
             # Get the userid of the file owner
-            shinyToken = files().iloc[filesTable.data_view(selected=True).index[0]].shinyToken
+            shinyToken = (
+                files().iloc[filesTable.data_view(selected=True).index[0]].shinyToken
+            )
             conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
             shinyToken = shared.pandasQuery(
-                conn, 
-                'SELECT "uID" FROM "session" WHERE "shinyToken" = ?', 
-                (shinyToken,)
+                conn,
+                'SELECT "uID" FROM "session" WHERE "shinyToken" = ?',
+                (shinyToken,),
             )
             conn.close()
             if user.get()["uID"] not in shinyToken["uID"].values:
                 ui.notification_show("Only admins can delete files uploaded by others")
                 return
-        
+
         fileName = files().iloc[filesTable.data_view(selected=True).index[0]].fileName
         ui.modal_show(
             ui.modal(
-                HTML(f"<p style='color:red;'>{fileName}</p>"
-                 "<p>If you sure you want to delete this file from the vector database,"
-                 "type <b>DELETE</b> in all caps in the text box below and click confirm</p><br>"),
+                HTML(
+                    f"<p style='color:red;'>{fileName}</p>"
+                    "<p>If you sure you want to delete this file from the vector database,"
+                    "type <b>DELETE</b> in all caps in the text box below and click confirm</p><br>"
+                ),
                 ui.input_text("deleteConfirm", label="Type DELETE in all caps"),
-                title="Delete file",                
+                title="Delete file",
                 footer=[
                     ui.input_action_button("confirmDelete", "Confirm"),
                     ui.modal_button("Cancel"),
                 ],
             )
         )
-    
+
     @reactive.effect
     @reactive.event(input.confirmDelete)
     def _():
@@ -224,33 +229,36 @@ def vectorDB_management_server(
             if shared.remoteAppDB:
                 _ = cursor.execute(
                     ("DELETE FROM data_document WHERE metadata_ ->> 'file_name' = %s"),
-                    (file.fileName,),                
+                    (file.fileName,),
                 )
             else:
                 _ = cursor.execute(
-                    ('DELETE FROM "documents" WHERE '
-                    "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"),
-                    parameters=('"'+ file.fileName + '"',),                
+                    (
+                        'DELETE FROM "documents" WHERE '
+                        "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"
+                    ),
+                    parameters=('"' + file.fileName + '"',),
                 )
 
             _ = shared.executeQuery(
                 cursor,
                 'DELETE FROM "keyword" WHERE "fID" = ?',
-                (int(file.fID),),                
+                (int(file.fID),),
             )
             _ = shared.executeQuery(
                 cursor,
                 'DELETE FROM "file" WHERE "fID" = ?',
-                (int(file.fID),),                
-            )            
+                (int(file.fID),),
+            )
             shared.elementDisplay("fileInfoCard", "h", session, alertNotFound=False)
-            files.set(shared.pandasQuery(conn, query='SELECT * FROM "file"'))            
+            files.set(shared.pandasQuery(conn, query='SELECT * FROM "file"'))
             conn.commit()
             conn.close()
             ui.notification_show("File successfully deleted")
             ui.modal_remove()
         else:
-            ui.notification_show("Incorrect input. Please type DELETE in all caps to confirm deletion")
-    
+            ui.notification_show(
+                "Incorrect input. Please type DELETE in all caps to confirm deletion"
+            )
 
     return files

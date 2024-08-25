@@ -145,7 +145,10 @@ def addFileToDB(
     conn.close()
 
     if existingFile.shape[0] > 0:
-            return (1, "A file with this name already exists. Please rename the file before uploading it again")
+        return (
+            1,
+            "A file with this name already exists. Please rename the file before uploading it again",
+        )
 
     if (storageFolder is not None) & (not isURL):
         if not os.path.exists(storageFolder):
@@ -199,8 +202,10 @@ def addFileToDB(
         conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
         cursor = conn.cursor()
         _ = cursor.execute(
-            ("SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y "
-            "FROM data_document WHERE metadata_ ->> 'file_name' = %s"),
+            (
+                "SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y "
+                "FROM data_document WHERE metadata_ ->> 'file_name' = %s"
+            ),
             (fileName,),
         )
 
@@ -218,9 +223,11 @@ def addFileToDB(
         )
         cursor = conn.cursor()
         _ = cursor.execute(
-            ("SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE "
-            "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"),
-            parameters=('"'+ fileName + '"',)
+            (
+                "SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE "
+                "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"
+            ),
+            parameters=('"' + fileName + '"',),
         )
         q = cursor.fetchall()
         conn.close()
@@ -259,7 +266,7 @@ def addFileToDB(
     )
     conn.commit()
     conn.close()
-        
+
     return (0, "Completed")
 
 

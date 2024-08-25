@@ -18,6 +18,7 @@ from htmltools import HTML, div
 from llama_index.core import ChatPromptTemplate
 from llama_index.core.llms import ChatMessage, MessageRole
 
+
 # --- Functions ---
 # LLM engine for generation
 def quizEngine():
@@ -217,7 +218,7 @@ def quiz_generation_server(
             f"<li>{input.rqOB()}</li><li>{input.rqOC()}</li>"
             f"<li>{input.rqOD()}</li></ol><i>Correct answer: {input.rqCorrect()}</i><hr>"
         )
-    
+
     # When the generate button is clicked...
     @reactive.effect
     @reactive.event(input.qGenerate)

@@ -166,6 +166,7 @@ def appDBConn(remoteAppDB=False, postgresHost="localhost"):
     finally:
         conn.close()
 
+
 # @contextmanager
 # def vectorDBConn(remoteAppDB=False, postgresHost="localhost"):
 #     if remoteAppDB:
