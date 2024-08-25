@@ -224,7 +224,7 @@ def vectorDB_management_server(
             if shared.remoteAppDB:
                 _ = cursor.execute(
                     ("DELETE FROM data_document WHERE metadata_ ->> 'file_name' = %s"),
-                    parameters=(file.fileName,),                
+                    (file.fileName,),                
                 )
             else:
                 _ = cursor.execute(

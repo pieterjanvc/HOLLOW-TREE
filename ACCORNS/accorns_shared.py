@@ -201,7 +201,7 @@ def addFileToDB(
         _ = cursor.execute(
             ("SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y "
             "FROM data_document WHERE metadata_ ->> 'file_name' = %s"),
-            parameters=(fileName,),
+            (fileName,),
         )
 
         q = cursor.fetchall()

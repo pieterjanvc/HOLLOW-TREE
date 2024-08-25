@@ -501,7 +501,7 @@ def test_checkDB(cmdopt):
     if cmdopt["publishPostgres"]:            
         _ = cursor.execute(
             "SELECT node_id FROM data_document WHERE metadata_ ->> 'file_name' = %s",
-            parameters = (fileName,)
+            (fileName,)
         )
     else:
         _ = cursor.execute(
@@ -516,7 +516,7 @@ def test_checkDB(cmdopt):
     if cmdopt["publishPostgres"]:            
         _ = cursor.execute(
             "SELECT node_id FROM data_document WHERE metadata_ ->> 'file_name' = %s",
-            parameters = (fileName,)
+            (fileName,)
         )
     else:
         _ = cursor.execute(
