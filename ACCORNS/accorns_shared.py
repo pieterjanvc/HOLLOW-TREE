@@ -101,7 +101,7 @@ def createLocalVectorDB(
 def addFileToDB(
     newFile,
     shinyToken,
-    vectorDB=None,
+    vectorDB,
     remoteAppDB=shared.remoteAppDB,
     storageFolder=None,
     newFileName=None,
@@ -135,14 +135,26 @@ def addFileToDB(
     # Move the file to permanent storage if requested
     newFileName = os.path.basename(newFile) if newFileName is None else newFileName
 
+    # Check if the file name is already in file table of the vector database
+    conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
+    existingFile = shared.pandasQuery(
+        conn,
+        'SELECT "fileName" FROM "file" WHERE "fileName" = ?',
+        (newFileName,),
+    )
+    conn.close()
+
+    if existingFile.shape[0] > 0:
+        return (
+            1,
+            "A file with this name already exists. Please rename the file before uploading it again",
+        )
+
     if (storageFolder is not None) & (not isURL):
         if not os.path.exists(storageFolder):
             os.makedirs(storageFolder)
 
         newFilePath = os.path.join(storageFolder, "") + newFileName
-
-        if os.path.exists(newFilePath):
-            return (1, "A file with this name already exists. Skipping")
 
         move(newFile, newFilePath)
         newFile = newFilePath
@@ -190,8 +202,11 @@ def addFileToDB(
         conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
         cursor = conn.cursor()
         _ = cursor.execute(
-            "SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y "
-            f"FROM data_document WHERE metadata_ ->> 'file_name' = '{fileName}'"
+            (
+                "SELECT metadata_ ->> 'document_title' as x, metadata_ ->> 'excerpt_keywords' as y "
+                "FROM data_document WHERE metadata_ ->> 'file_name' = %s"
+            ),
+            (fileName,),
         )
 
         q = cursor.fetchall()
@@ -208,8 +223,11 @@ def addFileToDB(
         )
         cursor = conn.cursor()
         _ = cursor.execute(
-            "SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE "
-            f"CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = '\"{fileName}\"'"
+            (
+                "SELECT metadata_ ->> ['document_title', 'excerpt_keywords'] FROM documents WHERE "
+                "CAST(json_extract(metadata_, '$.file_name') as VARCHAR) = ?"
+            ),
+            parameters=('"' + fileName + '"',),
         )
         q = cursor.fetchall()
         conn.close()
@@ -291,6 +309,7 @@ def addDemo(shinyToken):
         addFileToDB(
             newFile=shared.demoFile, shinyToken=shinyToken, vectorDB=shared.vectorDB
         )
+    conn.close()
 
     return (
         msg,

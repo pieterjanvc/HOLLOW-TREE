@@ -13,3 +13,4 @@ local/*
 publish/*
 !publish/publish.py
 *.webm
+*.bak
