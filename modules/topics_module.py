@@ -20,14 +20,13 @@ def topics_ui():
                 ui.input_select("gID", "Group", choices={}, width="400px"),
                 ui.panel_conditional(
                     "input.gID",
-                    ui.input_select("tID", "Pick a topic", choices=[], width="400px"),
+                    ui.input_select("tID", "Topic", choices=[], width="400px"),                    
                     div(
                         ui.input_action_button("tAdd", "Add new", width="180px"),
-                        ui.input_action_button("tEdit", "Edit selected", width="180px"),
-                        ui.input_action_button(
-                            "tArchive", "Archive selected", width="180px"
-                        ),
+                        ui.input_action_button("tEdit", "Edit name", width="180px"),
                     ),
+                    ui.input_radio_buttons("tStatus", "Change topic status", choices={0: "Active", 1: "Archived", 2: "Draft"},
+                                           inline=True),
                 ),
             ),
             # Table of concepts per topic with option to add, edit or archive
@@ -45,13 +44,14 @@ def topics_ui():
                         ui.input_action_button("cReorder", "Reorder", width="180px"),
                         style="display:inline",
                     ),
-                    HTML(
-                        "<i>Concepts are specific facts or pieces of information you want SCUIRREL to check with your students. "
+                    div(
+                        HTML("<i>Concepts are specific facts or pieces of information you want SCUIRREL to check with your students. "
                         "You can be very brief, as all context will be retrieved from the database of documents. "
                         "Don't be too broad, split into multiple topics if needed. "
-                        "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"
-                    ),
-                ),
+                        "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"),
+                        id="conceptInfo"),
+                    div(HTML("<i style='color:blue;'>Concepts can only be edited when the topic is in 'Draft' status</i>"), id="conceptStatus"),
+                id="conceptsPanel"),
             ),
             col_widths=12,
         )
@@ -288,9 +288,19 @@ def topics_server(
 
     # --- Archive a topic - modal popup
     @reactive.effect
-    @reactive.event(input.tArchive)
+    @reactive.event(input.tStatus)
     def _():
         if input.tID() is None:
+            return
+        
+        if input.tStatus() != 2:
+            shared.elementDisplay("cAdd", "d", session)
+            shared.elementDisplay("cEdit", "d", session)
+            shared.elementDisplay("cArchive", "d", session)
+            shared.elementDisplay("cReorder", "d", session)
+            shared.elementDisplay("conceptInfo", "h", session, ignoreNS=True)
+            shared.elementDisplay("conceptStatus", "s", session, ignoreNS=True)
+
             return
 
         conn = shared.appDBConn(postgresUser=postgresUser)
