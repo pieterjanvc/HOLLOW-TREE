@@ -20,7 +20,10 @@ def topics_ui():
                 ui.input_select("gID", "Group", choices={}, width="400px"),
                 ui.panel_conditional(
                     "input.gID",
-                    ui.input_select("tID", "Topic", choices=[], width="400px"),                    
+                    div(shared.customAttr(ui.input_select("tID", "Topic", choices=[], width="400px"),
+                        {'style': 'display:inline-block'}),       
+                        shared.customAttr(ui.input_checkbox("tShowArchived", "Show archived", value=False,),
+                                          {'style': 'display:inline-block'},)),                           
                     div(
                         ui.input_action_button("tAdd", "Add new", width="180px"),
                         ui.input_action_button("tEdit", "Edit name", width="180px"),

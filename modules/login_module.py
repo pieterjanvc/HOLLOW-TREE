@@ -17,13 +17,6 @@ passRules = "minlength: 8; maxlength: 20; required: lower; required: upper; requ
 
 
 # --- UI
-def customAttr(element, attrs):
-    for attr, value in attrs.items():
-        e = element
-        e.children[1].attrs[attr] = value
-
-    return e
-
 
 @module.ui
 def login_ui():
@@ -44,9 +37,10 @@ def login_ui():
                         and has not been extensively tested for security. We recommend
                         you create a unique password for this you are not using anywhere else</i>"""),
                 ui.tags.form(
-                    customAttr(
+                    shared.customAttr(
                         ui.input_text("newUsername", "Username"),
                         {"autocomplete": "username"},
+                        child=1,
                     ),
                     ui.panel_conditional(
                         "true" if shared.personalInfo else "false",
@@ -54,13 +48,15 @@ def login_ui():
                         ui.input_text("lastName", "Last name"),
                         ui.input_text("email", "Email"),
                     ),
-                    customAttr(
+                    shared.customAttr(
                         ui.input_password("newPassword", "New Password"),
                         {"autocomplete": "new-password", "passwordrules": passRules},
+                        child=1,
                     ),
-                    customAttr(
+                    shared.customAttr(
                         ui.input_password("newPassword2", "Repeat password"),
                         {"autocomplete": "new-password", "passwordrules": passRules},
+                        child=1,
                     ),
                     ui.input_text("accessCode", "Access code"),
                     ui.input_action_button("createAccount", "Create", width="200px"),

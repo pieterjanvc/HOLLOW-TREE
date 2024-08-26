@@ -106,6 +106,28 @@ def elementDisplay(id, effect, session, alertNotFound=True, ignoreNS=False):
             "hideShow", {"id": id, "effect": effect, "alertNotFound": alertNotFound}
         )
 
+# Add or edit an attribute of an HTML element
+def customAttr(element, attrs, child = None, append = True, separator = None):  
+    for attr, value in attrs.items():
+
+        if not separator:
+            if attr == "class":
+                separator = " "
+            elif attr == "style":
+                separator = ";"
+            else:
+                separator = ","
+
+        if child:
+            if attr in element.attrs:
+                value = element.children[child].attrs[attr] + str(value) + separator if append else value
+            element.children[child].attrs[attr] = value
+        else:
+            if attr in element.attrs:
+                value = element.attrs[attr] + str(value) + separator if append else value
+            element.attrs[attr] = value
+
+    return element
 
 def consecutiveInt(nums, start=1):
     # Sort the list of numbers

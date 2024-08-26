@@ -334,20 +334,20 @@ def chat_ui():
             ui.card(
                 ui.card_header("Pick a topic"),
                 div(
-                    div(
+                    shared.customAttr(
                         ui.input_select("gID", "Group", choices={}),
-                        **{"class": "makeInline"},
+                        {'style': 'display:inline-block'},
                     ),
                     group_join_ui("joinGroup"),
                 ),
                 ui.panel_conditional(
                     "input.gID",
                     div(
-                        div(
+                        shared.customAttr(
                             ui.input_select(
                                 "selTopic", "Topic", choices=[], width="auto"
                             ),
-                            **{"class": "makeInline"},
+                            {'style': 'display:inline-block'},
                         ),
                         ui.input_action_button(
                             "startConversation",
