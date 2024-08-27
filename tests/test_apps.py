@@ -260,7 +260,7 @@ def test_accorns(cmdopt, page, browser, accornsApp):
                 conn,
                 (
                     'INSERT INTO "question" ("qID", "sID", "tID", "cID", "question",'
-                    '"answer", "archived", "created", "modified", "optionA", "explanationA",'
+                    '"answer", "status", "created", "modified", "optionA", "explanationA",'
                     '"optionB", "explanationB", "optionC", "explanationC", "optionD", "explanationD")'
                     "VALUES ('1', '1', '2', '11',"
                     "'What was Gregor Mendel''s occupation in the nineteenth century?',"

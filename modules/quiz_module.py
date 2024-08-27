@@ -33,7 +33,7 @@ def quiz_server(input: Inputs, output: Outputs, session: Session, tID, sID, user
         conn = shared.appDBConn(postgresScuirrel)
         q = shared.pandasQuery(
             conn,
-            f'SELECT "qID" FROM "question" WHERE "tID" = {tID()} AND "archived" = 0 LIMIT 1',
+            f'SELECT "qID" FROM "question" WHERE "tID" = {tID()} AND "status" = 0 LIMIT 1',
         )
         conn.close()
 
@@ -51,7 +51,7 @@ def quiz_server(input: Inputs, output: Outputs, session: Session, tID, sID, user
         conn = shared.appDBConn(postgresScuirrel)
         q = shared.pandasQuery(
             conn,
-            f'SELECT * FROM "question" WHERE "tID" = {tID()} AND "archived" = 0',
+            f'SELECT * FROM "question" WHERE "tID" = {tID()} AND "status" = 0',
         )
         conn.close()
 

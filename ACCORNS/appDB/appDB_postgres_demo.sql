@@ -4,8 +4,8 @@ INSERT INTO "group" ("group", "created", "modified")
 VALUES('Demo',  to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), 
   to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
 
-INSERT INTO topic("topic", "created", "modified")
-VALUES('The central dogma of molecular biology', to_char(now(), 
+INSERT INTO topic("topic", "status", "created", "modified")
+VALUES('The central dogma of molecular biology', 0, to_char(now(), 
   'YYYY-MM-DD HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS'));
 
 INSERT INTO "concept" ("tID", "order", "concept", "created", "modified")

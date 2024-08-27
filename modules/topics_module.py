@@ -28,7 +28,7 @@ def topics_ui():
                         ui.input_action_button("tAdd", "Add new", width="180px"),
                         ui.input_action_button("tEdit", "Edit name", width="180px"),
                     ),
-                    ui.input_radio_buttons("tStatus", "Change topic status", choices={0: "Active", 1: "Archived", 2: "Draft"},
+                    ui.input_radio_buttons("tStatus", "Change topic status", choices={0: "Active", 1: "Draft", 2: "Archived"},
                                            inline=True),
                 ),
             ),
@@ -98,7 +98,7 @@ def topics_server(
             conn,
             (
                 'SELECT t.* FROM "topic" AS t, "group_topic" AS gt '
-                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '
+                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."status" = 0 '
                 'ORDER BY t."topic"'
             ),
             (int(input.gID()),),
@@ -171,7 +171,7 @@ def topics_server(
             conn,
             (
                 'SELECT t.* FROM "topic" AS t, "group_topic" AS gt '
-                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '
+                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."status" = 0 '
                 'ORDER BY t."topic"'
             ),
             (int(input.gID()),),
@@ -275,7 +275,7 @@ def topics_server(
             (sID, input.etInput(), shared.dt(), input.tID()),
         )
         newTopics = shared.pandasQuery(
-            conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
+            conn, 'SELECT "tID", "topic" FROM "topic" WHERE "status" = 0'
         )
         conn.commit()
         conn.close()
@@ -296,7 +296,9 @@ def topics_server(
         if input.tID() is None:
             return
         
-        if input.tStatus() != 2:
+        statusCode = int(input.tStatus())
+        
+        if statusCode != 1:
             shared.elementDisplay("cAdd", "d", session)
             shared.elementDisplay("cEdit", "d", session)
             shared.elementDisplay("cArchive", "d", session)
@@ -304,25 +306,31 @@ def topics_server(
             shared.elementDisplay("conceptInfo", "h", session, ignoreNS=True)
             shared.elementDisplay("conceptStatus", "s", session, ignoreNS=True)
 
-            return
+        else:
+            shared.elementDisplay("cAdd", "e", session)
+            shared.elementDisplay("cEdit", "e", session)
+            shared.elementDisplay("cArchive", "e", session)
+            shared.elementDisplay("cReorder", "e", session)
+            shared.elementDisplay("conceptInfo", "s", session, ignoreNS=True)
+            shared.elementDisplay("conceptStatus", "h", session, ignoreNS=True)
 
         conn = shared.appDBConn(postgresUser=postgresUser)
         cursor = conn.cursor()
         _ = shared.executeQuery(
             cursor,
-            'UPDATE "topic" SET "archived" = 1, "modified" = ? WHERE "tID" = ?',
-            (shared.dt(), input.tID()),
+            'UPDATE "topic" SET "status" = ?, "modified" = ? WHERE "tID" = ?',
+            (statusCode, shared.dt(), input.tID()),
         )
         newTopics = shared.pandasQuery(
-            conn, 'SELECT "tID", "topic" FROM "topic" WHERE "archived" = 0'
+            conn, 'SELECT "tID", "topic" FROM "topic" WHERE "status" = 0'
         )
 
-        # Empty the concept table if last topic was removed
-        if topics.shape[0] == 0:
-            conceptList = shared.pandasQuery(
-                conn, 'SELECT * FROM "concept" WHERE "tID" = 0'
-            )
-            concepts.set(conceptList)
+        # # Empty the concept table if last topic was removed
+        # if newTopics.shape[0] == 0:
+        #     conceptList = shared.pandasQuery(
+        #         conn, 'SELECT * FROM "concept" WHERE "tID" = 0'
+        #     )
+        #     concepts.set(conceptList)
 
         conn.commit()
         conn.close()
@@ -391,7 +399,7 @@ def topics_server(
         )
         conceptList = shared.pandasQuery(
             conn,
-            f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0 ORDER BY "order"',
+            f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "status" = 0 ORDER BY "order"',
         )
         conn.commit()
         conn.close()
@@ -486,7 +494,7 @@ def topics_server(
         )
         conceptList = shared.pandasQuery(
             conn,
-            f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0 ORDER BY "order"',
+            f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "status" = 0 ORDER BY "order"',
         )
         conn.commit()
         conn.close()
@@ -508,12 +516,12 @@ def topics_server(
         cursor = conn.cursor()
         _ = shared.executeQuery(
             cursor,
-            'UPDATE "concept" SET "archived" = 1, "modified" = ? WHERE "cID" = ?',
+            'UPDATE "concept" SET "status" = 1, "modified" = ? WHERE "cID" = ?',
             (shared.dt(), int(cID)),
         )
         conceptList = shared.pandasQuery(
             conn,
-            f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "archived" = 0 ORDER BY "order"',
+            f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "status" = 0 ORDER BY "order"',
         )
         conn.commit()
         conn.close()
@@ -524,11 +532,24 @@ def topics_server(
     @reactive.effect
     @reactive.event(input.tID)
     def _():
+
+        # Hide panel when no topic is available
+        if input.tID() is None:
+            shared.elementDisplay("conceptsPanel", "h", session)
+            shared.elementDisplay("tStatus", "h", session)
+            return
+        else:
+            shared.elementDisplay("conceptsPanel", "s", session)
+            shared.elementDisplay("tStatus", "s", session)
+
+        status = topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["status"]
+        ui.update_radio_buttons("tStatus", selected=int(status))
+
         tID = input.tID() if input.tID() else 0
         conn = shared.appDBConn(postgresUser=postgresUser)
         conceptList = shared.pandasQuery(
             conn,
-            f'SELECT * FROM "concept" WHERE "tID" = {tID} AND "archived" = 0 ORDER BY "order"',
+            f'SELECT * FROM "concept" WHERE "tID" = {tID} AND "status" = 0 ORDER BY "order"',
         )
         conn.close()
         concepts.set(conceptList)

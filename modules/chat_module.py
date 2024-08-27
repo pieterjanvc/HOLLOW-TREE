@@ -98,7 +98,7 @@ def groupQuery(user, postgresUser, demo=shared.addDemo):
             'SELECT g."gID", g."group" '
             'FROM "group_member" AS m, "group_topic" AS t, "group" AS g '
             f'WHERE m."gID" = g."gID" AND t."gID" = g."gID" {userFilter}'
-            'AND t."tID" IN (SELECT DISTINCT "tID" FROM "concept" WHERE "archived" = 0) '
+            'AND t."tID" IN (SELECT DISTINCT "tID" FROM "concept" WHERE "status" = 0) '
             f'{includeDemo} ORDER BY "group"'
         ),
         params,
@@ -476,7 +476,7 @@ def chat_server(
             conn,
             (
                 'SELECT t.* FROM "topic" AS t, "group_topic" AS gt '
-                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '
+                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."status" = 0 '
                 'ORDER BY t."topic"'
             ),
             (int(input.gID()),),
@@ -555,7 +555,7 @@ def chat_server(
         conn = shared.appDBConn(postgresUser)
         concepts = shared.pandasQuery(
             conn,
-            f'SELECT * FROM "concept" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0 ORDER BY "order"',
+            f'SELECT * FROM "concept" WHERE "tID" = {int(input.selTopic())} AND "status" = 0 ORDER BY "order"',
         )
         conn.close()
         return concepts

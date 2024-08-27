@@ -25,8 +25,8 @@ if not os.path.exists(shared.vectorDB) and not shared.remoteAppDB:
 conn = shared.appDBConn(shared.postgresScuirrel)
 topics = shared.pandasQuery(
     conn,
-    'SELECT * FROM "topic" WHERE "archived" = 0 AND "tID" IN'
-    '(SELECT DISTINCT "tID" from "concept" WHERE "archived" = 0)',
+    'SELECT * FROM "topic" WHERE "status" = 0 AND "tID" IN'
+    '(SELECT DISTINCT "tID" from "concept" WHERE "status" = 0)',
 )
 
 if topics.shape[0] == 0:
