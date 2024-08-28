@@ -335,8 +335,10 @@ def topics_server(
         conn.commit()
         conn.close()
 
-        # Update the topics select input
-        ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])))
+        # Update the topics only if archived and show archived is not checked
+        if statusCode == 2 and not input.tShowArchived():
+            ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])))
+        
         topics.set(newTopics)
 
     # ---- CONCEPTS ----
