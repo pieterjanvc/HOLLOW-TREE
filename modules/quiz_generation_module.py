@@ -236,6 +236,7 @@ def quiz_generation_server(
         shared.elementDisplay(
             "qBtnSet", "h", session, alertNotFound=False, ignoreNS=True
         )
+        shared.elementDisplay("gID", "d", session, alertNotFound=False)
         shared.elementDisplay("qtID", "d", session, alertNotFound=False)
         shared.elementDisplay("qID", "d", session, alertNotFound=False)
         shared.elementDisplay("qEditPanel", "h", session, alertNotFound=False)
@@ -329,15 +330,6 @@ def quiz_generation_server(
     def _():
         # Populate the respective UI outputs with the questions details
         resp = botResponse.result()
-        shared.elementDisplay(
-            "qBusyMsg", "h", session, alertNotFound=False, ignoreNS=True
-        )
-        shared.elementDisplay(
-            "qBtnSet", "s", session, alertNotFound=False, ignoreNS=True
-        )
-        shared.elementDisplay("qtID", "e", session, alertNotFound=False)
-        shared.elementDisplay("qID", "e", session, alertNotFound=False)
-        shared.elementDisplay("qEditPanel", "s", session, alertNotFound=False)
 
         if resp["resp"] is None:
             accorns_shared.modalMsg(
@@ -386,7 +378,14 @@ def quiz_generation_server(
             ui.update_select(
                 "qID", choices=dict(zip(q["qID"], q["question"])), selected=qID
             )
-            #shared.elementDisplay("qID", "s", session)
+            shared.elementDisplay(
+            "qBtnSet", "s", session, alertNotFound=False, ignoreNS=True
+            )
+            shared.elementDisplay("gID", "e", session, alertNotFound=False)
+            shared.elementDisplay("qtID", "e", session, alertNotFound=False)
+            shared.elementDisplay("qID", "e", session, alertNotFound=False)
+            shared.elementDisplay("qEditPanel", "s", session, alertNotFound=False)
+            shared.inputNotification(session, "qID", show=False)
 
     @reactive.effect
     @reactive.event(input.qtID)
@@ -396,7 +395,7 @@ def quiz_generation_server(
 
         q = shared.pandasQuery(
             conn,
-            f'SELECT "cID", FROM "concept" WHERE "tID" = {int(input.qtID())} AND "status" = 0',
+            f'SELECT "cID" FROM "concept" WHERE "tID" = {int(input.qtID())} AND "status" = 0',
         )
 
         if q.shape[0] == 0:
@@ -434,13 +433,8 @@ def quiz_generation_server(
     @reactive.event(input.qID, input.qDiscardChanges)
     def _():
         
-        # if input.qID() is None:
-        #     shared.inputNotification(session, "qID", "Create a topic with at least one concept before generating a question")
-        #     shared.elementDisplay("qBtnSet", "h", session, alertNotFound=False, ignoreNS=True)
-        #     return
-        # else:
-        #     shared.inputNotification(session, "qID", show=False)
-        #     shared.elementDisplay("qBtnSet", "s", session, alertNotFound=False, ignoreNS=True)
+        shared.elementDisplay("qBtnSet", "s", session, alertNotFound=False, ignoreNS=True) 
+        shared.elementDisplay("qArchive", "s", session)
         
         # Get the question info from the DB
         conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
