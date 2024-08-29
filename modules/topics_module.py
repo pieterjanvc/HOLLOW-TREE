@@ -2,62 +2,87 @@
 # --------------------------
 
 # -- Shiny
-from shiny import Inputs, Outputs, Session, module, reactive, ui, render, req
+from shiny import Inputs, Outputs, Session, module, reactive, ui, render, module
 from htmltools import HTML, div
 
 import shared.shared as shared
 import ACCORNS.accorns_shared as accorns_shared
 
+# --- Functions & variables ---
+topicStatus = {0: "Active", 1: "Draft", 2: "Archived"}
+
+def topicsQuery(conn, gID):
+    return shared.pandasQuery(
+            conn,
+            (
+                'SELECT t.* FROM "topic" AS t, "group_topic" AS gt '
+                'WHERE t."tID" = gt."tID" AND gt."gID" = ? '
+                'ORDER BY t."topic"'
+            ),
+            (int(gID),),
+        )
+
+def tDisplayNames(topics, showArchived):
+
+    topics["topic"] = topics.apply(
+        lambda x: f"({topicStatus[x['status']]}) {x['topic']}" if x["status"] != 0 else x["topic"],
+        axis=1,
+    )
+    if not showArchived:
+        topics = topics[topics["status"] != 2]
+    
+    # Sort the topics by status and name
+    topics = topics.sort_values(["status", "topic"])
+    
+    return topics
 
 # --- UI ---
 @module.ui
 def topics_ui():
     return [
-        ui.layout_columns(
-            # Select, add or archive a topic
-            ui.card(
-                ui.card_header("Topic"),
-                ui.input_select("gID", "Group", choices={}, width="400px"),
-                ui.panel_conditional(
-                    "input.gID",
-                    div(shared.customAttr(ui.input_select("tID", "Topic", choices=[], width="400px"),
-                        {'style': 'display:inline-block'}),       
-                        shared.customAttr(ui.input_checkbox("tShowArchived", "Show archived", value=False,),
-                                          {'style': 'display:inline-block'},)),                           
-                    div(
-                        ui.input_action_button("tAdd", "Add new", width="180px"),
-                        ui.input_action_button("tEdit", "Edit name", width="180px"),
-                    ),
-                    ui.input_radio_buttons("tStatus", "Change topic status", choices={0: "Active", 1: "Draft", 2: "Archived"},
-                                           inline=True),
-                ),
-            ),
-            # Table of concepts per topic with option to add, edit or archive
+
+        # Select, add or archive a topic
+        ui.card(
+            ui.card_header("Topic"),
+            ui.input_select("gID", "Group", choices={}, width="400px"),
             ui.panel_conditional(
-                "input.tID",
-                ui.card(
-                    ui.card_header("Concepts related to the topic"),
-                    ui.output_data_frame("conceptsTable"),
-                    div(
-                        ui.input_action_button("cAdd", "Add new", width="180px"),
-                        ui.input_action_button("cEdit", "Edit selected", width="180px"),
-                        ui.input_action_button(
-                            "cArchive", "Archive selected", width="180px"
-                        ),
-                        ui.input_action_button("cReorder", "Reorder", width="180px"),
-                        style="display:inline",
-                    ),
-                    div(
-                        HTML("<i>Concepts are specific facts or pieces of information you want SCUIRREL to check with your students. "
-                        "You can be very brief, as all context will be retrieved from the database of documents. "
-                        "Don't be too broad, split into multiple topics if needed. "
-                        "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"),
-                        id="conceptInfo"),
-                    div(HTML("<i style='color:blue;'>Concepts can only be edited when the topic is in 'Draft' status</i>"), id="conceptStatus"),
-                id="conceptsPanel"),
+                "input.gID",
+                div(shared.customAttr(ui.input_select("tID", "Topic", choices=[], width="400px"),
+                    {'style': 'display:inline-block'}),       
+                    shared.customAttr(ui.input_checkbox("tShowArchived", "Show archived", value=False,),
+                                        {'style': 'display:inline-block'},)),                           
+                div(
+                    ui.input_action_button("tAdd", "Add new", width="180px"),
+                    ui.input_action_button("tEdit", "Edit name", width="180px"),
+                ),
+                ui.input_radio_buttons("tStatus", "Change topic status", choices=topicStatus,
+                                        inline=True, selected=None),
             ),
-            col_widths=12,
-        )
+        ),
+        # Table of concepts per topic with option to add, edit or archive
+        ui.panel_conditional(
+            "input.tID",
+            ui.card(
+                ui.card_header("Concepts related to the topic"),
+                ui.output_data_frame("conceptsTable"),
+                div(
+                    ui.input_action_button("cAdd", "Add new", width="180px"),
+                    ui.input_action_button("cEdit", "Edit selected", width="180px"),
+                    ui.input_action_button(
+                        "cArchive", "Archive selected", width="180px"
+                    ),
+                    ui.input_action_button("cReorder", "Reorder", width="180px"),
+                    style="display:inline",
+                ),
+                div(
+                    HTML("<i>Concepts are specific facts or pieces of information you want SCUIRREL to check with your students. "
+                    "You can be very brief, as all context will be retrieved from the database of documents. "
+                    "Don't be too broad, split into multiple topics if needed. "
+                    "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"),
+                    id=module.resolve_id("conceptInfo")),
+                div(HTML("<i style='color:blue;'>Concepts can only be edited when the topic is in 'Draft' status</i>"), id=module.resolve_id("conceptStatus"))
+        ),
+    )
     ]
 
 
@@ -72,12 +97,17 @@ def topics_server(
     @reactive.effect
     @reactive.event(groups)
     def _():
+
         if groups.get().shape[0] == 0:
+            shared.elementDisplay(session, {"tAdd": "d", "tEdit": "d", "tStatus": "h", "tShowArchived": "d"},
+                                  alertNotFound=False)
             shared.inputNotification(
                 session, "gID", "Create a group (groups tab) before adding topics"
             )
             return
         else:
+            shared.elementDisplay(session, {"tAdd": "e", "tEdit": "e", "tStatus": "s", "tShowArchived": "e"},
+                                  alertNotFound=False)
             shared.inputNotification(session, "gID", show=False)
 
         ui.update_select(
@@ -94,22 +124,46 @@ def topics_server(
 
         # Get all active topics from the accorns database
         conn = shared.appDBConn(postgresUser=postgresUser)
-        activeTopics = shared.pandasQuery(
-            conn,
-            (
-                'SELECT t.* FROM "topic" AS t, "group_topic" AS gt '
-                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."status" = 0 '
-                'ORDER BY t."topic"'
-            ),
-            (int(input.gID()),),
-        )
+        topicsList = topicsQuery(conn, input.gID())
         conn.close()
 
+        # Add (Archived) in from of the topic name if the topic is archived, otherwise remove archived topics
+        topicsShow = topicsList.copy()
+        topicsShow = tDisplayNames(topicsShow, input.tShowArchived())
+        
         ui.update_select(
-            "tID", choices=dict(zip(activeTopics["tID"], activeTopics["topic"]))
+            "tID", choices=dict(zip(topicsShow["tID"], topicsShow["topic"]))
         )
 
-        topics.set(activeTopics)
+        if topicsShow.shape[0] == 0:
+            shared.elementDisplay(session, {"tEdit": "d", "tStatus": "h"})
+        else:
+            shared.elementDisplay(session, {"tEdit": "e", "tStatus": "s"})
+        
+        if topicsList.shape[0] == 0:
+             shared.elementDisplay(session, {"tShowArchived": "h"})
+        else:
+            shared.elementDisplay(session, {"tShowArchived": "s"})
+
+        topics.set(topicsList)
+
+    @reactive.effect
+    @reactive.event(input.tShowArchived, ignore_init=True)
+    def _():
+
+        topicsShow = topics.get().copy()
+        topicsShow = tDisplayNames(topicsShow, input.tShowArchived())
+        
+        ui.update_select(
+            "tID", choices=dict(zip(topicsShow["tID"], topicsShow["topic"]))
+        )
+
+        if topicsShow.shape[0] == 0:
+            shared.elementDisplay(session, {"tEdit": "d", "tStatus": "h"})
+        else:
+            shared.elementDisplay(session, {"tEdit": "e", "tStatus": "s"})
+            ui.update_radio_buttons("tStatus", selected=str(topicsShow["status"].iloc[0]))
+
 
     # --- Add topic - modal popup
     @reactive.effect
@@ -140,16 +194,11 @@ def topics_server(
     def _():
         # Only proceed if the input is valid
         if not shared.inputCheck(input.ntTopic()):
-            (ui.remove_ui(shared.nsID("noGoodTopic", session, True)),)
-            ui.insert_ui(
-                HTML(
-                    f"<div id={shared.nsID('noGoodTopic', session)} style='color: red'>New topic must be at least 6 characters</div>"
-                ),
-                shared.nsID("ntDescr", session, True),
-                "afterEnd",
-            )
+            shared.inputNotification(session, "ntDescr", "New topic must be at least 6 characters")
             return
-
+        else:
+            shared.inputNotification(session, "ntDescr", show=False)
+        
         # Add new topic to DB
         conn = shared.appDBConn(postgresUser=postgresUser)
         cursor = conn.cursor()
@@ -167,21 +216,15 @@ def topics_server(
             'INSERT INTO "group_topic"("gID", "tID", "uID", "added") VALUES(?, ?, ?, ?)',
             (int(input.gID()), tID, int(user.get()["uID"]), dt),
         )
-        newTopics = shared.pandasQuery(
-            conn,
-            (
-                'SELECT t.* FROM "topic" AS t, "group_topic" AS gt '
-                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."status" = 0 '
-                'ORDER BY t."topic"'
-            ),
-            (int(input.gID()),),
-        )
+        newTopics = topicsQuery(conn, input.gID())
         conn.commit()
         conn.close()
 
         # Update the topics select input
+        topicsShow = newTopics.copy()
+        topicsShow = tDisplayNames(topicsShow, showArchived=input.tShowArchived())
         ui.update_select(
-            "tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])), selected=tID
+            "tID", choices=dict(zip(topicsShow["tID"], topicsShow["topic"])), selected=tID
         )
         topics.set(newTopics)
         ui.modal_remove()
@@ -216,31 +259,22 @@ def topics_server(
     @reactive.effect
     @reactive.event(input.etEdit)
     def _():
+
         # Only proceed if the input is valid
         if not shared.inputCheck(input.etInput()):
-            ui.remove_ui(shared.nsID("noGoodTopic", session, True))
-            ui.insert_ui(
-                HTML(
-                    f"<div id={shared.nsID('noGoodTopic', session)} style='color: red'>A topic must be at least 6 characters</div>"
-                ),
-                shared.nsID("etInput", session, True),
-                "afterEnd",
-            )
+            shared.inputNotification(session, "etInput", "A topic must be at least 6 characters")
             return
+        else:
+            shared.inputNotification(session, "etInput", show=False)
 
         if (
             topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["topic"]
             == input.etInput()
         ):
-            ui.remove_ui(shared.nsID("noGoodTopic", session, True))
-            ui.insert_ui(
-                HTML(
-                    f"<div id={shared.nsID('noGoodTopic', session)} style='color: red'>No change detected</div>"
-                ),
-                shared.nsID("etInput", session, True),
-                "afterEnd",
-            )
+            shared.inputNotification(session, "etInput", "No change detected")
             return
+        else:
+            shared.inputNotification(session, "etInput", show=False)
 
         # Update the DB
         conn = shared.appDBConn(postgresUser=postgresUser)
@@ -273,46 +307,41 @@ def topics_server(
             cursor,
             'UPDATE "topic" SET "sID" = ?, "topic" = ?, "modified" = ? WHERE "tID" = ?',
             (sID, input.etInput(), shared.dt(), input.tID()),
-        )
-        newTopics = shared.pandasQuery(
-            conn, 'SELECT "tID", "topic" FROM "topic" WHERE "status" = 0'
-        )
+        )         
         conn.commit()
+        topicsList = topicsQuery(conn, input.gID())  
         conn.close()
 
         # Update the topics select input
+        topicsShow = topicsList.copy()
+        topicsShow = tDisplayNames(topicsShow, showArchived=input.tShowArchived())
         ui.update_select(
-            "tID",
-            choices=dict(zip(newTopics["tID"], newTopics["topic"])),
-            selected=input.tID(),
+            "tID", choices=dict(zip(topicsShow["tID"], topicsShow["topic"])), selected=input.tID()
         )
-        topics.set(newTopics)
+
+        topics.set(topicsList)
         ui.modal_remove()
 
     # --- Archive a topic - modal popup
     @reactive.effect
     @reactive.event(input.tStatus)
-    def _():
-        if input.tID() is None:
-            return
+    def _():        
         
         statusCode = int(input.tStatus())
         
-        if statusCode != 1:
-            shared.elementDisplay("cAdd", "d", session)
-            shared.elementDisplay("cEdit", "d", session)
-            shared.elementDisplay("cArchive", "d", session)
-            shared.elementDisplay("cReorder", "d", session)
-            shared.elementDisplay("conceptInfo", "h", session, ignoreNS=True)
-            shared.elementDisplay("conceptStatus", "s", session, ignoreNS=True)
-
+        if statusCode == 1:
+            shared.elementDisplay(session, {"tEdit":"e", "cAdd": "s", "cEdit": "s", "cArchive": "s", 
+                                            "cReorder": "s", "conceptInfo": "s", "conceptStatus": "h"})
         else:
-            shared.elementDisplay("cAdd", "e", session)
-            shared.elementDisplay("cEdit", "e", session)
-            shared.elementDisplay("cArchive", "e", session)
-            shared.elementDisplay("cReorder", "e", session)
-            shared.elementDisplay("conceptInfo", "s", session, ignoreNS=True)
-            shared.elementDisplay("conceptStatus", "h", session, ignoreNS=True)
+            shared.elementDisplay(session, {"tEdit":"d","cAdd": "h", "cEdit": "h", "cArchive": "h", 
+                                            "cReorder": "h", "conceptInfo": "h", "conceptStatus": "s"})
+            
+        if input.tID() is None:
+            return
+        
+        if statusCode == int(topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["status"]):
+            print("status unchanged")
+            return
 
         conn = shared.appDBConn(postgresUser=postgresUser)
         cursor = conn.cursor()
@@ -321,23 +350,15 @@ def topics_server(
             'UPDATE "topic" SET "status" = ?, "modified" = ? WHERE "tID" = ?',
             (statusCode, shared.dt(), input.tID()),
         )
-        newTopics = shared.pandasQuery(
-            conn, 'SELECT "tID", "topic" FROM "topic" WHERE "status" = 0'
-        )
-
-        # # Empty the concept table if last topic was removed
-        # if newTopics.shape[0] == 0:
-        #     conceptList = shared.pandasQuery(
-        #         conn, 'SELECT * FROM "concept" WHERE "tID" = 0'
-        #     )
-        #     concepts.set(conceptList)
+        newTopics = topicsQuery(conn, input.gID())
 
         conn.commit()
         conn.close()
 
-        # Update the topics only if archived and show archived is not checked
-        if statusCode == 2 and not input.tShowArchived():
-            ui.update_select("tID", choices=dict(zip(newTopics["tID"], newTopics["topic"])))
+        topicsShow = newTopics.copy()
+        topicsShow = tDisplayNames(topicsShow, showArchived=input.tShowArchived())           
+
+        ui.update_select("tID", choices=dict(zip(topicsShow["tID"], topicsShow["topic"])))
         
         topics.set(newTopics)
 
@@ -378,15 +399,10 @@ def topics_server(
     def _():
         # Only proceed if the input is valid
         if not shared.inputCheck(input.ncInput()):
-            ui.remove_ui(shared.nsID("noGoodConcept", session, True))
-            ui.insert_ui(
-                HTML(
-                    f"<div id={shared.nsID('noGoodConcept', session)} style='color: red'>New concept must be at least 6 characters</div>"
-                ),
-                shared.nsID("ncInput", session, True),
-                "afterEnd",
-            )
+            shared.inputNotification(session, "ncInput", "New concept must be at least 6 characters")
             return
+        else:
+            shared.inputNotification(session, "ncInput", show=False)
 
         # Add new topic to DB
         order = concepts.get()["order"].tolist()
@@ -439,26 +455,18 @@ def topics_server(
     def _():
         # Only proceed if the input is valid
         if not shared.inputCheck(input.ecInput()):
-            ui.remove_ui(shared.nsID("noGoodConcept", session, True))
-            ui.insert_ui(
-                HTML(
-                    f"<div id={shared.nsID('noGoodConcept', session)} style='color: red'>A concept must be at least 6 characters</div>"
-                ),
-                shared.nsID("ecInput", session, True),
-                "afterEnd",
-            )
+            shared.inputNotification(session, "ecInput", "A concept must be at least 6 characters")
             return
+        else:
+            shared.inputNotification(session, "ecInput", show=False)
+        
         concept = conceptsTable.data_view(selected=True).iloc[0]["concept"]
+
         if concept == input.ecInput():
-            ui.remove_ui(shared.nsID("noGoodConcept", session, True))
-            ui.insert_ui(
-                HTML(
-                    f"<div id{shared.nsID('noGoodConcept', session)} style='color: red'>No change detected</div>"
-                ),
-                shared.nsID("ecInput", session, True),
-                "afterEnd",
-            )
+            shared.inputNotification(session, "ecInput", "No change detected")
             return
+        else:
+            shared.inputNotification(session, "ecInput", show=False)
 
         # Update the DB
         cID = concepts.get().iloc[conceptsTable.data_view(selected=True).index[0]][
@@ -537,15 +545,20 @@ def topics_server(
 
         # Hide panel when no topic is available
         if input.tID() is None:
-            shared.elementDisplay("conceptsPanel", "h", session)
-            shared.elementDisplay("tStatus", "h", session)
+            shared.elementDisplay(session, {"conceptsPanel": "h", "tStatus": "h"},
+                                  alertNotFound=False)
             return
         else:
-            shared.elementDisplay("conceptsPanel", "s", session)
-            shared.elementDisplay("tStatus", "s", session)
+            shared.elementDisplay(session, {"conceptsPanel": "s", "tStatus": "s"},
+                                  alertNotFound=False) 
 
         status = topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["status"]
-        ui.update_radio_buttons("tStatus", selected=int(status))
+        if status == 2:
+            shared.elementDisplay(session, {"tEdit": "d"})
+        else:
+            shared.elementDisplay(session, {"tEdit": "e"})
+
+        ui.update_radio_buttons("tStatus", selected=str(status))
 
         tID = input.tID() if input.tID() else 0
         conn = shared.appDBConn(postgresUser=postgresUser)
@@ -592,18 +605,13 @@ def topics_server(
         if len(set(newOrder)) != concepts.get().shape[0] or not shared.consecutiveInt(
             newOrder
         ):
-            ui.remove_ui(shared.nsID("noGoodOrder", session, True))
-            ui.insert_ui(
-                HTML(
-                    f"<div id={shared.nsID('noGoodOrder', session)} style='color: red'>Order must be a comma separated list of all integers</div>"
-                ),
-                shared.nsID("rcNewOrder", session, True),
-                "afterEnd",
-            )
+            shared.inputNotification(session, "rcNewOrder", "Order must be a comma separated list of all integers")
             return
-
+        else:
+            shared.inputNotification(session, "rcNewOrder", show=False)
+        
         # Reorder the concepts based on the new order
-        newConcepts = concepts.get().copy()
+        newConcepts = concepts.get()
         newConcepts["newOrder"] = newOrder
         newConcepts = newConcepts.sort_values("newOrder")
 
@@ -612,15 +620,10 @@ def topics_server(
 
         # Message if no order changed
         if changedOrder.shape[0] == 0:
-            ui.remove_ui(shared.nsID("noGoodOrder", session, True))
-            ui.insert_ui(
-                HTML(
-                    f"<div id={shared.nsID('noGoodOrder', session)} style='color: red'>No order change detected</div>"
-                ),
-                shared.nsID("rcNewOrder", session, True),
-                "afterEnd",
-            )
+            shared.inputNotification(session, "rcNewOrder", "No order change detected")
             return
+        else:
+            shared.inputNotification(session, "rcNewOrder", show=False)
 
         # Get the connection to the database
         conn = shared.appDBConn(postgresUser=postgresUser)

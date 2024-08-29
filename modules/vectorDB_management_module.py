@@ -71,11 +71,6 @@ def vectorDB_management_server(
     conn = shared.vectorDBConn(postgresUser=shared.postgresAccorns)
     files = shared.pandasQuery(conn, query='SELECT * FROM "file"')
     conn.close()
-    # if files.shape[0] == 0:
-    #     index = None
-    #     shared.elementDisplay("blankDBMsg", "s", session, alertNotFound=False)
-    # else:
-    #     index = shared.getIndex(postgresUser=shared.postgresAccorns)
 
     files = reactive.value(files)
 
@@ -100,7 +95,7 @@ def vectorDB_management_server(
             accorns_shared.storageFolder,
             input.newFile()[0]["name"],
         )
-        shared.elementDisplay("uiUploadFile", "h", session, alertNotFound=False)
+        shared.elementDisplay(session, {"uiUploadFile": "h"})
         # TODO add nice loading animation https://codepen.io/nzbin/pen/GGrXbp
         ui.insert_ui(
             HTML(
@@ -149,7 +144,7 @@ def vectorDB_management_server(
 
         files.set(getFiles)
 
-        shared.elementDisplay("uiUploadFile", "s", session, alertNotFound=False)
+        shared.elementDisplay(session, {"uiUploadFile": "s"})
         ui.remove_ui("#processFile")
 
     # Get file details
@@ -250,7 +245,7 @@ def vectorDB_management_server(
                 'DELETE FROM "file" WHERE "fID" = ?',
                 (int(file.fID),),
             )
-            shared.elementDisplay("fileInfoCard", "h", session, alertNotFound=False)
+            shared.elementDisplay(session, {"fileInfoCard": "h"})
             files.set(shared.pandasQuery(conn, query='SELECT * FROM "file"'))
             conn.commit()
             conn.close()

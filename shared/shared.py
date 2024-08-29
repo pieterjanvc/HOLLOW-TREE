@@ -97,13 +97,18 @@ def nsID(id, session, addHashtag=False):
 
 # This function allows you to hide/show/disable/enable elements by ID or data-value
 # The latter is needed because tabs don't use ID's but data-value
-def elementDisplay(id, effect, session, alertNotFound=True, ignoreNS=False):
-    id = session.ns + "-" + id if (session.ns != "") and (not ignoreNS) else id
+def elementDisplay(session, change, alertNotFound=True, ignoreNS=False):
 
+    # Change is a dict with {"id": "effect"} of all elements that need to be changed
+    # update all ids to include the namespace
+    for k in list(change.keys()):
+        newKey = session.ns + "-" + k if (session.ns != "") and (not ignoreNS) else k
+        change[newKey] = change.pop(k)
+    
     @reactive.effect
     async def _():
         await session.send_custom_message(
-            "hideShow", {"id": id, "effect": effect, "alertNotFound": alertNotFound}
+            "hideShow", {"id": list(change.keys()), "effect": list(change.values()), "alertNotFound": alertNotFound}
         )
 
 # Add or edit an attribute of an HTML element

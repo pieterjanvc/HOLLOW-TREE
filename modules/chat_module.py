@@ -492,9 +492,7 @@ def chat_server(
             ui.update_select(
                 "selTopic", choices=dict(zip(topics()["tID"], topics()["topic"]))
             )
-            shared.elementDisplay("startConversation", "s", session, False)
-            shared.elementDisplay("chatIn", "s", session, False)
-
+            shared.elementDisplay(session, {"startConversation": "s", "chatIn": "s"})
         return
 
     # When the start conversation button is clicked...
@@ -546,7 +544,7 @@ def chat_server(
         )
         botLog.set(f"---- PREVIOUS CONVERSATION ----\n--- MENTOR:\n{firstWelcome}")
 
-        shared.elementDisplay("chatIn", "s", session)
+        shared.elementDisplay(session, {"chatIn": "s"})
         return tID
 
     # Get the concepts related to the topic
@@ -570,8 +568,7 @@ def chat_server(
             return
 
         # Prevent new chat whilst LLM is working and show waiting message
-        shared.elementDisplay("waitResp", "s", session)
-        shared.elementDisplay("chatIn", "h", session)
+        shared.elementDisplay(session, {"waitResp": "s", "chatIn": "h"})
 
         # Add the user message
         msg = messages.get()
@@ -651,8 +648,7 @@ def chat_server(
             ui.notification_show(
                 "SCUIRREL is having issues processing your response. Please try again later."
             )
-            shared.elementDisplay("waitResp", "h", session)
-            shared.elementDisplay("chatIn", "s", session)
+            shared.elementDisplay(session, {"waitResp": "h", "chatIn": "s"})
             return
 
         with reactive.isolate():
@@ -680,11 +676,11 @@ def chat_server(
             botLog.set(botLog.get() + "\n--- MENTOR:\n" + resp)
 
             # Now the LLM has finished the user can send a new response
-            shared.elementDisplay("waitResp", "h", session)
+            shared.elementDisplay(session, {"waitResp": "h"})
             ui.update_text_area("newChat", value="")
             # If conversation is over don't show new message box
             if not finished:
-                shared.elementDisplay("chatIn", "s", session)
+                shared.elementDisplay(session, {"chatIn": "s"})
                 scrollElement(".chatWindow .card-body")
             else:
                 ui.insert_ui(HTML("<hr>"), "#" + module.resolve_id("conversation"))

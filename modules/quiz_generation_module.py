@@ -11,7 +11,7 @@ import asyncio
 import regex as re
 
 # -- Shiny
-from shiny import Inputs, Outputs, Session, module, reactive, ui, render
+from shiny import Inputs, Outputs, Session, module, reactive, ui, render, module
 from htmltools import HTML, div
 
 # -- Llamaindex
@@ -109,14 +109,8 @@ def quiz_generation_ui():
             div(
                 ui.input_action_button("qGenerate", "Generate new", width="180px"),
                 ui.input_action_button("qArchive", "Archive selected", width="180px"),
-                id="qBtnSet",
-                style="display:inline",
+                id=module.resolve_id("qBtnSet"),
             ),
-            # div(
-            #     HTML("<i>Generating a new question...</i>"),
-            #     id="qBusyMsg",
-            #     style="display: none;",
-            # ),
         ),
         # Only show this panel if there is at least one question
         ui.panel_conditional(
@@ -156,7 +150,7 @@ def quiz_generation_ui():
                 ui.input_text_area(
                     "rqODexpl", "Explanation D", width="100%", autoresize=True
                 ),
-                id="qEditPanel",
+                id=module.resolve_id("qEditPanel"),
             ),
         ),
     ]
@@ -189,8 +183,8 @@ def quiz_generation_server(
 
         if groups.get().shape[0] == 0:
             shared.inputNotification(session, "qID", "Create a group and a topic before generating a question")
-            shared.elementDisplay("qBtnSet", "h", session, alertNotFound=False, ignoreNS=True)
-            shared.elementDisplay("qEditPanel", "h", session, alertNotFound=False)
+            shared.elementDisplay(session, {"qBtnSet": "h", "qEditPanel": "h"})
+
     @reactive.effect
     @reactive.event(input.gID, topicsx)
     def _():
@@ -215,8 +209,7 @@ def quiz_generation_server(
 
         if activeTopics.shape[0] == 0:
             shared.inputNotification(session, "qID", "This group has no active topics yet")
-            shared.elementDisplay("qBtnSet", "h", session, alertNotFound=False, ignoreNS=True)
-            shared.elementDisplay("qEditPanel", "h", session, alertNotFound=False)
+            shared.elementDisplay(session, {"qBtnSet": "h", "qEditPanel": "h"})
 
         topics.set(activeTopics)
 
@@ -232,14 +225,8 @@ def quiz_generation_server(
     @reactive.effect
     @reactive.event(input.qGenerate)
     def _():
-        
-        shared.elementDisplay(
-            "qBtnSet", "h", session, alertNotFound=False, ignoreNS=True
-        )
-        shared.elementDisplay("gID", "d", session, alertNotFound=False)
-        shared.elementDisplay("qtID", "d", session, alertNotFound=False)
-        shared.elementDisplay("qID", "d", session, alertNotFound=False)
-        shared.elementDisplay("qEditPanel", "h", session, alertNotFound=False)
+        shared.elementDisplay(session, {"qBtnSet": "h", "qEditPanel": "h", "gID": "d", 
+                                        "qtID": "d", "qID": "d", "qEditPanel": "h"})
         shared.inputNotification(session, "qID", "Generating a question...", colour="blue")
 
         # Get the topic
@@ -254,17 +241,6 @@ def quiz_generation_server(
             f'(SELECT "cID", "concept" FROM "concept" WHERE "tID" = {int(input.qtID())} AND "status" = 0 '
             f'UNION ALL SELECT "cID", \'\' as concept FROM "question" where "tID" = {int(input.qtID())}) GROUP BY "cID"',
         )
-        # # If there are no concepts, show a notification and return
-        # if conceptList.shape[0] == 0:            
-        #     shared.elementDisplay(
-        #         "qBtnSet", "s", session, alertNotFound=False, ignoreNS=True
-        #     )
-        #     shared.elementDisplay("qtID", "e", session, alertNotFound=False)
-        #     shared.elementDisplay("qID", "e", session, alertNotFound=False)
-        #     shared.elementDisplay("qEditPanel", "s", session, alertNotFound=False)
-        #     shared.inputNotification("qID", "This topic has no concepts yet, please add some first in the Topics tab")
-
-        #     return
 
         cID = int(
             conceptList[conceptList["n"] == min(conceptList["n"])]
@@ -378,13 +354,9 @@ def quiz_generation_server(
             ui.update_select(
                 "qID", choices=dict(zip(q["qID"], q["question"])), selected=qID
             )
-            shared.elementDisplay(
-            "qBtnSet", "s", session, alertNotFound=False, ignoreNS=True
-            )
-            shared.elementDisplay("gID", "e", session, alertNotFound=False)
-            shared.elementDisplay("qtID", "e", session, alertNotFound=False)
-            shared.elementDisplay("qID", "e", session, alertNotFound=False)
-            shared.elementDisplay("qEditPanel", "s", session, alertNotFound=False)
+            shared.elementDisplay(session, {"qBtnSet": "s", "qEditPanel": "s", "gID": "e", 
+                                            "qtID": "e", "qID": "e", "qEditPanel": "s"})            
+
             shared.inputNotification(session, "qID", show=False)
 
     @reactive.effect
@@ -399,10 +371,7 @@ def quiz_generation_server(
         )
 
         if q.shape[0] == 0:
-            shared.elementDisplay(
-                "qBtnSet", "h", session, alertNotFound=False, ignoreNS=True
-            )
-            shared.elementDisplay("qEditPanel", "h", session, alertNotFound=False)
+            shared.elementDisplay(session, {"qBtnSet": "h", "qEditPanel": "h"}) 
             shared.inputNotification(session, "qID", "This topic has no concepts yet, please add some first in the Topics tab")
            
             return
@@ -411,20 +380,12 @@ def quiz_generation_server(
             conn,
             f'SELECT "qID", "question" FROM "question" WHERE "tID" = {int(input.qtID())} AND "status" = 0',
         )
-        conn.close()   
-
-        shared.elementDisplay(
-                "qBtnSet", "s", session, alertNotFound=False, ignoreNS=True
-        )           
+        conn.close()          
 
         if q.shape[0] == 0:
-            #shared.elementDisplay("qID", "d", session)
-            shared.elementDisplay("qArchive", "h", session)
-            shared.elementDisplay("qEditPanel", "h", session, alertNotFound=False)
+            shared.elementDisplay(session, {"qBtnSet": "s", "qArchive": "h", "qEditPanel": "h"})
         else:
-            #shared.elementDisplay("qID", "e", session)
-            shared.elementDisplay("qArchive", "s", session)
-            shared.elementDisplay("qEditPanel", "s", session, alertNotFound=False)
+            shared.elementDisplay(session, {"qBtnSet": "s", "qArchive": "s", "qEditPanel": "s"})
 
         # Update the UI
         ui.update_select("qID", choices=dict(zip(q["qID"], q["question"])))
@@ -433,8 +394,7 @@ def quiz_generation_server(
     @reactive.event(input.qID, input.qDiscardChanges)
     def _():
         
-        shared.elementDisplay("qBtnSet", "s", session, alertNotFound=False, ignoreNS=True) 
-        shared.elementDisplay("qArchive", "s", session)
+        shared.elementDisplay(session, {"qBtnSet": "s", "qArchive": "s"})
         
         # Get the question info from the DB
         conn = shared.appDBConn(postgresUser=shared.postgresAccorns)

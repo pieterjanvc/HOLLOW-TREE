@@ -26,19 +26,23 @@ function hideShow(x, element) {
 
 Shiny.addCustomMessageHandler("hideShow", function(x) {
 
-    if (document.getElementById(x.id)) {        
-        hideShow(x.effect,document.getElementById(x.id));
-        // Check for elements with a "for" attribute with the same ID (e.g. select box labels)
-        if (document.querySelector('[for="' + x.id + '"]')) {
-            hideShow(x.effect,document.querySelector('[for="' + x.id + '"]'));
-        } 
-    } else if (document.querySelector('[data-value="' + x.id + '"]')) {
-        hideShow(x.effect,document.querySelector('[data-value="' + x.id + '"]'));
-    } else {
-        if (x.alertNotFound == true) {
-            alert("No element found with an ID or data-value of:" + x.id);
-        }        
-        return;
-    }  
+    // Loop through each element in the array x.id and x.effect
+    for (var i = 0; i < x.id.length; i++) {
+        // Check if the element has an ID
+        if (document.getElementById(x.id[i])) {
+            hideShow(x.effect[i], document.getElementById(x.id[i]));
+            // Check for elements with a "for" attribute with the same ID (e.g. select box labels)
+            if (document.querySelector('[for="' + x.id[i] + '"]')) {
+                hideShow(x.effect[i], document.querySelector('[for="' + x.id[i] + '"]'));
+            }
+        } else if (document.querySelector('[data-value="' + x.id[i] + '"]')) {
+            hideShow(x.effect[i], document.querySelector('[data-value="' + x.id[i] + '"]'));
+        } else {
+            if (x.alertNotFound == true) {
+                alert("No element found with an ID or data-value of:" + x.id[i]);
+            }
+            return;
+        }
+    }   
     
 });
