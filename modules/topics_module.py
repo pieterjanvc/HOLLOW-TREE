@@ -514,11 +514,19 @@ def topics_server(
         ]
         conn = shared.appDBConn(postgresUser=postgresUser)
         cursor = conn.cursor()
+        # Set the status of the concept to archived
         _ = shared.executeQuery(
             cursor,
             'UPDATE "concept" SET "status" = 1, "modified" = ? WHERE "cID" = ?',
             (shared.dt(), int(cID)),
         )
+        # Make sure to archive any related quiz questions
+        _ = shared.executeQuery(
+            cursor,
+            'UPDATE "question" SET "status" = 1, "modified" = ? WHERE "cID" = ?',
+            (shared.dt(), int(cID)),
+        )
+        # Get the new list of active concepts
         conceptList = shared.pandasQuery(
             conn,
             f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "status" = 0 ORDER BY "order"',
