@@ -22,19 +22,39 @@ def topicsQuery(conn, gID):
             (int(gID),),
         )
 
-def tDisplayNames(topics, showArchived):
+# Update the list of topics shown in the select input
+def tDisplayNames(topics, input, session, selected = None):
 
-    topics["topic"] = topics.apply(
+    selected = selected if selected is not None else input.tID()
+    showArchived = input.tShowArchived()    
+    
+    topicsList = topics.copy()
+
+    # Add the status to the topic name
+    topicsList["topic"] = topicsList.apply(
         lambda x: f"({topicStatus[x['status']]}) {x['topic']}" if x["status"] != 0 else x["topic"],
         axis=1,
     )
+
+    # Filter out archived topics if needed
     if not showArchived:
-        topics = topics[topics["status"] != 2]
+        topicsList = topicsList[topicsList["status"] != 2]    
+
+    # Hide or show the edit and status buttons if there are no topics to show
+    if topicsList.shape[0] == 0:
+        selected = None
+        # shared.elementDisplay(session, {"tEdit": "d", "tStatus": "h"})
+    else:
+        topicsList = topicsList.sort_values(["status", "topic"])
+        if selected:
+            selected = str(topicsList["tID"].iloc[0] if int(selected) not in list(topicsList["tID"]) else selected)
+        # shared.elementDisplay(session, {"tEdit": "e", "tStatus": "s"})   
+
+    # Update the select input with the new topics
+    ui.update_select("tID", choices=dict(zip(topicsList["tID"], topicsList["topic"])),
+                         selected=selected)
     
-    # Sort the topics by status and name
-    topics = topics.sort_values(["status", "topic"])
-    
-    return topics
+    return
 
 # --- UI ---
 @module.ui
@@ -74,13 +94,10 @@ def topics_ui():
                     ui.input_action_button("cReorder", "Reorder", width="180px"),
                     style="display:inline",
                 ),
-                div(
-                    HTML("<i>Concepts are specific facts or pieces of information you want SCUIRREL to check with your students. "
+                HTML("<i>Concepts are specific facts or pieces of information you want SCUIRREL to check with your students. "
                     "You can be very brief, as all context will be retrieved from the database of documents. "
                     "Don't be too broad, split into multiple topics if needed. "
-                    "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"),
-                    id=module.resolve_id("conceptInfo")),
-                div(HTML("<i style='color:blue;'>Concepts can only be edited when the topic is in 'Draft' status</i>"), id=module.resolve_id("conceptStatus"))
+                    "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"),                
         ),
     )
     ]
@@ -127,43 +144,20 @@ def topics_server(
         topicsList = topicsQuery(conn, input.gID())
         conn.close()
 
-        # Add (Archived) in from of the topic name if the topic is archived, otherwise remove archived topics
-        topicsShow = topicsList.copy()
-        topicsShow = tDisplayNames(topicsShow, input.tShowArchived())
-        
-        ui.update_select(
-            "tID", choices=dict(zip(topicsShow["tID"], topicsShow["topic"]))
-        )
-
-        if topicsShow.shape[0] == 0:
-            shared.elementDisplay(session, {"tEdit": "d", "tStatus": "h"})
-        else:
-            shared.elementDisplay(session, {"tEdit": "e", "tStatus": "s"})
-        
+        # IN case there are no topics (including archived) hide the show archived button
         if topicsList.shape[0] == 0:
-             shared.elementDisplay(session, {"tShowArchived": "h"})
+            shared.elementDisplay(session, {"tShowArchived": "h"})
         else:
             shared.elementDisplay(session, {"tShowArchived": "s"})
 
+        tDisplayNames(topicsList, input, session)
         topics.set(topicsList)
 
     @reactive.effect
     @reactive.event(input.tShowArchived, ignore_init=True)
     def _():
-
-        topicsShow = topics.get().copy()
-        topicsShow = tDisplayNames(topicsShow, input.tShowArchived())
         
-        ui.update_select(
-            "tID", choices=dict(zip(topicsShow["tID"], topicsShow["topic"]))
-        )
-
-        if topicsShow.shape[0] == 0:
-            shared.elementDisplay(session, {"tEdit": "d", "tStatus": "h"})
-        else:
-            shared.elementDisplay(session, {"tEdit": "e", "tStatus": "s"})
-            ui.update_radio_buttons("tStatus", selected=str(topicsShow["status"].iloc[0]))
-
+        tDisplayNames(topics.get(), input, session)
 
     # --- Add topic - modal popup
     @reactive.effect
@@ -221,11 +215,8 @@ def topics_server(
         conn.close()
 
         # Update the topics select input
-        topicsShow = newTopics.copy()
-        topicsShow = tDisplayNames(topicsShow, showArchived=input.tShowArchived())
-        ui.update_select(
-            "tID", choices=dict(zip(topicsShow["tID"], topicsShow["topic"])), selected=tID
-        )
+        tDisplayNames(newTopics, input, session, selected = tID)
+       
         topics.set(newTopics)
         ui.modal_remove()
 
@@ -312,12 +303,7 @@ def topics_server(
         topicsList = topicsQuery(conn, input.gID())  
         conn.close()
 
-        # Update the topics select input
-        topicsShow = topicsList.copy()
-        topicsShow = tDisplayNames(topicsShow, showArchived=input.tShowArchived())
-        ui.update_select(
-            "tID", choices=dict(zip(topicsShow["tID"], topicsShow["topic"])), selected=input.tID()
-        )
+        tDisplayNames(topicsList, input, session)      
 
         topics.set(topicsList)
         ui.modal_remove()
@@ -326,21 +312,28 @@ def topics_server(
     @reactive.effect
     @reactive.event(input.tStatus)
     def _():        
-        
-        statusCode = int(input.tStatus())
-        
-        if statusCode == 1:
-            shared.elementDisplay(session, {"tEdit":"e", "cAdd": "s", "cEdit": "s", "cArchive": "s", 
-                                            "cReorder": "s", "conceptInfo": "s", "conceptStatus": "h"})
-        else:
-            shared.elementDisplay(session, {"tEdit":"d","cAdd": "h", "cEdit": "h", "cArchive": "h", 
-                                            "cReorder": "h", "conceptInfo": "h", "conceptStatus": "s"})
-            
+
         if input.tID() is None:
             return
         
-        if statusCode == int(topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["status"]):
-            print("status unchanged")
+        statusCode = int(input.tStatus())
+        prevStatus = topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["status"]
+
+        if concepts.get().empty and statusCode == 0:
+            ui.notification_show("No concepts available for this topic. Please add some before activating the topic")
+            ui.update_radio_buttons("tStatus", selected=str(prevStatus))
+            return
+              
+        if statusCode == 1:
+            shared.elementDisplay(session, {"tEdit":"e", "cAdd": "s", "cEdit": "s", "cArchive": "s", 
+                                            "cReorder": "s"})
+            shared.inputNotification(session, "tStatus", show=False)
+        else:
+            shared.elementDisplay(session, {"tEdit":"d","cAdd": "h", "cEdit": "h", "cArchive": "h", 
+                                            "cReorder": "h"})
+            shared.inputNotification(session, "tStatus", "<i>The topic Title or Concepts can only be edited when the topic is in 'Draft' status</i>", colour = "blue")
+                
+        if statusCode == prevStatus:
             return
 
         conn = shared.appDBConn(postgresUser=postgresUser)
@@ -355,10 +348,7 @@ def topics_server(
         conn.commit()
         conn.close()
 
-        topicsShow = newTopics.copy()
-        topicsShow = tDisplayNames(topicsShow, showArchived=input.tShowArchived())           
-
-        ui.update_select("tID", choices=dict(zip(topicsShow["tID"], topicsShow["topic"])))
+        tDisplayNames(newTopics, input, session)
         
         topics.set(newTopics)
 
@@ -553,7 +543,7 @@ def topics_server(
                                   alertNotFound=False) 
 
         status = topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["status"]
-        if status == 2:
+        if status != 1:
             shared.elementDisplay(session, {"tEdit": "d"})
         else:
             shared.elementDisplay(session, {"tEdit": "e"})
@@ -567,6 +557,7 @@ def topics_server(
             f'SELECT * FROM "concept" WHERE "tID" = {tID} AND "status" = 0 ORDER BY "order"',
         )
         conn.close()
+
         concepts.set(conceptList)
 
     # --- Reorder the concepts - modal popup
