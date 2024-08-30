@@ -244,7 +244,6 @@ def quiz_generation_server(
         topics.set(activeTopics)
 
     @render.ui
-    @reactive.event(input.qID)
     def quizQuestionPreview():
 
         if questions.get() is None:
@@ -458,92 +457,100 @@ def quiz_generation_server(
     #     ui.update_text_area("rqOCexpl", value=q["explanationC"])
     #     ui.update_text("rqOD", value=q["optionD"])
     #     ui.update_text_area("rqODexpl", value=q["explanationD"])
-    #     ui.update_radio_buttons("rqCorrect", selected=q["answer"])
-
-    # # Save question edits
-    # @reactive.effect
-    # @reactive.event(input.qSaveChanges)
-    # def _():
-    #     # Get the original question
-    #     conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
-    #     cursor = conn.cursor()
-    #     q = shared.pandasQuery(
-    #         conn,
-    #         'SELECT "qID","question","answer","optionA","explanationA","optionB","explanationB","optionC",'
-    #         f'"explanationC","optionD","explanationD" FROM "question" WHERE "qID" = {input.qID()}',
-    #     ).iloc[0]
-    #     qID = int(q.iloc[0])
-    #     fields = [
-    #         "rqQuestion",
-    #         "rqCorrect",
-    #         "rqOA",
-    #         "rqOAexpl",
-    #         "rqOB",
-    #         "rqOBexpl",
-    #         "rqOC",
-    #         "rqOCexpl",
-    #         "rqOD",
-    #         "rqODexpl",
-    #     ]
-    #     now = shared.dt()
-
-    #     # Backup any changes
-    #     updates = []
-    #     for i, v in enumerate(fields):
-    #         if input[v].get() != q.iloc[i + 1]:
-    #             accorns_shared.backupQuery(
-    #                 cursor, sID, "question", qID, q.index[i + 1], None, now
-    #             )
-    #             updates.append(f"\"{q.index[i+1]}\" = '{input[v].get()}'")
-    #     # Update the question
-    #     if updates != []:
-    #         updates = ",".join(updates) + f", \"modified\" = '{now}'"
-    #         _ = shared.executeQuery(
-    #             cursor, f'UPDATE "question" SET {updates} WHERE "qID" = ?', (qID,)
-    #         )
-    #         conn.commit()
-    #         accorns_shared.modalMsg(
-    #             "Your edits were successfully saved", "Update complete"
-    #         )
-    #     else:
-    #         accorns_shared.modalMsg("No changes were detected")
-
-    #     conn.close()   
+    #     ui.update_radio_buttons("rqCorrect", selected=q["answer"])   
 
     @reactive.effect
     @reactive.event(input.qEdit)
     def _():
+        q = questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0]
         modal = ui.modal(
             div(
                     # Fields to edit any part of the question
                     ui.input_text_area(
-                        "rqQuestion", "Question", width="100%",
+                        "rqQuestion", "Question", value = q["question"], width="100%",
                     ),br(),                
-                    ui.input_text("rqOA", "Option A", width="100%",),
+                    ui.input_text("rqOA", "Option A", value = q["optionA"], width="100%",),
                     ui.input_text_area(
-                        "rqOAexpl", "Explanation A", width="100%",
-                    ),
-                    ui.input_text("rqOB", "Option B", width="100%",),
+                        "rqOAexpl", "Explanation A", value = q["explanationA"], width="100%",
+                    ),br(),
+                    ui.input_text("rqOB", "Option B", value = q["optionB"], width="100%",),
                     ui.input_text_area(
-                        "rqOBexpl", "Explanation B", width="100%",
-                    ),
-                    ui.input_text("rqOC", "Option C", width="100%",),
+                        "rqOBexpl", "Explanation B", value = q["explanationB"], width="100%",
+                    ),br(),
+                    ui.input_text("rqOC", "Option C", value = q["optionC"], width="100%",),
                     ui.input_text_area(
-                        "rqOCexpl", "Explanation C", width="100%",
-                    ),
-                    ui.input_text("rqOD", "Option D", width="100%",),
+                        "rqOCexpl", "Explanation C", value = q["explanationC"], width="100%",
+                    ),br(),
+                    ui.input_text("rqOD", "Option D", value = q["optionD"], width="100%",),
                     ui.input_text_area(
-                        "rqODexpl", "Explanation D", width="100%",
+                        "rqODexpl", "Explanation D", value = q["explanationD"], width="100%",
                     ),id="revise",),
                 ui.input_radio_buttons(
                     "rqCorrect",
                     "Correct answer",
                     choices=["A", "B", "C", "D"],
+                    selected=q["answer"],
                     inline=True,
                 ),
-                size = "xl"
+                title="Review the question and make any necessary changes",
+                size = "xl",
+                footer=[ui.input_action_button("qSaveChanges", "Save Changes"), ui.modal_button("Cancel")]
         )
         ui.modal_show(modal)
+    
+    # Save question edits
+    @reactive.effect
+    @reactive.event(input.qSaveChanges)
+    def _():
+        # Get the original question
+        q = questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0]
+    
+        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
+        cursor = conn.cursor()
+       
+        fields = {
+            "rqQuestion": "question",
+            "rqCorrect": "answer",
+            "rqOA": "optionA",
+            "rqOAexpl": "explanationA",
+            "rqOB": "optionB",
+            "rqOBexpl": "explanationB",
+            "rqOC": "optionC",
+            "rqOCexpl": "explanationC",
+            "rqOD": "optionD",
+            "rqODexpl": "explanationD",
+        }
+        now = shared.dt()
+
+        # Backup any changes
+        updates = []
+        values = ()
+        for element, column in fields.items():
+            if input[element].get().strip() != q[column]:
+                accorns_shared.backupQuery(
+                    cursor, sID, "question", q["qID"], column, dataType = "str",  isBot= False, timeStamp = now
+                )
+                updates.append(f'"{column}" = ?')
+                values += (input[element].get().strip(),)
+        # Update the question
+        if updates != []:
+            updates = ",".join(updates) + f", \"modified\" = '{now}'"
+            values += (int(q["qID"]),)
+            _ = shared.executeQuery(
+                cursor, f'UPDATE "question" SET {updates} WHERE "qID" = ?', values
+            )            
+            q = shared.pandasQuery(
+                conn,
+                f'SELECT * FROM "question" WHERE "tID" = {int(input.qtID())}',
+            )
+            conn.commit()
+            questions.set(q)
+            ui.notification_show("Your edits were successfully saved")
+        else:
+            ui.notification_show("No changes were detected. Nothing was saved")        
+
+        conn.close()  
+        ui.modal_remove() 
 
     return
 
