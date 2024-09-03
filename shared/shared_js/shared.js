@@ -46,3 +46,33 @@ Shiny.addCustomMessageHandler("hideShow", function(x) {
     }   
     
 });
+
+// Function to allow dragging of feedback button up and down
+document.addEventListener('DOMContentLoaded', function () {
+    var feedbackButton = document.getElementById('feedback-feedback');
+    var isDragging = false;
+    var offsetY;
+
+    feedbackButton.addEventListener('mousedown', function (e) {
+        isDragging = true;
+        offsetY = e.clientY - feedbackButton.getBoundingClientRect().top;
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+
+    function onMouseMove(e) {
+        if (isDragging) {
+            var top = e.clientY - offsetY;
+            var maxTop = window.innerHeight - feedbackButton.offsetHeight;
+            if (top < 0) top = 0;
+            if (top > maxTop) top = maxTop;
+            feedbackButton.style.top = top + 'px';
+        }
+    }
+
+    function onMouseUp() {
+        isDragging = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    }
+});

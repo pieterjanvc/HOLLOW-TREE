@@ -11,7 +11,7 @@ import asyncio
 import regex as re
 
 # -- Shiny
-from shiny import Inputs, Outputs, Session, module, reactive, ui, render, module
+from shiny import Inputs, Outputs, Session, module, reactive, ui, render, module, req
 from htmltools import HTML, div, br
 
 # -- Llamaindex
@@ -246,8 +246,7 @@ def quiz_generation_server(
     @render.ui
     def quizQuestionPreview():
 
-        if questions.get() is None:
-            return
+        req(input.qID())
         
         q = questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0]
 
@@ -265,7 +264,8 @@ def quiz_generation_server(
     @reactive.event(input.qGenerate)
     def _():
         shared.elementDisplay(session, {"qGenerate": "d", "qEditPanel": "h", "gID": "d", 
-                                        "qtID": "d", "qID": "d", "qEditPanel": "h"})
+                                        "qtID": "d", "qID": "d", "qEditPanel": "h",
+                                        "qShowArchived": "d"})
         shared.inputNotification(session, "qID", "Generating a question...", colour="blue")
 
         # Get the topic
@@ -363,7 +363,7 @@ def quiz_generation_server(
                 cursor,
                 'INSERT INTO "question"("sID","tID","cID","question","answer","status","created","modified",'
                 '"optionA","explanationA","optionB","explanationB","optionC","explanationC","optionD","explanationD")'
-                "VALUES(?,?,?,?,?,0,?,?,?,?,?,?,?,?,?,?)",
+                "VALUES(?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?)",
                 (
                     sID,
                     int(input.qtID()),
@@ -391,13 +391,15 @@ def quiz_generation_server(
             conn.close()
 
             questions.set(q)
+            qDisplayNames(q, input, qID)
 
             # Update the UI
-            ui.update_select(
-                "qID", choices=dict(zip(q["qID"], q["question"])), selected=qID
-            )
+            # ui.update_select(
+            #     "qID", choices=dict(zip(q["qID"], q["question"])), selected=qID
+            # )
             shared.elementDisplay(session, {"qGenerate": "e", "qEditPanel": "s", "gID": "e", 
-                                            "qtID": "e", "qID": "e", "qEditPanel": "s"})            
+                                            "qtID": "e", "qID": "e", "qEditPanel": "s",
+                                            "qShowArchived": "e"})            
 
             shared.inputNotification(session, "qID", show=False)
 
@@ -426,9 +428,9 @@ def quiz_generation_server(
         conn.close()          
 
         if q.shape[0] == 0:
-            shared.elementDisplay(session, {"qGenerate": "e", "qArchive": "h", "qEditPanel": "h"})
+            shared.elementDisplay(session, {"qGenerate": "e", "qEditPanel": "h"})
         else:
-            shared.elementDisplay(session, {"qGenerate": "e", "qArchive": "s", "qEditPanel": "s"})
+            shared.elementDisplay(session, {"qGenerate": "e", "qEditPanel": "s"})
 
         # Update the UI
         questions.set(q)
@@ -552,5 +554,53 @@ def quiz_generation_server(
         conn.close()  
         ui.modal_remove() 
 
-    return
+    
+    @reactive.effect
+    @reactive.event(input.qStatus)
+    def _():
 
+        req(input.qID())
+
+        if input.qStatus() == "1":
+            shared.elementDisplay(session, {"qEdit": "e"})
+            shared.inputNotification(session, "qStatus", "Please review the question and make edits where needed", colour="blue")
+        else:
+            shared.elementDisplay(session, {"qEdit": "d"})
+            shared.inputNotification(session, "qStatus", "Questions can only be edited in 'Draft' mode", colour="blue")
+        
+        # Only update the status if it's different
+        if questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0]["status"] == int(input.qStatus()):
+            return
+        
+        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
+        cursor = conn.cursor()
+        _ = shared.executeQuery(
+            cursor,
+            'UPDATE "question" SET "status" = ? WHERE "qID" = ?',
+            (int(input.qStatus()), int(input.qID())),
+        )
+
+        q = shared.pandasQuery(
+            conn,
+            f'SELECT * FROM "question" WHERE "tID" = {int(input.qtID())}',
+        )            
+        conn.commit()
+        conn.close()
+
+        questions.set(q)
+        qDisplayNames(q, input)
+    
+    @reactive.effect
+    @reactive.event(input.qShowArchived, ignore_init=True)
+    def _():
+        q = questions.get()
+        qDisplayNames(q, input)
+    
+    @reactive.effect
+    @reactive.event(input.qID)
+    def _():
+        
+        status = questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0]["status"]
+        ui.update_radio_buttons("qStatus", selected=str(status))
+
+    return
