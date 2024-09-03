@@ -93,27 +93,11 @@ def groups_ui():
 def groups_server(
     input: Inputs, output: Outputs, session: Session, sID, user, postgresUser
 ):
-    # Set reactive variables
-    conn = shared.appDBConn(postgresUser=postgresUser)
-    groups = reactive.value(
-        shared.pandasQuery(conn, 'SELECT * FROM "group" WHERE "gID" = NULL')
-    )
-    members = reactive.value(
-        shared.pandasQuery(
-            conn,
-            (
-                'SELECT m.*, u."username", u."fName", u."lName", u."email" '
-                'FROM "group" AS g, "user" AS u, "group_member" AS m '
-                'WHERE m."gID" = g."gID" AND m."uID" = u."uID" AND g."gID" = NULL'
-            ),
-        )
-    )
-    groupTopics = reactive.value(
-        shared.pandasQuery(conn, 'SELECT * FROM "group_topic"')
-    )
+    groups = reactive.value()
     groupCodes = reactive.value()
-    conn.close()
+    members = reactive.value()
 
+    # -- Join group module --
     newGroup = group_join_server(
         "joinGroup", user=user, groups=groups, postgresUser=postgresUser
     )
@@ -121,26 +105,27 @@ def groups_server(
     @reactive.effect
     @reactive.event(newGroup)
     def _():
-        if newGroup() is None:
-            return
-
         conn = shared.appDBConn(postgresUser=postgresUser)
         newGroups = groupQuery(conn, user.get())
         conn.close()
         groups.set(newGroups)
-        return
+    # ---
 
+    # When user changes
     @reactive.effect
     @reactive.event(user)
     def _():
+        # Set reactive variables
         conn = shared.appDBConn(postgresUser=postgresUser)
-        groups.set(groupQuery(conn, user.get()))
-        conn.close()
+        groups.set(
+            groupQuery(conn, user.get())
+        )
+        conn.close()    
 
-    # Update group list
+    # Update group list based on user
     @reactive.effect
-    @reactive.event(groups, ignore_init=True)
-    def _():
+    @reactive.event(groups)
+    def _():    
         ui.update_select(
             "gID",
             choices=dict(
@@ -148,19 +133,27 @@ def groups_server(
             ),
             selected=groups.get().shape[0] if groups.get().shape[0] > 0 else None,
         )
-        return
-
+    
+    # When group is selected
     @reactive.effect
+    @reactive.event(input.gID)
     def _():
-        if not input.gID():
-            return
-
         conn = shared.appDBConn(postgresUser=postgresUser)
+        members.set(
+            shared.pandasQuery(
+                conn,
+                (
+                    'SELECT m.*, u."username", u."fName", u."lName", u."email" '
+                    'FROM "group" AS g, "user" AS u, "group_member" AS m '
+                    'WHERE m."gID" = g."gID" AND m."uID" = u."uID" AND g."gID" = ?'
+                ),
+                params=(int(input.gID()),),
+            )
+        )
         groupCodes.set(
             shared.pandasQuery(conn, accessCodesQuery, params=(int(input.gID()),))
         )
         conn.close()
-        return
 
     # Members table
     @render.data_frame

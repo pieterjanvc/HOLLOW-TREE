@@ -24,6 +24,8 @@ questionStatus = {0: "Active", 1: "Draft", 2: "Archived"}
 
 def qDisplayNames(questions, input, selected = None):
 
+    req(not questions.empty)
+
     selected = selected if selected is not None else input.qID()
     showArchived = input.qShowArchived()    
     
@@ -162,7 +164,7 @@ def quiz_generation_ui():
             # Dropdown of topics and questions per topic
             ui.input_select("gID", "Group", choices={}),
             ui.input_select("qtID", "Pick a topic", choices=[], width="400px"),            
-            div(shared.customAttr(ui.input_select("qID", "Question", choices=[], width="400px"),
+            div(shared.customAttr(ui.input_select("qID", "Questions", choices=[], width="400px"),
                     {'style': 'display:inline-block'}),       
                     shared.customAttr(ui.input_checkbox("qShowArchived", "Show archived", value=False,),
                                         {'style': 'display:inline-block'},)),
@@ -218,7 +220,6 @@ def quiz_generation_server(
     @reactive.effect
     @reactive.event(input.gID, topicsx)
     def _():
-        # req(user.get()["uID"] != 1)
 
         # Get all active topics from the accorns database
         conn = shared.appDBConn(postgresUser=postgresUser)
@@ -239,7 +240,7 @@ def quiz_generation_server(
 
         if activeTopics.shape[0] == 0:
             shared.inputNotification(session, "qID", "This group has no active topics yet")
-            shared.elementDisplay(session, {"qGenerate": "d", "qEditPanel": "h"})
+            shared.elementDisplay(session, {"qGenerate": "d", "qEditPanel": "h", "qShowArchived": "d"})
 
         topics.set(activeTopics)
 
@@ -393,10 +394,6 @@ def quiz_generation_server(
             questions.set(q)
             qDisplayNames(q, input, qID)
 
-            # Update the UI
-            # ui.update_select(
-            #     "qID", choices=dict(zip(q["qID"], q["question"])), selected=qID
-            # )
             shared.elementDisplay(session, {"qGenerate": "e", "qEditPanel": "s", "gID": "e", 
                                             "qtID": "e", "qID": "e", "qEditPanel": "s",
                                             "qShowArchived": "e"})            
@@ -407,20 +404,7 @@ def quiz_generation_server(
     @reactive.event(input.qtID)
     def _():
         # Get the question info from the DB
-        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
-
-        ## No longer needed given active status is now a requirement to have concepts
-        # q = shared.pandasQuery(
-        #     conn,
-        #     f'SELECT "cID" FROM "concept" WHERE "tID" = {int(input.qtID())} AND "status" = 0',
-        # )
-
-        # if q.shape[0] == 0:
-        #     shared.elementDisplay(session, {"qGenerate": "d", "qEditPanel": "h"}) 
-        #     shared.inputNotification(session, "qID", "This topic has no concepts yet, please add some first in the Topics tab")
-           
-        #     return
-        
+        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)        
         q = shared.pandasQuery(
             conn,
             f'SELECT * FROM "question" WHERE "tID" = {int(input.qtID())} ',
@@ -428,38 +412,13 @@ def quiz_generation_server(
         conn.close()          
 
         if q.shape[0] == 0:
-            shared.elementDisplay(session, {"qGenerate": "e", "qEditPanel": "h"})
+            shared.elementDisplay(session, {"qEditPanel": "h", "qShowArchived": "d"})
         else:
-            shared.elementDisplay(session, {"qGenerate": "e", "qEditPanel": "s"})
+            shared.elementDisplay(session, {"qEditPanel": "s", "qShowArchived": "e"})
 
         # Update the UI
         questions.set(q)
-        qDisplayNames(q, input)
-        #ui.update_select("qID", choices=dict(zip(q["qID"], q["question"])))
-
-    # @reactive.effect
-    # @reactive.event(input.qID)
-    # def _():
-        
-    #     shared.elementDisplay(session, {"qGenerate": "e", "qArchive": "s"})
-        
-    #     # Get the question info from the DB
-    #     conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
-    #     q = shared.pandasQuery(
-    #         conn, f'SELECT * FROM "question" WHERE "qID" = {input.qID()}'
-    #     ).iloc[0]
-    #     conn.close()
-    #     # Update the UI
-    #     ui.update_text_area("rqQuestion", value=q["question"])
-    #     ui.update_text("rqOA", value=q["optionA"])
-    #     ui.update_text_area("rqOAexpl", value=q["explanationA"])
-    #     ui.update_text("rqOB", value=q["optionB"])
-    #     ui.update_text_area("rqOBexpl", value=q["explanationB"])
-    #     ui.update_text("rqOC", value=q["optionC"])
-    #     ui.update_text_area("rqOCexpl", value=q["explanationC"])
-    #     ui.update_text("rqOD", value=q["optionD"])
-    #     ui.update_text_area("rqODexpl", value=q["explanationD"])
-    #     ui.update_radio_buttons("rqCorrect", selected=q["answer"])   
+        qDisplayNames(q, input) 
 
     @reactive.effect
     @reactive.event(input.qEdit)
