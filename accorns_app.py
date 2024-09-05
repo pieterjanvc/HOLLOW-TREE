@@ -119,6 +119,30 @@ def server(input, output, session):
                 )
             )
         else:
+            # Server functions for the different tabs are found in their respective modules
+            groups = groups_server(
+                "groups", sID=sID, user=user, postgresUser=shared.postgresAccorns
+            )
+            topics, concepts = topics_server(
+                "topics",
+                sID=sID,
+                user=user,
+                groups=groups,
+                postgresUser=shared.postgresAccorns,
+            )
+            _ = user_management_server(
+                "userManagement", user=user, postgresUser=shared.postgresAccorns
+            )
+            files = vectorDB_management_server("vectorDB", user=user, pool=pool)
+            _ = quiz_generation_server(
+                "quizGeneration",
+                sID=sID,
+                user=user,
+                topicsx=topics,
+                groups=groups,
+                postgresUser=shared.postgresAccorns,
+                pool=pool,
+            )
             # Tabs to show after successful login
             return ui.TagList(
                 ui.navset_pill(
@@ -148,27 +172,6 @@ def server(input, output, session):
                     id="postLoginTabs",
                 )
             )
-
-    # Server functions for the different tabs are found in their respective modules
-    groups = groups_server(
-        "groups", sID=sID, user=user, postgresUser=shared.postgresAccorns
-    )
-    topics, concepts = topics_server(
-        "topics", sID=sID, user=user, groups=groups, postgresUser=shared.postgresAccorns
-    )
-    _ = user_management_server(
-        "userManagement", user=user, postgresUser=shared.postgresAccorns
-    )
-    files = vectorDB_management_server("vectorDB", user=user, pool=pool)
-    _ = quiz_generation_server(
-        "quizGeneration",
-        sID=sID,
-        user=user,
-        topicsx=topics,
-        groups=groups,
-        postgresUser=shared.postgresAccorns,
-        pool=pool,
-    )
 
     # Code to run at the END of the session (i.e. when user disconnects)
     _ = session.on_ended(lambda: theEnd())

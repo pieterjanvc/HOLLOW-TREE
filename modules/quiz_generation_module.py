@@ -11,8 +11,8 @@ import asyncio
 import regex as re
 
 # -- Shiny
-from shiny import Inputs, Outputs, Session, module, reactive, ui, render
-from htmltools import HTML, div
+from shiny import Inputs, Outputs, Session, module, reactive, ui, render, module, req
+from htmltools import HTML, div, br
 
 # -- Llamaindex
 from llama_index.core import ChatPromptTemplate
@@ -20,6 +20,52 @@ from llama_index.core.llms import ChatMessage, MessageRole
 
 
 # --- Functions ---
+questionStatus = {0: "Active", 1: "Draft", 2: "Archived"}
+
+
+def qDisplayNames(questions, input, selected=None):
+    req(not questions.empty)
+
+    selected = selected if selected is not None else input.qID()
+    showArchived = input.qShowArchived()
+
+    questionsList = questions.copy()
+
+    # Add the status to the question name
+    questionsList["question"] = questionsList.apply(
+        lambda x: f"({questionStatus[x['status']]}) {x['question']}"
+        if x["status"] != 0
+        else x["question"],
+        axis=1,
+    )
+
+    # Filter out archived question if needed
+    if not showArchived:
+        questionsList = questionsList[questionsList["status"] != 2]
+
+    # Hide or show the edit and status buttons if there are no question to show
+    if questionsList.shape[0] == 0:
+        selected = None
+
+    else:
+        questionsList = questionsList.sort_values(["status", "question"])
+        if selected:
+            selected = str(
+                questionsList["qID"].iloc[0]
+                if int(selected) not in list(questionsList["qID"])
+                else selected
+            )
+
+    # Update the select input with the new question
+    ui.update_select(
+        "qID",
+        choices=dict(zip(questionsList["qID"], questionsList["question"])),
+        selected=selected,
+    )
+
+    return
+
+
 # LLM engine for generation
 def quizEngine():
     qa_prompt_str = (
@@ -99,64 +145,64 @@ The output should be a python dictionary according to the template below. Make s
 @module.ui
 def quiz_generation_ui():
     return [
+        ui.head_content(
+            ui.tags.style("""
+            #revise * {                
+                display:flex;
+                vertical-align: middle;  
+                padding: 0;
+                margin: 1px;
+                font-family: inherit;
+                font-size: inherit;
+                resize: none;
+                field-sizing: content;
+                    }
+            #revise .shiny-bound-input {
+                border:none;
+                min-height: 1.7em;
+                background: #f2f0f0;
+                      }
+            #revise .control-label {
+                white-space:nowrap;
+                font-weight: bold;
+            }
+        """)
+        ),
         ui.card(
             ui.card_header("Questions by Topic"),
             # Dropdown of topics and questions per topic
             ui.input_select("gID", "Group", choices={}),
             ui.input_select("qtID", "Pick a topic", choices=[], width="400px"),
-            ui.input_select("qID", "Question", choices=[], width="400px"),
+            div(
+                shared.customAttr(
+                    ui.input_select("qID", "Questions", choices=[], width="400px"),
+                    {"style": "display:inline-block"},
+                ),
+                shared.customAttr(
+                    ui.input_checkbox(
+                        "qShowArchived",
+                        "Show archived",
+                        value=False,
+                    ),
+                    {"style": "display:inline-block"},
+                ),
+            ),
             # Buttons to add or archive questions and message when busy generating
-            div(
-                ui.input_action_button("qGenerate", "Generate new", width="180px"),
-                ui.input_action_button("qArchive", "Archive selected", width="180px"),
-                id="qBtnSet",
-                style="display:inline",
-            ),
-            div(
-                HTML("<i>Generating a new question...</i>"),
-                id="qBusyMsg",
-                style="display: none;",
-            ),
+            ui.input_action_button("qGenerate", "Generate new", width="180px"),
         ),
         # Only show this panel if there is at least one question
         ui.panel_conditional(
             "input.qID",
             ui.card(
                 ui.card_header("Review question"),
+                # Save updates
+                ui.input_radio_buttons(
+                    "qStatus", "Status", choices=questionStatus, inline=True
+                ),
+                ui.input_action_button("qEdit", "Edit question", width="180px"),
                 # Show a preview of the question
                 ui.output_ui("quizQuestionPreview", style=""),
-                # Save updates
-                div(
-                    ui.input_action_button("qSaveChanges", "Save Changes"),
-                    ui.input_action_button("qDiscardChanges", "Discard Changes"),
-                ),
-                # Fields to edit any part of the question
-                ui.input_text_area(
-                    "rqQuestion", "Question", width="100%", autoresize=True
-                ),
-                ui.input_radio_buttons(
-                    "rqCorrect",
-                    "Correct answer",
-                    choices=["A", "B", "C", "D"],
-                    inline=True,
-                ),
-                ui.input_text("rqOA", "Option A", width="100%"),
-                ui.input_text_area(
-                    "rqOAexpl", "Explanation A", width="100%", autoresize=True
-                ),
-                ui.input_text("rqOB", "Option B", width="100%"),
-                ui.input_text_area(
-                    "rqOBexpl", "Explanation B", width="100%", autoresize=True
-                ),
-                ui.input_text("rqOC", "Option C", width="100%"),
-                ui.input_text_area(
-                    "rqOCexpl", "Explanation C", width="100%", autoresize=True
-                ),
-                ui.input_text("rqOD", "Option D", width="100%"),
-                ui.input_text_area(
-                    "rqODexpl", "Explanation D", width="100%", autoresize=True
-                ),
-                id="qEditPanel",
+                id=module.resolve_id("qEditPanel"),
             ),
         ),
     ]
@@ -176,6 +222,7 @@ def quiz_generation_server(
     pool,
 ):
     topics = reactive.value(None)
+    questions = reactive.value(None)
 
     @reactive.effect
     @reactive.event(groups)
@@ -187,18 +234,24 @@ def quiz_generation_server(
             ),
         )
 
+        if groups.get().shape[0] == 0:
+            shared.inputNotification(
+                session,
+                "qID",
+                "Create a group and a topic before generating a question",
+            )
+            shared.elementDisplay(session, {"qGenerate": "d", "qEditPanel": "h"})
+
     @reactive.effect
     @reactive.event(input.gID, topicsx)
     def _():
-        # req(user.get()["uID"] != 1)
-
         # Get all active topics from the accorns database
         conn = shared.appDBConn(postgresUser=postgresUser)
         activeTopics = shared.pandasQuery(
             conn,
             (
                 'SELECT t.* FROM "topic" AS t, "group_topic" AS gt '
-                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '
+                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."status" = 0 '
                 'ORDER BY t."topic"'
             ),
             (int(input.gID()),),
@@ -209,14 +262,32 @@ def quiz_generation_server(
             "qtID", choices=dict(zip(activeTopics["tID"], activeTopics["topic"]))
         )
 
+        if activeTopics.shape[0] == 0:
+            shared.inputNotification(
+                session, "qID", "This group has no active topics yet"
+            )
+            shared.elementDisplay(
+                session, {"qGenerate": "d", "qEditPanel": "h", "qShowArchived": "d"}
+            )
+        else:
+            shared.inputNotification(session, "qID", show=False)
+            shared.elementDisplay(session, {"qGenerate": "e"})
+
         topics.set(activeTopics)
 
     @render.ui
     def quizQuestionPreview():
+        req(input.qID())
+
+        q = questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0]
+
         return HTML(
-            f"<b>{input.rqQuestion()}</b><ol type='A'><li>{input.rqOA()}</li>"
-            f"<li>{input.rqOB()}</li><li>{input.rqOC()}</li>"
-            f"<li>{input.rqOD()}</li></ol><i>Correct answer: {input.rqCorrect()}</i><hr>"
+            f"<b>{q['question']}</b><ol type='A'><li>{q['optionA']}</li>"
+            f"<li>{q['optionB']}</li><li>{q['optionC']}</li>"
+            f"<li>{q['optionD']}</li></ol><i>Correct answer: {q['answer']}</i>"
+            "<i><b>Explanations:</b><ol type='A'><li>"
+            f"{q['explanationA']}</li><li>{q['explanationB']}</li>"
+            f"<li>{q['explanationC']}</li><li>{q['explanationD']}</li></ol></i>"
         )
 
     # When the generate button is clicked...
@@ -224,14 +295,20 @@ def quiz_generation_server(
     @reactive.event(input.qGenerate)
     def _():
         shared.elementDisplay(
-            "qBusyMsg", "s", session, alertNotFound=False, ignoreNS=True
+            session,
+            {
+                "qGenerate": "d",
+                "qEditPanel": "h",
+                "gID": "d",
+                "qtID": "d",
+                "qID": "d",
+                "qEditPanel": "h",
+                "qShowArchived": "d",
+            },
         )
-        shared.elementDisplay(
-            "qBtnSet", "h", session, alertNotFound=False, ignoreNS=True
+        shared.inputNotification(
+            session, "qID", "Generating a question...", colour="blue"
         )
-        shared.elementDisplay("qtID", "d", session, alertNotFound=False)
-        shared.elementDisplay("qID", "d", session, alertNotFound=False)
-        shared.elementDisplay("qEditPanel", "h", session, alertNotFound=False)
 
         # Get the topic
         topic = topics.get()[topics.get()["tID"] == int(input.qtID())].iloc[0]["topic"]
@@ -242,25 +319,9 @@ def quiz_generation_server(
         conceptList = shared.pandasQuery(
             conn,
             'SELECT "cID", max("concept") as "concept", count(*) as n FROM '
-            f'(SELECT "cID", "concept" FROM "concept" WHERE "tID" = {int(input.qtID())} AND "archived" = 0 '
+            f'(SELECT "cID", "concept" FROM "concept" WHERE "tID" = {int(input.qtID())} AND "status" = 0 '
             f'UNION ALL SELECT "cID", \'\' as concept FROM "question" where "tID" = {int(input.qtID())}) GROUP BY "cID"',
         )
-        # If there are no concepts, show a notification and return
-        if conceptList.shape[0] == 0:
-            ui.notification_show(
-                "This topic has no concepts yet, please add some first in the Topics tab"
-            )
-            shared.elementDisplay(
-                "qBusyMsg", "h", session, alertNotFound=False, ignoreNS=True
-            )
-            shared.elementDisplay(
-                "qBtnSet", "s", session, alertNotFound=False, ignoreNS=True
-            )
-            shared.elementDisplay("qtID", "e", session, alertNotFound=False)
-            shared.elementDisplay("qID", "e", session, alertNotFound=False)
-            shared.elementDisplay("qEditPanel", "s", session, alertNotFound=False)
-
-            return
 
         cID = int(
             conceptList[conceptList["n"] == min(conceptList["n"])]
@@ -269,7 +330,7 @@ def quiz_generation_server(
         )
         prevQuestions = shared.pandasQuery(
             conn,
-            f'SELECT "question" FROM "question" WHERE "cID" = {cID} AND "archived" = 0',
+            f'SELECT "question" FROM "question" WHERE "cID" = {cID} AND "status" = 0',
         )
         conn.close()
 
@@ -326,15 +387,6 @@ def quiz_generation_server(
     def _():
         # Populate the respective UI outputs with the questions details
         resp = botResponse.result()
-        shared.elementDisplay(
-            "qBusyMsg", "h", session, alertNotFound=False, ignoreNS=True
-        )
-        shared.elementDisplay(
-            "qBtnSet", "s", session, alertNotFound=False, ignoreNS=True
-        )
-        shared.elementDisplay("qtID", "e", session, alertNotFound=False)
-        shared.elementDisplay("qID", "e", session, alertNotFound=False)
-        shared.elementDisplay("qEditPanel", "s", session, alertNotFound=False)
 
         if resp["resp"] is None:
             accorns_shared.modalMsg(
@@ -351,9 +403,9 @@ def quiz_generation_server(
             # Insert question
             qID = shared.executeQuery(
                 cursor,
-                'INSERT INTO "question"("sID","tID","cID","question","answer","archived","created","modified",'
+                'INSERT INTO "question"("sID","tID","cID","question","answer","status","created","modified",'
                 '"optionA","explanationA","optionB","explanationB","optionC","explanationC","optionD","explanationD")'
-                "VALUES(?,?,?,?,?,0,?,?,?,?,?,?,?,?,?,?)",
+                "VALUES(?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?)",
                 (
                     sID,
                     int(input.qtID()),
@@ -375,15 +427,28 @@ def quiz_generation_server(
             )
             q = shared.pandasQuery(
                 conn,
-                f'SELECT "qID", "question" FROM "question" WHERE "tID" = {int(input.qtID())} AND "archived" = 0',
+                f'SELECT * FROM "question" WHERE "tID" = {int(input.qtID())}',
             )
             conn.commit()
             conn.close()
-            # Update the UI
-            ui.update_select(
-                "qID", choices=dict(zip(q["qID"], q["question"])), selected=qID
+
+            questions.set(q)
+            qDisplayNames(q, input, qID)
+
+            shared.elementDisplay(
+                session,
+                {
+                    "qGenerate": "e",
+                    "qEditPanel": "s",
+                    "gID": "e",
+                    "qtID": "e",
+                    "qID": "e",
+                    "qEditPanel": "s",
+                    "qShowArchived": "e",
+                },
             )
-            shared.elementDisplay("qID", "s", session)
+
+            shared.inputNotification(session, "qID", show=False)
 
     @reactive.effect
     @reactive.event(input.qtID)
@@ -392,89 +457,221 @@ def quiz_generation_server(
         conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
         q = shared.pandasQuery(
             conn,
-            f'SELECT "qID", "question" FROM "question" WHERE "tID" = {int(input.qtID())} AND "archived" = 0',
+            f'SELECT * FROM "question" WHERE "tID" = {int(input.qtID())} ',
         )
         conn.close()
 
         if q.shape[0] == 0:
-            shared.elementDisplay("qID", "h", session)
-            shared.elementDisplay("qArchive", "h", session)
+            shared.elementDisplay(session, {"qEditPanel": "h", "qShowArchived": "d"})
         else:
-            shared.elementDisplay("qID", "s", session)
-            shared.elementDisplay("qArchive", "s", session)
+            shared.elementDisplay(session, {"qEditPanel": "s", "qShowArchived": "e"})
 
         # Update the UI
-        ui.update_select("qID", choices=dict(zip(q["qID"], q["question"])))
+        questions.set(q)
+        qDisplayNames(q, input)
 
     @reactive.effect
-    @reactive.event(input.qID, input.qDiscardChanges)
+    @reactive.event(input.qEdit)
     def _():
-        # Get the question info from the DB
-        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
-        q = shared.pandasQuery(
-            conn, f'SELECT * FROM "question" WHERE "qID" = {input.qID()}'
-        ).iloc[0]
-        conn.close()
-        # Update the UI
-        ui.update_text_area("rqQuestion", value=q["question"])
-        ui.update_text("rqOA", value=q["optionA"])
-        ui.update_text_area("rqOAexpl", value=q["explanationA"])
-        ui.update_text("rqOB", value=q["optionB"])
-        ui.update_text_area("rqOBexpl", value=q["explanationB"])
-        ui.update_text("rqOC", value=q["optionC"])
-        ui.update_text_area("rqOCexpl", value=q["explanationC"])
-        ui.update_text("rqOD", value=q["optionD"])
-        ui.update_text_area("rqODexpl", value=q["explanationD"])
-        ui.update_radio_buttons("rqCorrect", selected=q["answer"])
+        q = questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0]
+        modal = ui.modal(
+            div(
+                # Fields to edit any part of the question
+                ui.input_text_area(
+                    "rqQuestion",
+                    "Question",
+                    value=q["question"],
+                    width="100%",
+                ),
+                br(),
+                ui.input_text_area(
+                    "rqOA",
+                    "Option A",
+                    value=q["optionA"],
+                    width="100%",
+                ),
+                ui.input_text_area(
+                    "rqOAexpl",
+                    "Explanation A",
+                    value=q["explanationA"],
+                    width="100%",
+                ),
+                br(),
+                ui.input_text_area(
+                    "rqOB",
+                    "Option B",
+                    value=q["optionB"],
+                    width="100%",
+                ),
+                ui.input_text_area(
+                    "rqOBexpl",
+                    "Explanation B",
+                    value=q["explanationB"],
+                    width="100%",
+                ),
+                br(),
+                ui.input_text_area(
+                    "rqOC",
+                    "Option C",
+                    value=q["optionC"],
+                    width="100%",
+                ),
+                ui.input_text_area(
+                    "rqOCexpl",
+                    "Explanation C",
+                    value=q["explanationC"],
+                    width="100%",
+                ),
+                br(),
+                ui.input_text_area(
+                    "rqOD",
+                    "Option D",
+                    value=q["optionD"],
+                    width="100%",
+                ),
+                ui.input_text_area(
+                    "rqODexpl",
+                    "Explanation D",
+                    value=q["explanationD"],
+                    width="100%",
+                ),
+                id="revise",
+            ),
+            ui.input_radio_buttons(
+                "rqCorrect",
+                "Correct answer",
+                choices=["A", "B", "C", "D"],
+                selected=q["answer"],
+                inline=True,
+            ),
+            title="Review the question and make any necessary changes",
+            size="xl",
+            footer=[
+                ui.input_action_button("qSaveChanges", "Save Changes"),
+                ui.modal_button("Cancel"),
+            ],
+        )
+        ui.modal_show(modal)
 
     # Save question edits
     @reactive.effect
     @reactive.event(input.qSaveChanges)
     def _():
         # Get the original question
+        q = questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0]
+
         conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
         cursor = conn.cursor()
-        q = shared.pandasQuery(
-            conn,
-            'SELECT "qID","question","answer","optionA","explanationA","optionB","explanationB","optionC",'
-            f'"explanationC","optionD","explanationD" FROM "question" WHERE "qID" = {input.qID()}',
-        ).iloc[0]
-        qID = int(q.iloc[0])
-        fields = [
-            "rqQuestion",
-            "rqCorrect",
-            "rqOA",
-            "rqOAexpl",
-            "rqOB",
-            "rqOBexpl",
-            "rqOC",
-            "rqOCexpl",
-            "rqOD",
-            "rqODexpl",
-        ]
+
+        fields = {
+            "rqQuestion": "question",
+            "rqCorrect": "answer",
+            "rqOA": "optionA",
+            "rqOAexpl": "explanationA",
+            "rqOB": "optionB",
+            "rqOBexpl": "explanationB",
+            "rqOC": "optionC",
+            "rqOCexpl": "explanationC",
+            "rqOD": "optionD",
+            "rqODexpl": "explanationD",
+        }
         now = shared.dt()
 
         # Backup any changes
         updates = []
-        for i, v in enumerate(fields):
-            if input[v].get() != q.iloc[i + 1]:
+        values = ()
+        for element, column in fields.items():
+            if input[element].get().strip() != q[column]:
                 accorns_shared.backupQuery(
-                    cursor, sID, "question", qID, q.index[i + 1], None, now
+                    cursor,
+                    sID,
+                    "question",
+                    q["qID"],
+                    column,
+                    dataType="str",
+                    isBot=False,
+                    timeStamp=now,
                 )
-                updates.append(f"\"{q.index[i+1]}\" = '{input[v].get()}'")
+                updates.append(f'"{column}" = ?')
+                values += (input[element].get().strip(),)
         # Update the question
         if updates != []:
             updates = ",".join(updates) + f", \"modified\" = '{now}'"
+            values += (int(q["qID"]),)
             _ = shared.executeQuery(
-                cursor, f'UPDATE "question" SET {updates} WHERE "qID" = ?', (qID,)
+                cursor, f'UPDATE "question" SET {updates} WHERE "qID" = ?', values
+            )
+            q = shared.pandasQuery(
+                conn,
+                f'SELECT * FROM "question" WHERE "tID" = {int(input.qtID())}',
             )
             conn.commit()
-            accorns_shared.modalMsg(
-                "Your edits were successfully saved", "Update complete"
-            )
+            questions.set(q)
+            ui.notification_show("Your edits were successfully saved")
         else:
-            accorns_shared.modalMsg("No changes were detected")
+            ui.notification_show("No changes were detected. Nothing was saved")
 
         conn.close()
+        ui.modal_remove()
+
+    @reactive.effect
+    @reactive.event(input.qStatus)
+    def _():
+        if input.qStatus() == "1":
+            shared.elementDisplay(session, {"qEdit": "e"})
+            shared.inputNotification(
+                session,
+                "qStatus",
+                "Please review the question and make edits where needed",
+                colour="blue",
+            )
+        else:
+            shared.elementDisplay(session, {"qEdit": "d"})
+            shared.inputNotification(
+                session,
+                "qStatus",
+                "Questions can only be edited in 'Draft' mode",
+                colour="blue",
+            )
+
+        req(input.qID())
+
+        # Only update the status if it's different
+        if questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0][
+            "status"
+        ] == int(input.qStatus()):
+            return
+
+        conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
+        cursor = conn.cursor()
+        _ = shared.executeQuery(
+            cursor,
+            'UPDATE "question" SET "status" = ? WHERE "qID" = ?',
+            (int(input.qStatus()), int(input.qID())),
+        )
+
+        q = shared.pandasQuery(
+            conn,
+            f'SELECT * FROM "question" WHERE "tID" = {int(input.qtID())}',
+        )
+        conn.commit()
+        conn.close()
+
+        questions.set(q)
+        qDisplayNames(q, input)
+
+    @reactive.effect
+    @reactive.event(input.qShowArchived, ignore_init=True)
+    def _():
+        q = questions.get()
+        qDisplayNames(q, input)
+
+    @reactive.effect
+    @reactive.event(input.qID)
+    def _():
+        status = questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0][
+            "status"
+        ]
+        ui.update_radio_buttons("qStatus", selected=str(status))
 
     return

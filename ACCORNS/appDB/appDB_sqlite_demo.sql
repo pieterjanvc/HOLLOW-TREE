@@ -2,8 +2,8 @@
 INSERT INTO "group" ("group", "created", "modified")
 VALUES('Demo', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
-INSERT INTO "topic" ("topic", "created", "modified")
-VALUES('The central dogma of molecular biology', 
+INSERT INTO "topic" ("topic", "status", "created", "modified")
+VALUES('The central dogma of molecular biology', 0,
   CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO "concept" ("tID", "order", "concept", "created", "modified")

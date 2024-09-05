@@ -98,7 +98,7 @@ def groupQuery(user, postgresUser, demo=shared.addDemo):
             'SELECT g."gID", g."group" '
             'FROM "group_member" AS m, "group_topic" AS t, "group" AS g '
             f'WHERE m."gID" = g."gID" AND t."gID" = g."gID" {userFilter}'
-            'AND t."tID" IN (SELECT DISTINCT "tID" FROM "concept" WHERE "archived" = 0) '
+            'AND t."tID" IN (SELECT DISTINCT "tID" FROM "concept" WHERE "status" = 0) '
             f'{includeDemo} ORDER BY "group"'
         ),
         params,
@@ -334,20 +334,20 @@ def chat_ui():
             ui.card(
                 ui.card_header("Pick a topic"),
                 div(
-                    div(
+                    shared.customAttr(
                         ui.input_select("gID", "Group", choices={}),
-                        **{"class": "makeInline"},
+                        {"style": "display:inline-block"},
                     ),
                     group_join_ui("joinGroup"),
                 ),
                 ui.panel_conditional(
                     "input.gID",
                     div(
-                        div(
+                        shared.customAttr(
                             ui.input_select(
                                 "selTopic", "Topic", choices=[], width="auto"
                             ),
-                            **{"class": "makeInline"},
+                            {"style": "display:inline-block"},
                         ),
                         ui.input_action_button(
                             "startConversation",
@@ -476,7 +476,7 @@ def chat_server(
             conn,
             (
                 'SELECT t.* FROM "topic" AS t, "group_topic" AS gt '
-                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."archived" = 0 '
+                'WHERE t."tID" = gt."tID" AND gt."gID" = ? AND t."status" = 0 '
                 'ORDER BY t."topic"'
             ),
             (int(input.gID()),),
@@ -492,9 +492,7 @@ def chat_server(
             ui.update_select(
                 "selTopic", choices=dict(zip(topics()["tID"], topics()["topic"]))
             )
-            shared.elementDisplay("startConversation", "s", session, False)
-            shared.elementDisplay("chatIn", "s", session, False)
-
+            shared.elementDisplay(session, {"startConversation": "s", "chatIn": "s"})
         return
 
     # When the start conversation button is clicked...
@@ -546,7 +544,7 @@ def chat_server(
         )
         botLog.set(f"---- PREVIOUS CONVERSATION ----\n--- MENTOR:\n{firstWelcome}")
 
-        shared.elementDisplay("chatIn", "s", session)
+        shared.elementDisplay(session, {"chatIn": "s"})
         return tID
 
     # Get the concepts related to the topic
@@ -555,7 +553,7 @@ def chat_server(
         conn = shared.appDBConn(postgresUser)
         concepts = shared.pandasQuery(
             conn,
-            f'SELECT * FROM "concept" WHERE "tID" = {int(input.selTopic())} AND "archived" = 0 ORDER BY "order"',
+            f'SELECT * FROM "concept" WHERE "tID" = {int(input.selTopic())} AND "status" = 0 ORDER BY "order"',
         )
         conn.close()
         return concepts
@@ -570,8 +568,7 @@ def chat_server(
             return
 
         # Prevent new chat whilst LLM is working and show waiting message
-        shared.elementDisplay("waitResp", "s", session)
-        shared.elementDisplay("chatIn", "h", session)
+        shared.elementDisplay(session, {"waitResp": "s", "chatIn": "h"})
 
         # Add the user message
         msg = messages.get()
@@ -651,8 +648,7 @@ def chat_server(
             ui.notification_show(
                 "SCUIRREL is having issues processing your response. Please try again later."
             )
-            shared.elementDisplay("waitResp", "h", session)
-            shared.elementDisplay("chatIn", "s", session)
+            shared.elementDisplay(session, {"waitResp": "h", "chatIn": "s"})
             return
 
         with reactive.isolate():
@@ -680,11 +676,11 @@ def chat_server(
             botLog.set(botLog.get() + "\n--- MENTOR:\n" + resp)
 
             # Now the LLM has finished the user can send a new response
-            shared.elementDisplay("waitResp", "h", session)
+            shared.elementDisplay(session, {"waitResp": "h"})
             ui.update_text_area("newChat", value="")
             # If conversation is over don't show new message box
             if not finished:
-                shared.elementDisplay("chatIn", "s", session)
+                shared.elementDisplay(session, {"chatIn": "s"})
                 scrollElement(".chatWindow .card-body")
             else:
                 ui.insert_ui(HTML("<hr>"), "#" + module.resolve_id("conversation"))
