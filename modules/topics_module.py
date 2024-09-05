@@ -28,13 +28,7 @@ def tDisplayNames(topics, input, session, selected = None):
     selected = selected if selected is not None else input.tID()
     showArchived = input.tShowArchived()    
     
-    topicsList = topics.copy()
-
-    # Add the status to the topic name
-    topicsList["topic"] = topicsList.apply(
-        lambda x: f"({topicStatus[x['status']]}) {x['topic']}" if x["status"] != 0 else x["topic"],
-        axis=1,
-    )
+    topicsList = topics.copy()    
 
     # Filter out archived topics if needed
     if not showArchived:
@@ -45,6 +39,11 @@ def tDisplayNames(topics, input, session, selected = None):
         selected = None
         # shared.elementDisplay(session, {"tEdit": "d", "tStatus": "h"})
     else:
+        # Add the status to the topic name
+        topicsList["topic"] = topicsList.apply(
+            lambda x: f"({topicStatus[x['status']]}) {x['topic']}" if x["status"] != 0 else x["topic"],
+            axis=1,
+        )
         topicsList = topicsList.sort_values(["status", "topic"])
         if selected:
             selected = str(topicsList["tID"].iloc[0] if int(selected) not in list(topicsList["tID"]) else selected)

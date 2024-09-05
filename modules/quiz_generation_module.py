@@ -241,6 +241,9 @@ def quiz_generation_server(
         if activeTopics.shape[0] == 0:
             shared.inputNotification(session, "qID", "This group has no active topics yet")
             shared.elementDisplay(session, {"qGenerate": "d", "qEditPanel": "h", "qShowArchived": "d"})
+        else:
+            shared.inputNotification(session, "qID", show=False)
+            shared.elementDisplay(session, {"qGenerate": "e"})
 
         topics.set(activeTopics)
 
@@ -430,19 +433,19 @@ def quiz_generation_server(
                     ui.input_text_area(
                         "rqQuestion", "Question", value = q["question"], width="100%",
                     ),br(),                
-                    ui.input_text("rqOA", "Option A", value = q["optionA"], width="100%",),
+                    ui.input_text_area("rqOA", "Option A", value = q["optionA"], width="100%",),
                     ui.input_text_area(
                         "rqOAexpl", "Explanation A", value = q["explanationA"], width="100%",
                     ),br(),
-                    ui.input_text("rqOB", "Option B", value = q["optionB"], width="100%",),
+                    ui.input_text_area("rqOB", "Option B", value = q["optionB"], width="100%",),
                     ui.input_text_area(
                         "rqOBexpl", "Explanation B", value = q["explanationB"], width="100%",
                     ),br(),
-                    ui.input_text("rqOC", "Option C", value = q["optionC"], width="100%",),
+                    ui.input_text_area("rqOC", "Option C", value = q["optionC"], width="100%",),
                     ui.input_text_area(
                         "rqOCexpl", "Explanation C", value = q["explanationC"], width="100%",
                     ),br(),
-                    ui.input_text("rqOD", "Option D", value = q["optionD"], width="100%",),
+                    ui.input_text_area("rqOD", "Option D", value = q["optionD"], width="100%",),
                     ui.input_text_area(
                         "rqODexpl", "Explanation D", value = q["explanationD"], width="100%",
                     ),id="revise",),
@@ -518,7 +521,7 @@ def quiz_generation_server(
     @reactive.event(input.qStatus)
     def _():
 
-        req(input.qID())
+        
 
         if input.qStatus() == "1":
             shared.elementDisplay(session, {"qEdit": "e"})
@@ -527,6 +530,8 @@ def quiz_generation_server(
             shared.elementDisplay(session, {"qEdit": "d"})
             shared.inputNotification(session, "qStatus", "Questions can only be edited in 'Draft' mode", colour="blue")
         
+        req(input.qID())
+
         # Only update the status if it's different
         if questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0]["status"] == int(input.qStatus()):
             return

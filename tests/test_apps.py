@@ -175,6 +175,16 @@ def test_accorns(cmdopt, page, browser, accornsApp):
             timeout=10000
         )
 
+        # Archive the demo topic
+        controller.InputRadioButtons(page, "topics-tStatus").set("2", timeout=10000)
+        controller.InputSelect(page, "topics-tID").expect_choices([], timeout=10000)
+        controller.InputCheckbox(page, "topics-tShowArchived").set(True, timeout=1000)
+        controller.InputSelect(page, "topics-tID").expect_choices(["1"], timeout=10000)
+        assert page.locator('option:has-text("(Archived) The central dogma of molecular biology")')
+
+        q = dbQuery(conn, 'SELECT "status" FROM "topic" WHERE "tID" = 1')
+        assert q["status"].iloc[0] == 2
+
         # Select the new group by name
         controller.InputSelect(page, "topics-gID").set("testGroup", timeout=10000)
 
@@ -198,11 +208,19 @@ def test_accorns(cmdopt, page, browser, accornsApp):
         controller.InputActionButton(page, "topics-etEdit").click(timeout=10000)
         controller.InputSelect(page, "topics-tID").expect_selected("2", timeout=10000)
 
+        assert page.locator('option:has-text("(Draft) Mendelian Inheritance")')
+        
+        try:
+            controller.InputRadioButtons(page, "topics-tStatus").set("0", timeout=10000)
+        except:
+            page.get_by_text("No concepts available for this topic. Please add some before activating the topic").wait_for(timeout=10000)
+        
         # Check DB
         q = dbQuery(conn, 'SELECT * FROM "topic"')
         assert q.shape[0] == 2
         assert q["topic"].iloc[1] == "Mendelian Inheritance"
         assert q["description"].iloc[1] == "Basics about genetic inheritance"
+        assert q["status"].iloc[1] == 1
         assert not q.iloc[1].isna().any()
 
         # Add a new concept
@@ -227,6 +245,9 @@ def test_accorns(cmdopt, page, browser, accornsApp):
             "Gregor Mendel was a nineteenth-century monk", row=0, col=0
         )
 
+        controller.InputRadioButtons(page, "topics-tStatus").set("0", timeout=1000)
+        page.get_by_text("The topic Title or Concepts can only be edited when the topic is in 'Draft' status")
+
         # Check DB
         q = dbQuery(conn, 'SELECT * FROM "concept" WHERE "sID" IS NOT NULL')
         assert q.shape[0] == 1
@@ -248,13 +269,9 @@ def test_accorns(cmdopt, page, browser, accornsApp):
             controller.InputActionButton(page, "quizGeneration-qGenerate").click(
                 timeout=10000
             )
-            page.get_by_text(re.compile("Correct answer:"), exact=False).wait_for(
+            page.get_by_text("Please review the question and make edits where needed").wait_for(
                 timeout=20000
-            )
-            q = dbQuery(conn, 'SELECT "optionA" FROM "question"')
-            controller.InputText(page, "quizGeneration-rqOA").expect_value(
-                q["optionA"].iloc[0]
-            )
+            )            
         else:
             dbQuery(
                 conn,
@@ -275,6 +292,27 @@ def test_accorns(cmdopt, page, browser, accornsApp):
                 ),
                 insert=True,
             )
+
+        # Edit the quiz question
+        controller.InputActionButton(page, "quizGeneration-qEdit").click(timeout=10000)
+        q = dbQuery(conn, 'SELECT * FROM "question"')
+        controller.InputTextArea(page, "quizGeneration-rqOA").expect_value(
+            q["optionA"].iloc[0]
+        )    
+        controller.InputActionButton(page, "quizGeneration-qSaveChanges").click(timeout=10000)
+        page.get_by_text("No changes were detected. Nothing was saved").wait_for(timeout=10000)
+
+        controller.InputActionButton(page, "quizGeneration-qEdit").click(timeout=10000)        
+        controller.InputTextArea(page, "quizGeneration-rqQuestion").set(
+            "Tell me this: " + q["question"].iloc[0], timeout=10000
+        )
+        controller.InputActionButton(page, "quizGeneration-qSaveChanges").click(timeout=10000)
+        page.get_by_text("Your edits were successfully saved").wait_for(timeout=10000)
+        controller.InputRadioButtons(page, "quizGeneration-qStatus").set("0", timeout=10000)
+        page.get_by_text("Questions can only be edited in 'Draft' mode")
+
+        q = dbQuery(conn, 'SELECT * FROM "question"')
+        assert re.search("Tell me this:", q["question"].iloc[0])        
 
         # End the session and start new one
         page.reload()

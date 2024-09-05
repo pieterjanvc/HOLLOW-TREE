@@ -33,15 +33,16 @@ def quiz_server(input: Inputs, output: Outputs, session: Session, tID, sID, user
         conn = shared.appDBConn(postgresScuirrel)
         q = shared.pandasQuery(
             conn,
-            f'SELECT "qID" FROM "question" WHERE "tID" = {tID()} AND "status" = 0 LIMIT 1',
+            'SELECT "qID" FROM "question" WHERE "tID" = ? AND "status" = 0 LIMIT 1',
+            params=(int(tID()),),
         )
         conn.close()
 
         if q.empty:
-            elementDisplay("quizQuestion", "h", session)
+            elementDisplay(session, {"quizQuestion": "h"})
             return
         else:
-            elementDisplay("quizQuestion", "s", session)
+            elementDisplay(session, {"quizQuestion": "s"})
 
     # Clicking the quiz button shows a modal
     @reactive.effect
@@ -51,7 +52,8 @@ def quiz_server(input: Inputs, output: Outputs, session: Session, tID, sID, user
         conn = shared.appDBConn(postgresScuirrel)
         q = shared.pandasQuery(
             conn,
-            f'SELECT * FROM "question" WHERE "tID" = {tID()} AND "status" = 0',
+            'SELECT * FROM "question" WHERE "tID" = ? AND "status" = 0',
+            params=(int(tID()),),
         )
         conn.close()
 
@@ -108,7 +110,7 @@ def quiz_server(input: Inputs, output: Outputs, session: Session, tID, sID, user
 
         # Hide the answer button (don't allow for multiple guessing)
         if not allowMultiGuess:
-            elementDisplay("checkAnswer", "h", session)
+            elementDisplay(session, {"checkAnswer": "h"})
 
         # Add the timestamp the answer was checked
         q["check"] = shared.dt()
