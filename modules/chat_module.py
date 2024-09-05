@@ -336,7 +336,7 @@ def chat_ui():
                 div(
                     shared.customAttr(
                         ui.input_select("gID", "Group", choices={}),
-                        {'style': 'display:inline-block'},
+                        {"style": "display:inline-block"},
                     ),
                     group_join_ui("joinGroup"),
                 ),
@@ -347,7 +347,7 @@ def chat_ui():
                             ui.input_select(
                                 "selTopic", "Topic", choices=[], width="auto"
                             ),
-                            {'style': 'display:inline-block'},
+                            {"style": "display:inline-block"},
                         ),
                         ui.input_action_button(
                             "startConversation",

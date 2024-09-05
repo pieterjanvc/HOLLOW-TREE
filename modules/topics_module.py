@@ -11,28 +11,29 @@ import ACCORNS.accorns_shared as accorns_shared
 # --- Functions & variables ---
 topicStatus = {0: "Active", 1: "Draft", 2: "Archived"}
 
+
 def topicsQuery(conn, gID):
     return shared.pandasQuery(
-            conn,
-            (
-                'SELECT t.* FROM "topic" AS t, "group_topic" AS gt '
-                'WHERE t."tID" = gt."tID" AND gt."gID" = ? '
-                'ORDER BY t."topic"'
-            ),
-            (int(gID),),
-        )
+        conn,
+        (
+            'SELECT t.* FROM "topic" AS t, "group_topic" AS gt '
+            'WHERE t."tID" = gt."tID" AND gt."gID" = ? '
+            'ORDER BY t."topic"'
+        ),
+        (int(gID),),
+    )
+
 
 # Update the list of topics shown in the select input
-def tDisplayNames(topics, input, session, selected = None):
-
+def tDisplayNames(topics, input, session, selected=None):
     selected = selected if selected is not None else input.tID()
-    showArchived = input.tShowArchived()    
-    
-    topicsList = topics.copy()    
+    showArchived = input.tShowArchived()
+
+    topicsList = topics.copy()
 
     # Filter out archived topics if needed
     if not showArchived:
-        topicsList = topicsList[topicsList["status"] != 2]    
+        topicsList = topicsList[topicsList["status"] != 2]
 
     # Hide or show the edit and status buttons if there are no topics to show
     if topicsList.shape[0] == 0:
@@ -41,41 +42,65 @@ def tDisplayNames(topics, input, session, selected = None):
     else:
         # Add the status to the topic name
         topicsList["topic"] = topicsList.apply(
-            lambda x: f"({topicStatus[x['status']]}) {x['topic']}" if x["status"] != 0 else x["topic"],
+            lambda x: f"({topicStatus[x['status']]}) {x['topic']}"
+            if x["status"] != 0
+            else x["topic"],
             axis=1,
         )
         topicsList = topicsList.sort_values(["status", "topic"])
         if selected:
-            selected = str(topicsList["tID"].iloc[0] if int(selected) not in list(topicsList["tID"]) else selected)
-        # shared.elementDisplay(session, {"tEdit": "e", "tStatus": "s"})   
+            selected = str(
+                topicsList["tID"].iloc[0]
+                if int(selected) not in list(topicsList["tID"])
+                else selected
+            )
+        # shared.elementDisplay(session, {"tEdit": "e", "tStatus": "s"})
 
     # Update the select input with the new topics
-    ui.update_select("tID", choices=dict(zip(topicsList["tID"], topicsList["topic"])),
-                         selected=selected)
-    
+    ui.update_select(
+        "tID",
+        choices=dict(zip(topicsList["tID"], topicsList["topic"])),
+        selected=selected,
+    )
+
     return
+
 
 # --- UI ---
 @module.ui
 def topics_ui():
     return [
-
         # Select, add or archive a topic
         ui.card(
             ui.card_header("Topic"),
             ui.input_select("gID", "Group", choices={}, width="400px"),
             ui.panel_conditional(
                 "input.gID",
-                div(shared.customAttr(ui.input_select("tID", "Topic", choices=[], width="400px"),
-                    {'style': 'display:inline-block'}),       
-                    shared.customAttr(ui.input_checkbox("tShowArchived", "Show archived", value=False,),
-                                        {'style': 'display:inline-block'},)),                           
+                div(
+                    shared.customAttr(
+                        ui.input_select("tID", "Topic", choices=[], width="400px"),
+                        {"style": "display:inline-block"},
+                    ),
+                    shared.customAttr(
+                        ui.input_checkbox(
+                            "tShowArchived",
+                            "Show archived",
+                            value=False,
+                        ),
+                        {"style": "display:inline-block"},
+                    ),
+                ),
                 div(
                     ui.input_action_button("tAdd", "Add new", width="180px"),
                     ui.input_action_button("tEdit", "Edit name", width="180px"),
                 ),
-                ui.input_radio_buttons("tStatus", "Change topic status", choices=topicStatus,
-                                        inline=True, selected=None),
+                ui.input_radio_buttons(
+                    "tStatus",
+                    "Change topic status",
+                    choices=topicStatus,
+                    inline=True,
+                    selected=None,
+                ),
             ),
         ),
         # Table of concepts per topic with option to add, edit or archive
@@ -93,12 +118,14 @@ def topics_ui():
                     ui.input_action_button("cReorder", "Reorder", width="180px"),
                     style="display:inline",
                 ),
-                HTML("<i>Concepts are specific facts or pieces of information you want SCUIRREL to check with your students. "
+                HTML(
+                    "<i>Concepts are specific facts or pieces of information you want SCUIRREL to check with your students. "
                     "You can be very brief, as all context will be retrieved from the database of documents. "
                     "Don't be too broad, split into multiple topics if needed. "
-                    "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"),                
+                    "SCUIRREL will walk through the concepts in order, so kep that in mind</i>"
+                ),
+            ),
         ),
-    )
     ]
 
 
@@ -113,17 +140,22 @@ def topics_server(
     @reactive.effect
     @reactive.event(groups)
     def _():
-
         if groups.get().shape[0] == 0:
-            shared.elementDisplay(session, {"tAdd": "d", "tEdit": "d", "tStatus": "h", "tShowArchived": "d"},
-                                  alertNotFound=False)
+            shared.elementDisplay(
+                session,
+                {"tAdd": "d", "tEdit": "d", "tStatus": "h", "tShowArchived": "d"},
+                alertNotFound=False,
+            )
             shared.inputNotification(
                 session, "gID", "Create a group (groups tab) before adding topics"
             )
             return
         else:
-            shared.elementDisplay(session, {"tAdd": "e", "tEdit": "e", "tStatus": "s", "tShowArchived": "e"},
-                                  alertNotFound=False)
+            shared.elementDisplay(
+                session,
+                {"tAdd": "e", "tEdit": "e", "tStatus": "s", "tShowArchived": "e"},
+                alertNotFound=False,
+            )
             shared.inputNotification(session, "gID", show=False)
 
         ui.update_select(
@@ -155,7 +187,6 @@ def topics_server(
     @reactive.effect
     @reactive.event(input.tShowArchived, ignore_init=True)
     def _():
-        
         tDisplayNames(topics.get(), input, session)
 
     # --- Add topic - modal popup
@@ -187,11 +218,13 @@ def topics_server(
     def _():
         # Only proceed if the input is valid
         if not shared.inputCheck(input.ntTopic()):
-            shared.inputNotification(session, "ntDescr", "New topic must be at least 6 characters")
+            shared.inputNotification(
+                session, "ntDescr", "New topic must be at least 6 characters"
+            )
             return
         else:
             shared.inputNotification(session, "ntDescr", show=False)
-        
+
         # Add new topic to DB
         conn = shared.appDBConn(postgresUser=postgresUser)
         cursor = conn.cursor()
@@ -214,8 +247,8 @@ def topics_server(
         conn.close()
 
         # Update the topics select input
-        tDisplayNames(newTopics, input, session, selected = tID)
-       
+        tDisplayNames(newTopics, input, session, selected=tID)
+
         topics.set(newTopics)
         ui.modal_remove()
 
@@ -249,10 +282,11 @@ def topics_server(
     @reactive.effect
     @reactive.event(input.etEdit)
     def _():
-
         # Only proceed if the input is valid
         if not shared.inputCheck(input.etInput()):
-            shared.inputNotification(session, "etInput", "A topic must be at least 6 characters")
+            shared.inputNotification(
+                session, "etInput", "A topic must be at least 6 characters"
+            )
             return
         else:
             shared.inputNotification(session, "etInput", show=False)
@@ -297,12 +331,12 @@ def topics_server(
             cursor,
             'UPDATE "topic" SET "sID" = ?, "topic" = ?, "modified" = ? WHERE "tID" = ?',
             (sID, input.etInput(), shared.dt(), input.tID()),
-        )         
+        )
         conn.commit()
-        topicsList = topicsQuery(conn, input.gID())  
+        topicsList = topicsQuery(conn, input.gID())
         conn.close()
 
-        tDisplayNames(topicsList, input, session)      
+        tDisplayNames(topicsList, input, session)
 
         topics.set(topicsList)
         ui.modal_remove()
@@ -310,28 +344,52 @@ def topics_server(
     # --- Archive a topic - modal popup
     @reactive.effect
     @reactive.event(input.tStatus)
-    def _():        
-
+    def _():
         if input.tID() is None:
             return
-        
+
         statusCode = int(input.tStatus())
-        prevStatus = topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["status"]
+        prevStatus = topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0][
+            "status"
+        ]
 
         if concepts.get().empty and statusCode == 0:
-            ui.notification_show("No concepts available for this topic. Please add some before activating the topic")
+            ui.notification_show(
+                "No concepts available for this topic. Please add some before activating the topic"
+            )
             ui.update_radio_buttons("tStatus", selected=str(prevStatus))
             return
-              
+
         if statusCode == 1:
-            shared.elementDisplay(session, {"tEdit":"e", "cAdd": "s", "cEdit": "s", "cArchive": "s", 
-                                            "cReorder": "s"})
+            shared.elementDisplay(
+                session,
+                {
+                    "tEdit": "e",
+                    "cAdd": "s",
+                    "cEdit": "s",
+                    "cArchive": "s",
+                    "cReorder": "s",
+                },
+            )
             shared.inputNotification(session, "tStatus", show=False)
         else:
-            shared.elementDisplay(session, {"tEdit":"d","cAdd": "h", "cEdit": "h", "cArchive": "h", 
-                                            "cReorder": "h"})
-            shared.inputNotification(session, "tStatus", "<i>The topic Title or Concepts can only be edited when the topic is in 'Draft' status</i>", colour = "blue")
-                
+            shared.elementDisplay(
+                session,
+                {
+                    "tEdit": "d",
+                    "cAdd": "h",
+                    "cEdit": "h",
+                    "cArchive": "h",
+                    "cReorder": "h",
+                },
+            )
+            shared.inputNotification(
+                session,
+                "tStatus",
+                "<i>The topic Title or Concepts can only be edited when the topic is in 'Draft' status</i>",
+                colour="blue",
+            )
+
         if statusCode == prevStatus:
             return
 
@@ -348,7 +406,7 @@ def topics_server(
         conn.close()
 
         tDisplayNames(newTopics, input, session)
-        
+
         topics.set(newTopics)
 
     # ---- CONCEPTS ----
@@ -388,7 +446,9 @@ def topics_server(
     def _():
         # Only proceed if the input is valid
         if not shared.inputCheck(input.ncInput()):
-            shared.inputNotification(session, "ncInput", "New concept must be at least 6 characters")
+            shared.inputNotification(
+                session, "ncInput", "New concept must be at least 6 characters"
+            )
             return
         else:
             shared.inputNotification(session, "ncInput", show=False)
@@ -444,11 +504,13 @@ def topics_server(
     def _():
         # Only proceed if the input is valid
         if not shared.inputCheck(input.ecInput()):
-            shared.inputNotification(session, "ecInput", "A concept must be at least 6 characters")
+            shared.inputNotification(
+                session, "ecInput", "A concept must be at least 6 characters"
+            )
             return
         else:
             shared.inputNotification(session, "ecInput", show=False)
-        
+
         concept = conceptsTable.data_view(selected=True).iloc[0]["concept"]
 
         if concept == input.ecInput():
@@ -539,15 +601,16 @@ def topics_server(
     @reactive.effect
     @reactive.event(input.tID)
     def _():
-
         # Hide panel when no topic is available
         if input.tID() is None:
-            shared.elementDisplay(session, {"conceptsPanel": "h", "tStatus": "h"},
-                                  alertNotFound=False)
+            shared.elementDisplay(
+                session, {"conceptsPanel": "h", "tStatus": "h"}, alertNotFound=False
+            )
             return
         else:
-            shared.elementDisplay(session, {"conceptsPanel": "s", "tStatus": "s"},
-                                  alertNotFound=False) 
+            shared.elementDisplay(
+                session, {"conceptsPanel": "s", "tStatus": "s"}, alertNotFound=False
+            )
 
         status = topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["status"]
         if status != 1:
@@ -603,11 +666,15 @@ def topics_server(
         if len(set(newOrder)) != concepts.get().shape[0] or not shared.consecutiveInt(
             newOrder
         ):
-            shared.inputNotification(session, "rcNewOrder", "Order must be a comma separated list of all integers")
+            shared.inputNotification(
+                session,
+                "rcNewOrder",
+                "Order must be a comma separated list of all integers",
+            )
             return
         else:
             shared.inputNotification(session, "rcNewOrder", show=False)
-        
+
         # Reorder the concepts based on the new order
         newConcepts = concepts.get()
         newConcepts["newOrder"] = newOrder

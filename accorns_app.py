@@ -124,7 +124,11 @@ def server(input, output, session):
                 "groups", sID=sID, user=user, postgresUser=shared.postgresAccorns
             )
             topics, concepts = topics_server(
-                "topics", sID=sID, user=user, groups=groups, postgresUser=shared.postgresAccorns
+                "topics",
+                sID=sID,
+                user=user,
+                groups=groups,
+                postgresUser=shared.postgresAccorns,
             )
             _ = user_management_server(
                 "userManagement", user=user, postgresUser=shared.postgresAccorns
@@ -167,7 +171,7 @@ def server(input, output, session):
                     ),
                     id="postLoginTabs",
                 )
-            )    
+            )
 
     # Code to run at the END of the session (i.e. when user disconnects)
     _ = session.on_ended(lambda: theEnd())

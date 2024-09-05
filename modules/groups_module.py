@@ -109,6 +109,7 @@ def groups_server(
         newGroups = groupQuery(conn, user.get())
         conn.close()
         groups.set(newGroups)
+
     # ---
 
     # When user changes
@@ -117,15 +118,13 @@ def groups_server(
     def _():
         # Set reactive variables
         conn = shared.appDBConn(postgresUser=postgresUser)
-        groups.set(
-            groupQuery(conn, user.get())
-        )
-        conn.close()    
+        groups.set(groupQuery(conn, user.get()))
+        conn.close()
 
     # Update group list based on user
     @reactive.effect
     @reactive.event(groups)
-    def _():    
+    def _():
         ui.update_select(
             "gID",
             choices=dict(
@@ -133,7 +132,7 @@ def groups_server(
             ),
             selected=groups.get().shape[0] if groups.get().shape[0] > 0 else None,
         )
-    
+
     # When group is selected
     @reactive.effect
     @reactive.event(input.gID)

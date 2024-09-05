@@ -18,6 +18,7 @@ passRules = "minlength: 8; maxlength: 20; required: lower; required: upper; requ
 
 # --- UI
 
+
 @module.ui
 def login_ui():
     return [
