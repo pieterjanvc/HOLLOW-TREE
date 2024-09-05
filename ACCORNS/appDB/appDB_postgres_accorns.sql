@@ -16,8 +16,8 @@ $$ LANGUAGE plpgsql;
 SELECT check_overwrite(:overWrite, 'accorns');
 
 -- Drop and create the database
-DROP DATABASE IF EXISTS accorns;
-CREATE DATABASE accorns;
+DROP DATABASE IF EXISTS "accorns";
+CREATE DATABASE "accorns";
 
 \c accorns;
 
@@ -253,7 +253,9 @@ RETURNS void AS $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = uName) THEN
         EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD %L', uName, uPass);
-    END IF;
+  ELSE
+		EXECUTE format('ALTER ROLE %I WITH LOGIN PASSWORD %L', uName, uPass);
+  END IF;
 END;
 $$ LANGUAGE plpgsql;
 
