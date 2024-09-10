@@ -95,7 +95,7 @@ def vectorDB_management_server(
             accorns_shared.storageFolder,
             input.newFile()[0]["name"],
         )
-        shared.elementDisplay(session, {"uiUploadFile": "h"})
+        shared.elementDisplay(session, {"uiUploadFile": "h"}, alertNotFound=False)
         # TODO add nice loading animation https://codepen.io/nzbin/pen/GGrXbp
         ui.insert_ui(
             HTML(
@@ -144,7 +144,7 @@ def vectorDB_management_server(
 
         files.set(getFiles)
 
-        shared.elementDisplay(session, {"uiUploadFile": "s"})
+        shared.elementDisplay(session, {"uiUploadFile": "s"}, alertNotFound=False)
         ui.remove_ui("#processFile")
 
     # Get file details
