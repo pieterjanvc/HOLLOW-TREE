@@ -24,7 +24,10 @@ questionStatus = {0: "Active", 1: "Draft", 2: "Archived"}
 
 
 def qDisplayNames(questions, input, selected=None):
-    req(not questions.empty)
+
+    if questions.empty:
+        ui.update_select("qID", choices=[], selected=None)
+        return
 
     selected = selected if selected is not None else input.qID()
     showArchived = input.qShowArchived()
@@ -278,6 +281,7 @@ def quiz_generation_server(
     @render.ui
     def quizQuestionPreview():
         req(input.qID())
+        req(not questions.get().empty)
 
         q = questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0]
 
@@ -451,13 +455,16 @@ def quiz_generation_server(
             shared.inputNotification(session, "qID", show=False)
 
     @reactive.effect
-    @reactive.event(input.qtID)
+    @reactive.event(input.qtID, ignore_none=False)
     def _():
+
+        tID = int(input.qtID()) if input.qtID() else 0
+        
         # Get the question info from the DB
         conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
         q = shared.pandasQuery(
             conn,
-            f'SELECT * FROM "question" WHERE "tID" = {int(input.qtID())} ',
+            f'SELECT * FROM "question" WHERE "tID" = {tID} ',
         )
         conn.close()
 
@@ -635,6 +642,7 @@ def quiz_generation_server(
             )
 
         req(input.qID())
+        req(not questions.get().empty)
 
         # Only update the status if it's different
         if questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0][
@@ -669,6 +677,8 @@ def quiz_generation_server(
     @reactive.effect
     @reactive.event(input.qID)
     def _():
+        req(not questions.get().empty)
+
         status = questions.get()[questions.get()["qID"] == int(input.qID())].iloc[0][
             "status"
         ]
