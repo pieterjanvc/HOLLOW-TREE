@@ -143,7 +143,7 @@ def topics_server(
         if groups.get().shape[0] == 0:
             shared.elementDisplay(
                 session,
-                {"tAdd": "d", "tEdit": "d", "tStatus": "h", "tShowArchived": "d"},
+                {"tAdd": "d", "tStatus": "h", "tShowArchived": "d"},
                 alertNotFound=False,
             )
             shared.inputNotification(
@@ -153,7 +153,7 @@ def topics_server(
         else:
             shared.elementDisplay(
                 session,
-                {"tAdd": "e", "tEdit": "e", "tStatus": "s", "tShowArchived": "e"},
+                {"tAdd": "e", "tStatus": "s", "tShowArchived": "e"},
                 alertNotFound=False,
             )
             shared.inputNotification(session, "gID", show=False)
@@ -183,6 +183,35 @@ def topics_server(
 
         tDisplayNames(topicsList, input, session)
         topics.set(topicsList)
+
+    # --- Load concepts when a topic is selected
+    @reactive.effect
+    @reactive.event(input.tID, ignore_none=False)
+    def _():
+        # Hide panel when no topic is available
+        if input.tID() is None:
+            shared.elementDisplay(session, {"tStatus": "h", "tEdit": "d"})
+            return
+        else:
+            shared.elementDisplay(session, {"tStatus": "s", "tEdit": "e"})
+
+        status = topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["status"]
+        if status != 1:
+            shared.elementDisplay(session, {"tEdit": "d"})
+        else:
+            shared.elementDisplay(session, {"tEdit": "e"})
+
+        ui.update_radio_buttons("tStatus", selected=str(status))
+
+        tID = input.tID() if input.tID() else 0
+        conn = shared.appDBConn(postgresUser=postgresUser)
+        conceptList = shared.pandasQuery(
+            conn,
+            f'SELECT * FROM "concept" WHERE "tID" = {tID} AND "status" = 0 ORDER BY "order"',
+        )
+        conn.close()
+
+        concepts.set(conceptList)
 
     @reactive.effect
     @reactive.event(input.tShowArchived, ignore_init=True)
@@ -593,39 +622,6 @@ def topics_server(
             f'SELECT * FROM "concept" WHERE "tID" = {input.tID()} AND "status" = 0 ORDER BY "order"',
         )
         conn.commit()
-        conn.close()
-
-        concepts.set(conceptList)
-
-    # --- Load concepts when a topic is selected
-    @reactive.effect
-    @reactive.event(input.tID)
-    def _():
-        # Hide panel when no topic is available
-        if input.tID() is None:
-            shared.elementDisplay(
-                session, {"conceptsPanel": "h", "tStatus": "h"}, alertNotFound=False
-            )
-            return
-        else:
-            shared.elementDisplay(
-                session, {"conceptsPanel": "s", "tStatus": "s"}, alertNotFound=False
-            )
-
-        status = topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["status"]
-        if status != 1:
-            shared.elementDisplay(session, {"tEdit": "d"})
-        else:
-            shared.elementDisplay(session, {"tEdit": "e"})
-
-        ui.update_radio_buttons("tStatus", selected=str(status))
-
-        tID = input.tID() if input.tID() else 0
-        conn = shared.appDBConn(postgresUser=postgresUser)
-        conceptList = shared.pandasQuery(
-            conn,
-            f'SELECT * FROM "concept" WHERE "tID" = {tID} AND "status" = 0 ORDER BY "order"',
-        )
         conn.close()
 
         concepts.set(conceptList)

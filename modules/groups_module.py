@@ -23,10 +23,10 @@ accessCodesQuery = (
 def groupQuery(conn, user):
     userFilter = (
         'WHERE "gID" IN (SELECT "gID" FROM "group_member" WHERE "uID" = ?) '
-        if user["adminLevel"] < 2
+        if user["adminLevel"] < 3
         else ""
     )
-    params = (int(user["uID"]),) if user["adminLevel"] < 2 else ()
+    params = (int(user["uID"]),) if user["adminLevel"] < 3 else ()
     return shared.pandasQuery(
         conn,
         (f'SELECT * FROM "group" {userFilter} '),
@@ -125,12 +125,11 @@ def groups_server(
     @reactive.effect
     @reactive.event(groups)
     def _():
+        gIDs = groups.get()["gID"].to_list()
         ui.update_select(
             "gID",
-            choices=dict(
-                zip(groups.get()["gID"].to_list(), groups.get()["group"].to_list())
-            ),
-            selected=groups.get().shape[0] if groups.get().shape[0] > 0 else None,
+            choices=dict(zip(gIDs, groups.get()["group"].to_list())),
+            selected=gIDs[-1] if groups.get().shape[0] > 0 else None,
         )
 
     # When group is selected

@@ -41,7 +41,6 @@ Shiny.addCustomMessageHandler("hideShow", function(x) {
             if (x.alertNotFound == true) {
                 alert("No element found with an ID or data-value of:" + x.id[i]);
             }
-            return;
         }
     }   
     

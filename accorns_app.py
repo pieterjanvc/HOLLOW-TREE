@@ -119,6 +119,34 @@ def server(input, output, session):
                 )
             )
         else:
+            uiList = ui.TagList(
+                ui.navset_pill(
+                    # TAB 2 - VECTOR DATABASE
+                    ui.nav_panel(
+                        "Files  Database",
+                        vectorDB_management_ui("vectorDB"),
+                        value="vTab",
+                    ),
+                    # TAB 3 - TOPICS
+                    ui.nav_panel("Groups", groups_ui("groups"), value="gTab"),
+                    # TAB 4 - TOPICS
+                    ui.nav_panel("Topics", topics_ui("topics"), value="tTab"),
+                    # TAB 5 - QUIZ QUESTIONS
+                    ui.nav_panel(
+                        "Quiz Questions",
+                        # Select a topic and a question with options to add or archive
+                        quiz_generation_ui("quizGeneration"),
+                        value="qTab",
+                    ),
+                    # TAB 6 - USER MANAGEMENT
+                    ui.nav_panel(
+                        "User Management",
+                        user_management_ui("userManagement"),
+                        value="uTab",
+                    ),
+                    id="postLoginTabs",
+                )
+            )
             # Server functions for the different tabs are found in their respective modules
             groups = groups_server(
                 "groups", sID=sID, user=user, postgresUser=shared.postgresAccorns
@@ -144,34 +172,7 @@ def server(input, output, session):
                 pool=pool,
             )
             # Tabs to show after successful login
-            return ui.TagList(
-                ui.navset_pill(
-                    # TAB 2 - VECTOR DATABASE
-                    ui.nav_panel(
-                        "Vector Database",
-                        vectorDB_management_ui("vectorDB"),
-                        value="vTab",
-                    ),
-                    # TAB 3 - TOPICS
-                    ui.nav_panel("Groups", groups_ui("groups"), value="gTab"),
-                    # TAB 4 - TOPICS
-                    ui.nav_panel("Topics", topics_ui("topics"), value="tTab"),
-                    # TAB 5 - QUIZ QUESTIONS
-                    ui.nav_panel(
-                        "Quiz Questions",
-                        # Select a topic and a question with options to add or archive
-                        quiz_generation_ui("quizGeneration"),
-                        value="qTab",
-                    ),
-                    # TAB 6 - USER MANAGEMENT
-                    ui.nav_panel(
-                        "User Management",
-                        user_management_ui("userManagement"),
-                        value="uTab",
-                    ),
-                    id="postLoginTabs",
-                )
-            )
+            return uiList
 
     # Code to run at the END of the session (i.e. when user disconnects)
     _ = session.on_ended(lambda: theEnd())

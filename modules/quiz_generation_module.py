@@ -24,7 +24,6 @@ questionStatus = {0: "Active", 1: "Draft", 2: "Archived"}
 
 
 def qDisplayNames(questions, input, selected=None):
-
     if questions.empty:
         ui.update_select("qID", choices=[], selected=None)
         return
@@ -243,7 +242,9 @@ def quiz_generation_server(
                 "qID",
                 "Create a group and a topic before generating a question",
             )
-            shared.elementDisplay(session, {"qGenerate": "d", "qEditPanel": "h"})
+            shared.elementDisplay(
+                session, {"qGenerate": "d", "qEditPanel": "h"}, alertNotFound=False
+            )
 
     @reactive.effect
     @reactive.event(input.gID, topicsx)
@@ -298,6 +299,8 @@ def quiz_generation_server(
     @reactive.effect
     @reactive.event(input.qGenerate)
     def _():
+        req(input.qtID())
+
         shared.elementDisplay(
             session,
             {
@@ -457,9 +460,8 @@ def quiz_generation_server(
     @reactive.effect
     @reactive.event(input.qtID, ignore_none=False)
     def _():
-
         tID = int(input.qtID()) if input.qtID() else 0
-        
+
         # Get the question info from the DB
         conn = shared.appDBConn(postgresUser=shared.postgresAccorns)
         q = shared.pandasQuery(
