@@ -43,7 +43,15 @@ elif args.app != "":
     apps = [args.app]
 
 # Generate a new requirements.txt file for rsconnect
-os.system(f"uv export --no-dev -o {os.path.join(publishDir, 'requirements.txt')}")
+x = os.path.join(publishDir, 'requirements.txt')
+os.system(f'uv export --no-hashes --no-dev --output-file "{x}"')
+
+# Delete the second line of the file
+with open(x, 'r') as f:
+    lines = f.readlines()
+    lines = lines[2:]
+with open(x, 'w') as f:
+    f.writelines(lines)
 
 for toGenerate in apps:
 
