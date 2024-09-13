@@ -16,6 +16,7 @@ dependencies = [
     "psycopg2-binary",
     "sqlparse",
     "bcrypt",
+    "openai>=1.42.0",
 ]
 
 [build-system]

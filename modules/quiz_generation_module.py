@@ -243,7 +243,7 @@ def quiz_generation_server(
                 "qID",
                 "Create a group and a topic before generating a question",
             )
-            shared.elementDisplay(session, {"qGenerate": "d", "qEditPanel": "h"})
+            shared.elementDisplay(session, {"qGenerate": "d", "qEditPanel": "h"}, alertNotFound=False)
 
     @reactive.effect
     @reactive.event(input.gID, topicsx)
@@ -298,6 +298,9 @@ def quiz_generation_server(
     @reactive.effect
     @reactive.event(input.qGenerate)
     def _():
+
+        req(input.qtID())
+
         shared.elementDisplay(
             session,
             {

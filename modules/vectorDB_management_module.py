@@ -29,13 +29,10 @@ def vectorDB_management_ui():
         ),
         # Tables of the files that are in the DB
         ui.card(
-            ui.card_header("Vector database files"), ui.output_data_frame("filesTable")
+            ui.card_header("Files and materials uploaded to the vector database"), ui.output_data_frame("filesTable")
         ),
-        ui.panel_conditional(
-            "output.fileInfo != ''",
-            ui.card(
+        ui.card(
                 ui.card_header("File info"), ui.output_ui("fileInfo"), id="fileInfoCard"
-            ),
         ),
         # Option to add new files
         ui.card(
@@ -95,7 +92,7 @@ def vectorDB_management_server(
             accorns_shared.storageFolder,
             input.newFile()[0]["name"],
         )
-        shared.elementDisplay(session, {"uiUploadFile": "h"}, alertNotFound=False)
+        shared.elementDisplay(session, {"uiUploadFile": "h", "newFile": "e"}, alertNotFound=False)
         # TODO add nice loading animation https://codepen.io/nzbin/pen/GGrXbp
         ui.insert_ui(
             HTML(
@@ -144,7 +141,7 @@ def vectorDB_management_server(
 
         files.set(getFiles)
 
-        shared.elementDisplay(session, {"uiUploadFile": "s"}, alertNotFound=False)
+        shared.elementDisplay(session, {"uiUploadFile": "s", "newFile": "d"}, alertNotFound=False)
         ui.remove_ui("#processFile")
 
     # Get file details
@@ -152,8 +149,7 @@ def vectorDB_management_server(
     @reactive.calc
     def fileInfo():
         if filesTable.data_view(selected=True).empty:
-            # elementDisplay("fileInfoCard", "h")
-            return HTML("")
+            return HTML("<i>Select a file in the table above to see details here</i>")
 
         info = files().iloc[filesTable.data_view(selected=True).index[0]]
 
@@ -173,7 +169,7 @@ def vectorDB_management_server(
                 "<p><b>Top-10 keywords extracted from document</b> <i>(AI generated)</i></p>"
                 f"{keywords}"
             ),
-            ui.input_action_button("deleteFile", "Delete file", width="auto"),
+            ui.input_action_button("deleteFile", "Delete file", width="150px"),
         )
 
     @reactive.effect
@@ -244,8 +240,7 @@ def vectorDB_management_server(
                 cursor,
                 'DELETE FROM "file" WHERE "fID" = ?',
                 (int(file.fID),),
-            )
-            shared.elementDisplay(session, {"fileInfoCard": "h"})
+            )            
             files.set(shared.pandasQuery(conn, query='SELECT * FROM "file"'))
             conn.commit()
             conn.close()

@@ -43,7 +43,7 @@ elif args.app != "":
     apps = [args.app]
 
 # Generate a new requirements.txt file for rsconnect
-os.system(f"uv pip compile {os.path.join(baseFolder, 'pyproject.toml')} > {os.path.join(publishDir, 'requirements.txt')}")
+os.system(f"uv export --no-dev -o {os.path.join(publishDir, 'requirements.txt')}")
 
 for toGenerate in apps:
 
