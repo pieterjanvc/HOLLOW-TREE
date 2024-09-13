@@ -128,9 +128,7 @@ def groups_server(
         gIDs = groups.get()["gID"].to_list()
         ui.update_select(
             "gID",
-            choices=dict(
-                zip(gIDs, groups.get()["group"].to_list())
-            ),
+            choices=dict(zip(gIDs, groups.get()["group"].to_list())),
             selected=gIDs[-1] if groups.get().shape[0] > 0 else None,
         )
 

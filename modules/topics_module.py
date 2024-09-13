@@ -183,21 +183,17 @@ def topics_server(
 
         tDisplayNames(topicsList, input, session)
         topics.set(topicsList)
-    
+
     # --- Load concepts when a topic is selected
     @reactive.effect
     @reactive.event(input.tID, ignore_none=False)
     def _():
         # Hide panel when no topic is available
         if input.tID() is None:
-            shared.elementDisplay(
-                session, {"tStatus": "h", "tEdit": "d"}
-            )
+            shared.elementDisplay(session, {"tStatus": "h", "tEdit": "d"})
             return
         else:
-            shared.elementDisplay(
-                session, {"tStatus": "s", "tEdit": "e"}
-            )
+            shared.elementDisplay(session, {"tStatus": "s", "tEdit": "e"})
 
         status = topics.get()[topics.get()["tID"] == int(input.tID())].iloc[0]["status"]
         if status != 1:
@@ -216,7 +212,6 @@ def topics_server(
         conn.close()
 
         concepts.set(conceptList)
-
 
     @reactive.effect
     @reactive.event(input.tShowArchived, ignore_init=True)
@@ -630,7 +625,7 @@ def topics_server(
         conn.close()
 
         concepts.set(conceptList)
-    
+
     # --- Reorder the concepts - modal popup
     @reactive.effect
     @reactive.event(input.cReorder)

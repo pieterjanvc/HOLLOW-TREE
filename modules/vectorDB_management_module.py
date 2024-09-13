@@ -29,10 +29,11 @@ def vectorDB_management_ui():
         ),
         # Tables of the files that are in the DB
         ui.card(
-            ui.card_header("Files and materials uploaded to the vector database"), ui.output_data_frame("filesTable")
+            ui.card_header("Files and materials uploaded to the vector database"),
+            ui.output_data_frame("filesTable"),
         ),
         ui.card(
-                ui.card_header("File info"), ui.output_ui("fileInfo"), id="fileInfoCard"
+            ui.card_header("File info"), ui.output_ui("fileInfo"), id="fileInfoCard"
         ),
         # Option to add new files
         ui.card(
@@ -92,7 +93,9 @@ def vectorDB_management_server(
             accorns_shared.storageFolder,
             input.newFile()[0]["name"],
         )
-        shared.elementDisplay(session, {"uiUploadFile": "h", "newFile": "e"}, alertNotFound=False)
+        shared.elementDisplay(
+            session, {"uiUploadFile": "h", "newFile": "e"}, alertNotFound=False
+        )
         # TODO add nice loading animation https://codepen.io/nzbin/pen/GGrXbp
         ui.insert_ui(
             HTML(
@@ -141,7 +144,9 @@ def vectorDB_management_server(
 
         files.set(getFiles)
 
-        shared.elementDisplay(session, {"uiUploadFile": "s", "newFile": "d"}, alertNotFound=False)
+        shared.elementDisplay(
+            session, {"uiUploadFile": "s", "newFile": "d"}, alertNotFound=False
+        )
         ui.remove_ui("#processFile")
 
     # Get file details
@@ -240,7 +245,7 @@ def vectorDB_management_server(
                 cursor,
                 'DELETE FROM "file" WHERE "fID" = ?',
                 (int(file.fID),),
-            )            
+            )
             files.set(shared.pandasQuery(conn, query='SELECT * FROM "file"'))
             conn.commit()
             conn.close()
