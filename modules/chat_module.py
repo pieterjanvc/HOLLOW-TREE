@@ -88,8 +88,8 @@ def groupQuery(user, postgresUser, demo=shared.addDemo):
     includeDemo = (
         'UNION SELECT "gID", "group" FROM "group" WHERE "gID" = 1 ' if demo else ""
     )
-    userFilter = 'AND m."uID" = ? ' if user["adminLevel"] < 2 else ""
-    params = (user["uID"],) if user["adminLevel"] < 2 else ()
+    userFilter = 'AND m."uID" = ? ' if user["adminLevel"] < 3 else ""
+    params = (user["uID"],) if user["adminLevel"] < 3 else ()
 
     conn = shared.appDBConn(postgresUser)
     getGroups = shared.pandasQuery(
