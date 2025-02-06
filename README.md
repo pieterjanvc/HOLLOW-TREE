@@ -7,6 +7,9 @@ the higher-education classroom by providing students a way of checking their kno
 on specific topics by interacting with a chatbot that has been configured and scoped by
 course instructors to fit the course content.
 
+> [!TIP]
+> For details on the research and methodology behing this project, we refer to our [OSF Preprint](https://doi.org/10.31219/osf.io/z8gpd_v1)
+
 This repository holds the source code for two web-based Python Shiny apps that will help
 accomplish this goal:
 
