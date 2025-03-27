@@ -44,7 +44,7 @@ elif args.app != "":
 
 # Generate a new requirements.txt file for rsconnect
 x = os.path.join(publishDir, 'requirements.txt')
-os.system(f'uv export --no-hashes --no-dev --output-file "{x}"')
+os.system(f'uv export --no-hashes --no-dev --without-urls --output-file "{x}"')
 
 # Delete the second line of the file
 with open(x, 'r') as f:

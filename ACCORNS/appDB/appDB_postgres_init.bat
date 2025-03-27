@@ -91,3 +91,5 @@ IF "%toCreate%"=="both" (
 )
 echo.
 echo SUCCESS: %dbName% created and the users 'scuirrel' and 'accorns' added
+
+pause
